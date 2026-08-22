@@ -131,6 +131,7 @@ fun MainScreen() {
     val currentQuestion by AppStateManager.currentQuestion.collectAsState()
     val activeReplies by AppStateManager.activeReplies.collectAsState()
     val isGenerating by AppStateManager.isGenerating.collectAsState()
+    val errorMessage by AppStateManager.errorMessage.collectAsState()
     val history by AppStateManager.history.collectAsState()
 
     var selectedTab by remember { mutableIntStateOf(0) }
@@ -274,6 +275,7 @@ fun MainScreen() {
                     currentQuestion = currentQuestion?.text,
                     activeReplies = activeReplies,
                     isGenerating = isGenerating,
+                    errorMessage = errorMessage,
                     testInputText = testInputText,
                     onTestInputChange = { testInputText = it },
                     onStartOverlay = {
@@ -290,6 +292,9 @@ fun MainScreen() {
                     onRequestAccessibilityPermission = { requestAccessibilityPermission(context) },
                     onTestDetection = { q ->
                         AppStateManager.onQuestionDetected(q, "App Sandbox")
+                    },
+                    onRetryGeneration = {
+                        AppStateManager.generateRepliesForQuestion()
                     },
                     onCopyReply = { reply ->
                         AppStateManager.copyAndDismissReply(context, reply)
@@ -333,6 +338,7 @@ fun ControlsAndTestTab(
     currentQuestion: String?,
     activeReplies: List<com.example.model.ReplyItem>,
     isGenerating: Boolean,
+    errorMessage: String? = null,
     testInputText: String,
     onTestInputChange: (String) -> Unit,
     onStartOverlay: () -> Unit,
@@ -340,6 +346,7 @@ fun ControlsAndTestTab(
     onRequestOverlayPermission: () -> Unit,
     onRequestAccessibilityPermission: () -> Unit,
     onTestDetection: (String) -> Unit,
+    onRetryGeneration: () -> Unit,
     onCopyReply: (com.example.model.ReplyItem) -> Unit,
     onDismissReply: (String) -> Unit
 ) {
@@ -662,8 +669,83 @@ fun ControlsAndTestTab(
                         }
                     }
 
-                    // Active Generated Replies Section
-                    if (activeReplies.isNotEmpty()) {
+                    // Active Generated Replies / Loading / Error Section
+                    if (isGenerating) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                                .padding(16.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(20.dp),
+                                    color = MaterialTheme.colorScheme.primary,
+                                    strokeWidth = 2.dp
+                                )
+                                Text(
+                                    text = "Generating replies with Gemini...",
+                                    fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    } else if (errorMessage != null) {
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onRetryGeneration() },
+                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.errorContainer
+                            )
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(14.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.Warning,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.error,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Text(
+                                        text = "Couldn't generate reply",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 13.sp,
+                                        color = MaterialTheme.colorScheme.onErrorContainer
+                                    )
+                                }
+                                Text(
+                                    text = errorMessage,
+                                    fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.8f)
+                                )
+                                Button(
+                                    onClick = onRetryGeneration,
+                                    shape = RoundedCornerShape(8.dp),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = MaterialTheme.colorScheme.error
+                                    )
+                                ) {
+                                    Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(14.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Tap to Retry", fontSize = 12.sp)
+                                }
+                            }
+                        }
+                    } else if (activeReplies.isNotEmpty()) {
                         Text(
                             text = "SUGGESTED REPLIES (Tap Copy to put on clipboard & remove):",
                             fontSize = 10.sp,
@@ -679,7 +761,7 @@ fun ControlsAndTestTab(
                                 onDismiss = { onDismissReply(reply.id) }
                             )
                         }
-                    } else if (currentQuestion != null && !isGenerating) {
+                    } else if (currentQuestion != null) {
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()

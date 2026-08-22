@@ -5,6 +5,7 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import android.widget.Toast
 import com.example.api.GeminiClient
 import com.example.model.DetectedQuestion
@@ -13,8 +14,10 @@ import com.example.model.ReplyItem
 import com.example.model.ReplyLength
 import com.example.model.ReplySettings
 import com.example.model.ReplyTone
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -24,7 +27,9 @@ import kotlinx.coroutines.launch
 import java.util.UUID
 
 object AppStateManager {
+    private const val TAG = "AppStateManager"
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    private var generationJob: Job? = null
 
     private val _settings = MutableStateFlow(ReplySettings())
     val settings: StateFlow<ReplySettings> = _settings.asStateFlow()
@@ -37,6 +42,9 @@ object AppStateManager {
 
     private val _isGenerating = MutableStateFlow(false)
     val isGenerating: StateFlow<Boolean> = _isGenerating.asStateFlow()
+
+    private val _errorMessage = MutableStateFlow<String?>(null)
+    val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
 
     private val _isOverlayRunning = MutableStateFlow(false)
     val isOverlayRunning: StateFlow<Boolean> = _isOverlayRunning.asStateFlow()
@@ -168,40 +176,57 @@ object AppStateManager {
         val text = questionText ?: _currentQuestion.value?.text ?: return
         if (text.isBlank()) return
 
-        scope.launch {
-            _isGenerating.value = true
-            val currentCfg = _settings.value
+        // 1. Cancel any previous in-flight Gemini request so it cannot overwrite this one
+        generationJob?.cancel()
 
-            val result = GeminiClient.generateReplies(
-                question = text,
-                count = currentCfg.count,
-                length = currentCfg.length,
-                tone = currentCfg.tone,
-                customApiKey = currentCfg.customApiKey
-            )
+        // 2. Clear existing replies, clear error, and show loading indicator immediately
+        _activeReplies.value = emptyList()
+        _errorMessage.value = null
+        _isGenerating.value = true
 
-            _isGenerating.value = false
+        generationJob = scope.launch {
+            try {
+                val currentCfg = _settings.value
 
-            result.onSuccess { replyTexts ->
-                val items = replyTexts.map { ReplyItem(text = it) }
-                _activeReplies.value = items
+                val result = GeminiClient.generateReplies(
+                    question = text,
+                    count = currentCfg.count,
+                    length = currentCfg.length,
+                    tone = currentCfg.tone,
+                    customApiKey = currentCfg.customApiKey
+                )
 
-                // Add to history
-                if (items.isNotEmpty()) {
-                    _history.update { oldList ->
-                        val historyItem = QuestionDetectionHistory(
-                            question = text,
-                            replies = replyTexts,
-                            sourceApp = sourceApp ?: _currentQuestion.value?.sourceApp,
-                            timestamp = System.currentTimeMillis()
-                        )
-                        (listOf(historyItem) + oldList).take(30)
+                result.onSuccess { replyTexts ->
+                    val items = replyTexts.map { ReplyItem(text = it) }
+                    _activeReplies.value = items
+                    _errorMessage.value = null
+
+                    // Add to history
+                    if (items.isNotEmpty()) {
+                        _history.update { oldList ->
+                            val historyItem = QuestionDetectionHistory(
+                                question = text,
+                                replies = replyTexts,
+                                sourceApp = sourceApp ?: _currentQuestion.value?.sourceApp,
+                                timestamp = System.currentTimeMillis()
+                            )
+                            (listOf(historyItem) + oldList).take(30)
+                        }
                     }
+                }.onFailure { ex ->
+                    Log.e(TAG, "Failed to generate replies for \"$text\": ${ex.message}")
+                    _activeReplies.value = emptyList()
+                    _errorMessage.value = ex.message ?: "Couldn't generate reply, tap to retry"
                 }
-            }.onFailure {
-                // If failed, generate fallback
-                val fallbackTexts = listOf("Yes, sounds good.", "I will get back to you shortly.")
-                _activeReplies.value = fallbackTexts.map { ReplyItem(text = it) }
+            } catch (e: CancellationException) {
+                Log.d(TAG, "Previous generation was cancelled for question: \"$text\"")
+                // Do not update states when cancelled by a newer request
+            } catch (e: Exception) {
+                Log.e(TAG, "Error in generateRepliesForQuestion", e)
+                _activeReplies.value = emptyList()
+                _errorMessage.value = e.message ?: "Couldn't generate reply, tap to retry"
+            } finally {
+                _isGenerating.value = false
             }
         }
     }

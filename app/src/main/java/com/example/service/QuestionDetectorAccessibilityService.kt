@@ -27,12 +27,10 @@ class QuestionDetectorAccessibilityService : AccessibilityService() {
         val info = serviceInfo ?: AccessibilityServiceInfo()
         info.eventTypes = AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED or
                 AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED or
-                AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED or
-                AccessibilityEvent.TYPE_VIEW_SCROLLED
+                AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED
         info.feedbackType = AccessibilityServiceInfo.FEEDBACK_GENERIC
-        info.flags = AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS or
-                AccessibilityServiceInfo.FLAG_INCLUDE_NOT_IMPORTANT_VIEWS
-        info.notificationTimeout = 150
+        info.flags = AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS
+        info.notificationTimeout = 800
         serviceInfo = info
     }
 
@@ -45,10 +43,18 @@ class QuestionDetectorAccessibilityService : AccessibilityService() {
             return
         }
 
-        // Debounce scanning to avoid high CPU usage or thread contention
+        // For window content changes, skip non-structural/cursor-only events to prevent lag
+        if (event.eventType == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED) {
+            val changeTypes = event.contentChangeTypes
+            if (changeTypes != 0 && (changeTypes and (AccessibilityEvent.CONTENT_CHANGE_TYPE_TEXT or AccessibilityEvent.CONTENT_CHANGE_TYPE_SUBTREE)) == 0) {
+                return
+            }
+        }
+
+        // Debounce scanning to ~850ms to ensure content stabilizes before scanning
         scanJob?.cancel()
         scanJob = serviceScope.launch {
-            delay(250) // Debounce 250ms
+            delay(850)
             scanActiveWindowForQuestions(packageName)
         }
     }
@@ -82,7 +88,7 @@ class QuestionDetectorAccessibilityService : AccessibilityService() {
         outQuestions: MutableList<String>,
         depth: Int
     ) {
-        if (node == null || depth > 25 || outQuestions.size >= 10) return
+        if (node == null || depth > 15 || outQuestions.size >= 8) return
 
         // Check text and contentDescription
         val text = node.text?.toString()?.trim()

@@ -50,6 +50,8 @@ import androidx.compose.material.icons.filled.QuestionMark
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Timer
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.WarningAmber
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -75,6 +77,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -93,6 +96,7 @@ fun FloatingOverlayContent(
     val currentQuestion by AppStateManager.currentQuestion.collectAsState()
     val activeReplies by AppStateManager.activeReplies.collectAsState()
     val isGenerating by AppStateManager.isGenerating.collectAsState()
+    val errorMessage by AppStateManager.errorMessage.collectAsState()
     val settings by AppStateManager.settings.collectAsState()
 
     AnimatedContent(
@@ -100,12 +104,13 @@ fun FloatingOverlayContent(
         label = "OverlayExpandAnimation",
         modifier = modifier
     ) { expanded ->
-                if (expanded) {
+        if (expanded) {
             ExpandedOverlayBar(
                 currentQuestion = currentQuestion?.text,
                 sourceApp = currentQuestion?.sourceApp,
                 replies = activeReplies,
                 isGenerating = isGenerating,
+                errorMessage = errorMessage,
                 selectedLength = settings.length,
                 selectedCount = settings.count,
                 autoDeleteEnabled = settings.autoDeleteHistory,
@@ -128,6 +133,7 @@ fun FloatingOverlayContent(
                 questionSnippet = currentQuestion?.text,
                 repliesCount = activeReplies.size,
                 isGenerating = isGenerating,
+                errorMessage = errorMessage,
                 onExpand = { AppStateManager.setOverlayExpanded(true) },
                 onDragDelta = onDragDelta
             )
@@ -141,6 +147,7 @@ fun CollapsedFloatingBar(
     questionSnippet: String?,
     repliesCount: Int,
     isGenerating: Boolean,
+    errorMessage: String? = null,
     onExpand: () -> Unit,
     onDragDelta: (Float, Float) -> Unit,
     modifier: Modifier = Modifier
@@ -163,10 +170,11 @@ fun CollapsedFloatingBar(
             .border(
                 width = 1.5.dp,
                 brush = Brush.horizontalGradient(
-                    colors = listOf(
-                        Color(0xFFDC2626),
-                        Color(0xFFFF5757)
-                    )
+                    colors = if (errorMessage != null) {
+                        listOf(Color(0xFFEF4444), Color(0xFFF59E0B))
+                    } else {
+                        listOf(Color(0xFFDC2626), Color(0xFFFF5757))
+                    }
                 ),
                 shape = RoundedCornerShape(24.dp)
             )
@@ -195,14 +203,18 @@ fun CollapsedFloatingBar(
                 modifier = Modifier.size(16.dp)
             )
 
-            // Sparkling AI Icon
+            // Sparkling AI Icon / Progress / Error
             Box(
                 modifier = Modifier
                     .size(28.dp)
                     .clip(CircleShape)
                     .background(
                         Brush.linearGradient(
-                            listOf(Color(0xFF8B1515), Color(0xFFFF5757))
+                            if (errorMessage != null) {
+                                listOf(Color(0xFFB91C1C), Color(0xFFEF4444))
+                            } else {
+                                listOf(Color(0xFF8B1515), Color(0xFFFF5757))
+                            }
                         )
                     ),
                 contentAlignment = Alignment.Center
@@ -212,6 +224,13 @@ fun CollapsedFloatingBar(
                         modifier = Modifier.size(18.dp),
                         color = Color.White,
                         strokeWidth = 2.dp
+                    )
+                } else if (errorMessage != null) {
+                    Icon(
+                        imageVector = Icons.Default.Warning,
+                        contentDescription = "Error",
+                        tint = Color.White,
+                        modifier = Modifier.size(16.dp)
                     )
                 } else {
                     Icon(
@@ -236,20 +255,22 @@ fun CollapsedFloatingBar(
                 Text(
                     text = if (isGenerating) {
                         "Thinking..."
+                    } else if (errorMessage != null) {
+                        "Error, tap to retry"
                     } else if (hasQuestion && !questionSnippet.isNullOrBlank()) {
                         questionSnippet
                     } else {
                         "Waiting for '?'..."
                     },
-                    color = if (hasQuestion) Color(0xFFFF8A8A) else Color(0xFFD4C8C8),
+                    color = if (errorMessage != null) Color(0xFFFCA5A5) else if (hasQuestion) Color(0xFFFF8A8A) else Color(0xFFD4C8C8),
                     fontSize = 10.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
             }
 
-            // Replies badge if available
-            if (repliesCount > 0) {
+            // Replies badge if available and not generating
+            if (repliesCount > 0 && !isGenerating && errorMessage == null) {
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(10.dp))
@@ -283,6 +304,7 @@ fun ExpandedOverlayBar(
     sourceApp: String?,
     replies: List<ReplyItem>,
     isGenerating: Boolean,
+    errorMessage: String? = null,
     selectedLength: ReplyLength,
     selectedCount: Int,
     autoDeleteEnabled: Boolean = true,
@@ -643,7 +665,9 @@ fun ExpandedOverlayBar(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 16.dp),
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color(0x333A1818))
+                        .padding(vertical = 20.dp, horizontal = 16.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Column(
@@ -651,15 +675,85 @@ fun ExpandedOverlayBar(
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         CircularProgressIndicator(
-                            modifier = Modifier.size(24.dp),
+                            modifier = Modifier.size(26.dp),
                             color = Color(0xFFFF5757),
                             strokeWidth = 2.5.dp
                         )
                         Text(
-                            text = "Gemini is crafting replies...",
-                            color = Color(0xFFD4C8C8),
-                            fontSize = 11.sp
+                            text = "Generating replies with Gemini...",
+                            color = Color(0xFFFEE2E2),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium
                         )
+                    }
+                }
+            } else if (errorMessage != null) {
+                // Prominent Error State with Tap to Retry
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .border(1.dp, Color(0xFFEF4444), RoundedCornerShape(12.dp))
+                        .background(Color(0x443F1212))
+                        .clickable { onRegenerate() }
+                        .padding(12.dp),
+                    color = Color.Transparent
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Warning,
+                                contentDescription = null,
+                                tint = Color(0xFFEF4444),
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Text(
+                                text = "Couldn't generate reply",
+                                color = Color(0xFFFCA5A5),
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+
+                        Text(
+                            text = errorMessage,
+                            color = Color(0xFFE2E8F0),
+                            fontSize = 11.sp,
+                            textAlign = TextAlign.Center,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+
+                        Button(
+                            onClick = onRegenerate,
+                            modifier = Modifier
+                                .height(32.dp)
+                                .testTag("retry_generation_button"),
+                            shape = RoundedCornerShape(8.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFFDC2626),
+                                contentColor = Color.White
+                            ),
+                            contentPadding = ButtonDefaults.ButtonWithIconContentPadding
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Refresh,
+                                contentDescription = null,
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "Tap to Retry",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
                 }
             } else if (replies.isEmpty()) {
