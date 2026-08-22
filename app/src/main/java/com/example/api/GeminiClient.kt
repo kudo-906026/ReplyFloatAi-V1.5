@@ -30,8 +30,9 @@ object GeminiClient {
         count: Int,
         length: ReplyLength,
         tone: ReplyTone,
-        customApiKey: String? = null
-    ): Result<List<String>> = withContext(Dispatchers.IO) {
+        customApiKey: String? = null,
+        multiLanguage: Boolean = false
+    ): Result<com.example.model.GeminiReplyResult> = withContext(Dispatchers.IO) {
         val apiKey = when {
             !customApiKey.isNullOrBlank() -> customApiKey.trim()
             BuildConfig.GEMINI_API_KEY.isNotBlank() && BuildConfig.GEMINI_API_KEY != "MY_GEMINI_API_KEY" -> BuildConfig.GEMINI_API_KEY.trim()
@@ -45,20 +46,47 @@ object GeminiClient {
             )
         }
 
-        val prompt = buildString {
-            appendLine("You are an intelligent instant-reply AI assistant for Android.")
-            appendLine("The user was asked the following question on screen:")
-            appendLine("\"$question\"")
-            appendLine()
-            appendLine("Generate exactly $count distinct, ready-to-send reply options.")
-            appendLine("STRICT LENGTH CONSTRAINT: ${length.promptInstruction}")
-            appendLine("TONE CONSTRAINT: ${tone.promptInstruction}")
-            appendLine()
-            appendLine("RULES:")
-            appendLine("1. Return ONLY the reply options.")
-            appendLine("2. Prefix each individual reply option with '>>> ' at the start of the line.")
-            appendLine("3. Do NOT include markdown headers, quotes around the replies, numbered lists (like 1., 2.), or explanations.")
-            appendLine("4. Each reply should be ready to paste directly into a chat or message.")
+        val prompt = if (multiLanguage) {
+            buildString {
+                appendLine("You are an intelligent multi-language instant-reply AI assistant for Android.")
+                appendLine("The user was asked the following question on screen:")
+                appendLine("\"$question\"")
+                appendLine()
+                appendLine("TASK & INSTRUCTIONS:")
+                appendLine("1. Detect the exact language, dialect, and script of the input question (e.g. Hinglish like 'isko karo kya vote?', French, Spanish, Russian Cyrillic, Japanese Kanji/Kana, Hindi, etc.).")
+                appendLine("2. Translate what the question means into clear, plain English.")
+                appendLine("3. Generate exactly $count distinct, natural reply options in the EXACT SAME language, dialect, and script as the original question.")
+                appendLine("4. Length rule: ${length.promptInstruction}")
+                appendLine("5. Tone rule: ${tone.promptInstruction}")
+                appendLine()
+                appendLine("OUTPUT FORMAT:")
+                appendLine("Return a valid JSON object ONLY. Do NOT include markdown code blocks, backticks, or extra commentary. Structure:")
+                appendLine("{")
+                appendLine("  \"original\": \"<exact question in original language/script>\",")
+                appendLine("  \"english_meaning\": \"<plain English translation of the question>\",")
+                appendLine("  \"replies\": [")
+                appendLine("    \"<reply 1 in same language as original>\",")
+                appendLine("    \"<reply 2 in same language as original>\"")
+                appendLine("  ]")
+                appendLine("}")
+            }
+        } else {
+            buildString {
+                appendLine("You are an intelligent instant-reply AI assistant for Android.")
+                appendLine("The user was asked the following question on screen:")
+                appendLine("\"$question\"")
+                appendLine()
+                appendLine("LANGUAGE INSTRUCTION: Reply in clear, natural English.")
+                appendLine("Generate exactly $count distinct, ready-to-send reply options.")
+                appendLine("STRICT LENGTH CONSTRAINT: ${length.promptInstruction}")
+                appendLine("TONE CONSTRAINT: ${tone.promptInstruction}")
+                appendLine()
+                appendLine("RULES:")
+                appendLine("1. Return ONLY the reply options.")
+                appendLine("2. Prefix each individual reply option with '>>> ' at the start of the line.")
+                appendLine("3. Do NOT include markdown headers, quotes around the replies, numbered lists (like 1., 2.), or explanations.")
+                appendLine("4. Each reply should be ready to paste directly into a chat or message.")
+            }
         }
 
         try {
@@ -89,7 +117,7 @@ object GeminiClient {
                 .post(requestBody)
                 .build()
 
-            Log.d(TAG, "Executing Gemini API request for question: \"$question\" (count=$count, length=${length.label})")
+            Log.d(TAG, "Executing Gemini API request for question: \"$question\" (count=$count, length=${length.label}, multiLang=$multiLanguage)")
             val response = okHttpClient.newCall(request).execute()
             val responseBody = response.body?.string() ?: ""
 
@@ -116,13 +144,26 @@ object GeminiClient {
                 return@withContext Result.failure(Exception("No replies generated by Gemini"))
             }
 
-            val parsedReplies = parseReplies(text, count)
-            if (parsedReplies.isEmpty()) {
+            val parsedResult = if (multiLanguage) {
+                parseMultiLanguageResult(text, question, count)
+            } else {
+                val parsedReplies = parseReplies(text, count)
+                if (parsedReplies.isEmpty()) {
+                    return@withContext Result.failure(Exception("Could not parse replies from Gemini response"))
+                }
+                com.example.model.GeminiReplyResult(
+                    original = question,
+                    englishMeaning = null,
+                    replies = parsedReplies
+                )
+            }
+
+            if (parsedResult.replies.isEmpty()) {
                 return@withContext Result.failure(Exception("Could not parse replies from Gemini response"))
             }
 
-            Log.d(TAG, "Successfully received and parsed ${parsedReplies.size} replies from Gemini")
-            Result.success(parsedReplies)
+            Log.d(TAG, "Successfully received ${parsedResult.replies.size} replies from Gemini (meaning: ${parsedResult.englishMeaning})")
+            Result.success(parsedResult)
         } catch (e: kotlinx.coroutines.CancellationException) {
             Log.d(TAG, "Gemini API request was cancelled by new question")
             throw e
@@ -130,6 +171,58 @@ object GeminiClient {
             Log.e(TAG, "Exception calling Gemini API", e)
             Result.failure(Exception(e.localizedMessage ?: "Network or connection error"))
         }
+    }
+
+    private fun parseMultiLanguageResult(
+        rawText: String,
+        fallbackQuestion: String,
+        targetCount: Int
+    ): com.example.model.GeminiReplyResult {
+        val cleaned = rawText.trim()
+            .removePrefix("```json")
+            .removePrefix("```JSON")
+            .removePrefix("```")
+            .removeSuffix("```")
+            .trim()
+
+        try {
+            val firstBrace = cleaned.indexOf('{')
+            val lastBrace = cleaned.lastIndexOf('}')
+            if (firstBrace != -1 && lastBrace > firstBrace) {
+                val jsonStr = cleaned.substring(firstBrace, lastBrace + 1)
+                val json = JSONObject(jsonStr)
+                val original = json.optString("original", fallbackQuestion).ifBlank { fallbackQuestion }
+                val englishMeaning = json.optString("english_meaning", "").ifBlank { null }
+                val repliesArr = json.optJSONArray("replies")
+                val repliesList = mutableListOf<String>()
+                if (repliesArr != null) {
+                    for (i in 0 until repliesArr.length()) {
+                        val r = cleanReply(repliesArr.optString(i))
+                        if (r.isNotBlank()) {
+                            repliesList.add(r)
+                        }
+                    }
+                }
+
+                if (repliesList.isNotEmpty()) {
+                    return com.example.model.GeminiReplyResult(
+                        original = original,
+                        englishMeaning = englishMeaning,
+                        replies = repliesList.take(targetCount)
+                    )
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "JSON parsing failed for multi-language response, falling back to text parsing", e)
+        }
+
+        // Fallback to regular line parsing
+        val lines = parseReplies(rawText, targetCount)
+        return com.example.model.GeminiReplyResult(
+            original = fallbackQuestion,
+            englishMeaning = null,
+            replies = lines
+        )
     }
 
     private fun parseReplies(

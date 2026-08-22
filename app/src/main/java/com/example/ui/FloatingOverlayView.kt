@@ -46,10 +46,17 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.filled.PauseCircle
+import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material.icons.filled.QuestionMark
+import androidx.compose.material.icons.filled.Radar
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Timer
+import androidx.compose.material.icons.filled.Translate
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.WarningAmber
 import androidx.compose.material3.Button
@@ -107,6 +114,7 @@ fun FloatingOverlayContent(
         if (expanded) {
             ExpandedOverlayBar(
                 currentQuestion = currentQuestion?.text,
+                englishMeaning = currentQuestion?.englishMeaning,
                 sourceApp = currentQuestion?.sourceApp,
                 replies = activeReplies,
                 isGenerating = isGenerating,
@@ -115,8 +123,12 @@ fun FloatingOverlayContent(
                 selectedCount = settings.count,
                 autoDeleteEnabled = settings.autoDeleteHistory,
                 autoDeleteMinutes = settings.autoDeleteMinutes,
+                multiLanguageEnabled = settings.multiLanguageEnabled,
+                scanningEnabled = settings.scanningEnabled,
                 onLengthSelected = { AppStateManager.updateReplyLength(it) },
                 onCountSelected = { AppStateManager.updateReplyCount(it) },
+                onToggleMultiLanguage = { AppStateManager.toggleMultiLanguage() },
+                onToggleScanning = { AppStateManager.toggleScanning() },
                 onAutoDeleteMinutesChanged = { mins ->
                     AppStateManager.updateAutoDeleteSettings(settings.autoDeleteHistory, mins)
                 },
@@ -301,6 +313,7 @@ fun CollapsedFloatingBar(
 @Composable
 fun ExpandedOverlayBar(
     currentQuestion: String?,
+    englishMeaning: String? = null,
     sourceApp: String?,
     replies: List<ReplyItem>,
     isGenerating: Boolean,
@@ -309,8 +322,12 @@ fun ExpandedOverlayBar(
     selectedCount: Int,
     autoDeleteEnabled: Boolean = true,
     autoDeleteMinutes: Int = 5,
+    multiLanguageEnabled: Boolean = false,
+    scanningEnabled: Boolean = true,
     onLengthSelected: (ReplyLength) -> Unit,
     onCountSelected: (Int) -> Unit,
+    onToggleMultiLanguage: () -> Unit = {},
+    onToggleScanning: () -> Unit = {},
     onAutoDeleteMinutesChanged: (Int) -> Unit = {},
     onRegenerate: () -> Unit,
     onCopyReply: (ReplyItem) -> Unit,
@@ -423,67 +440,184 @@ fun ExpandedOverlayBar(
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // Detected Question Box
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(Color(0x333A1818))
-                    .border(0.8.dp, Color(0x44DC2626), RoundedCornerShape(12.dp))
-                    .padding(10.dp)
-            ) {
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+            // Detected Question Box (or Stacked Original + Meaning when Lang is ON)
+            if (multiLanguageEnabled) {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    // 1. Original
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(Color(0x333A1818))
+                            .border(0.8.dp, Color(0x44DC2626), RoundedCornerShape(10.dp))
+                            .padding(8.dp)
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.QuestionMark,
-                                contentDescription = null,
-                                tint = Color(0xFFFF8A8A),
-                                modifier = Modifier.size(12.dp)
-                            )
-                            Text(
-                                text = "DETECTED QUESTION",
-                                color = Color(0xFFFF8A8A),
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                letterSpacing = 0.5.sp
-                            )
-                        }
-
-                        if (!currentQuestion.isNullOrBlank()) {
-                            IconButton(
-                                onClick = onRegenerate,
-                                modifier = Modifier.size(22.dp)
+                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.Refresh,
-                                    contentDescription = "Regenerate",
-                                    tint = Color.White.copy(alpha = 0.7f),
-                                    modifier = Modifier.size(14.dp)
-                                )
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Language,
+                                        contentDescription = null,
+                                        tint = Color(0xFFFF8A8A),
+                                        modifier = Modifier.size(11.dp)
+                                    )
+                                    Text(
+                                        text = "ORIGINAL:",
+                                        color = Color(0xFFFF8A8A),
+                                        fontSize = 9.5.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        letterSpacing = 0.5.sp
+                                    )
+                                }
+
+                                if (!currentQuestion.isNullOrBlank()) {
+                                    IconButton(
+                                        onClick = onRegenerate,
+                                        modifier = Modifier.size(20.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Refresh,
+                                            contentDescription = "Regenerate",
+                                            tint = Color.White.copy(alpha = 0.7f),
+                                            modifier = Modifier.size(13.dp)
+                                        )
+                                    }
+                                }
                             }
+
+                            Text(
+                                text = if (!currentQuestion.isNullOrBlank()) {
+                                    currentQuestion
+                                } else {
+                                    "No question detected on screen yet"
+                                },
+                                color = Color.White,
+                                fontSize = 11.5.sp,
+                                fontWeight = FontWeight.Medium,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
+                            )
                         }
                     }
 
-                    Text(
-                        text = if (!currentQuestion.isNullOrBlank()) {
-                            currentQuestion
-                        } else {
-                            "No '?' detected on screen yet. Type a question or test in the main app."
-                        },
-                        color = Color.White,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium,
-                        maxLines = 3,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                    // 2. Meaning (English)
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(Color(0x280284C7))
+                            .border(0.8.dp, Color(0x4438BDF8), RoundedCornerShape(10.dp))
+                            .padding(8.dp)
+                    ) {
+                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Translate,
+                                    contentDescription = null,
+                                    tint = Color(0xFF7DD3FC),
+                                    modifier = Modifier.size(11.dp)
+                                )
+                                Text(
+                                    text = "MEANING (ENGLISH):",
+                                    color = Color(0xFF7DD3FC),
+                                    fontSize = 9.5.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    letterSpacing = 0.5.sp
+                                )
+                            }
+
+                            Text(
+                                text = if (!englishMeaning.isNullOrBlank()) {
+                                    englishMeaning
+                                } else if (isGenerating) {
+                                    "Translating meaning with Gemini..."
+                                } else if (!currentQuestion.isNullOrBlank()) {
+                                    "Translating..."
+                                } else {
+                                    "English translation will appear here"
+                                },
+                                color = Color(0xFFE0F2FE),
+                                fontSize = 11.5.sp,
+                                fontWeight = FontWeight.Medium,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                }
+            } else {
+                // When Lang mode is OFF: keep current single-question display as-is
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color(0x333A1818))
+                        .border(0.8.dp, Color(0x44DC2626), RoundedCornerShape(12.dp))
+                        .padding(10.dp)
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.QuestionMark,
+                                    contentDescription = null,
+                                    tint = Color(0xFFFF8A8A),
+                                    modifier = Modifier.size(12.dp)
+                                )
+                                Text(
+                                    text = "DETECTED QUESTION",
+                                    color = Color(0xFFFF8A8A),
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    letterSpacing = 0.5.sp
+                                )
+                            }
+
+                            if (!currentQuestion.isNullOrBlank()) {
+                                IconButton(
+                                    onClick = onRegenerate,
+                                    modifier = Modifier.size(22.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Refresh,
+                                        contentDescription = "Regenerate",
+                                        tint = Color.White.copy(alpha = 0.7f),
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                }
+                            }
+                        }
+
+                        Text(
+                            text = if (!currentQuestion.isNullOrBlank()) {
+                                currentQuestion
+                            } else {
+                                "No '?' detected on screen yet. Type a question or test in the main app."
+                            },
+                            color = Color.White,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 3,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
                 }
             }
 
@@ -525,20 +659,23 @@ fun ExpandedOverlayBar(
 
             Spacer(modifier = Modifier.height(6.dp))
 
-            // Reply Count Selector (1, 2, 3)
+            // Reply Count Selector (1, 2, 3) + Lang Toggle & Analyze Toggle
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Text(
-                    text = "COUNT:",
-                    color = Color(0xFFD4C8C8),
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        text = "COUNT:",
+                        color = Color(0xFFD4C8C8),
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold
+                    )
 
-                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     listOf(1, 2, 3).forEach { count ->
                         val isSelected = selectedCount == count
                         Box(
@@ -548,13 +685,89 @@ fun ExpandedOverlayBar(
                                     if (isSelected) Color(0xFFB91C1C) else Color(0x33441818)
                                 )
                                 .clickable { onCountSelected(count) }
-                                .padding(horizontal = 8.dp, vertical = 3.dp)
+                                .padding(horizontal = 7.dp, vertical = 3.dp)
                         ) {
                             Text(
                                 text = "$count",
                                 color = if (isSelected) Color.White else Color(0xFFD4C8C8),
                                 fontSize = 10.sp,
                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                            )
+                        }
+                    }
+                }
+
+                // Compact Quick Toggles: Lang & Analyze
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(5.dp)
+                ) {
+                    // Language Toggle Button ("Lang: ON/OFF")
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(
+                                if (multiLanguageEnabled) Color(0xFF0284C7) else Color(0x33441818)
+                            )
+                            .border(
+                                width = 0.8.dp,
+                                color = if (multiLanguageEnabled) Color(0xFF38BDF8) else Color(0x44666666),
+                                shape = RoundedCornerShape(6.dp)
+                            )
+                            .clickable { onToggleMultiLanguage() }
+                            .padding(horizontal = 6.dp, vertical = 3.dp)
+                            .testTag("lang_toggle_button")
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(3.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Translate,
+                                contentDescription = null,
+                                tint = if (multiLanguageEnabled) Color.White else Color(0xFFB0A8A8),
+                                modifier = Modifier.size(11.dp)
+                            )
+                            Text(
+                                text = if (multiLanguageEnabled) "Lang: ON" else "Lang: OFF",
+                                color = if (multiLanguageEnabled) Color.White else Color(0xFFB0A8A8),
+                                fontSize = 9.5.sp,
+                                fontWeight = if (multiLanguageEnabled) FontWeight.Bold else FontWeight.Medium
+                            )
+                        }
+                    }
+
+                    // Analyze On/Off Toggle Button (Green when active, Gray when paused)
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(
+                                if (scanningEnabled) Color(0xFF15803D) else Color(0xFF4B5563)
+                            )
+                            .border(
+                                width = 0.8.dp,
+                                color = if (scanningEnabled) Color(0xFF4ADE80) else Color(0x449CA3AF),
+                                shape = RoundedCornerShape(6.dp)
+                            )
+                            .clickable { onToggleScanning() }
+                            .padding(horizontal = 6.dp, vertical = 3.dp)
+                            .testTag("analyze_toggle_button")
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(3.dp)
+                        ) {
+                            Icon(
+                                imageVector = if (scanningEnabled) Icons.Default.Radar else Icons.Default.PauseCircle,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(11.dp)
+                            )
+                            Text(
+                                text = if (scanningEnabled) "Analyze: ON" else "Analyze: OFF",
+                                color = Color.White,
+                                fontSize = 9.5.sp,
+                                fontWeight = FontWeight.Bold
                             )
                         }
                     }
@@ -796,6 +1009,16 @@ fun ExpandedOverlayBar(
                         .verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
+                    if (multiLanguageEnabled) {
+                        Text(
+                            text = "REPLY (in original language):",
+                            color = Color(0xFFD4C8C8),
+                            fontSize = 9.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 0.5.sp
+                        )
+                    }
+
                     replies.forEach { reply ->
                         ReplyCardItem(
                             reply = reply,

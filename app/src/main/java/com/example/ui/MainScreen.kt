@@ -52,12 +52,14 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.QuestionAnswer
+import androidx.compose.material.icons.filled.Radar
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Timer
+import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.Warning
@@ -291,7 +293,7 @@ fun MainScreen() {
                     onRequestOverlayPermission = { requestOverlayPermission(context) },
                     onRequestAccessibilityPermission = { requestAccessibilityPermission(context) },
                     onTestDetection = { q ->
-                        AppStateManager.onQuestionDetected(q, "App Sandbox")
+                        AppStateManager.onQuestionDetected(q, "App Sandbox", force = true)
                     },
                     onRetryGeneration = {
                         AppStateManager.generateRepliesForQuestion()
@@ -603,8 +605,10 @@ fun ControlsAndTestTab(
                     ) {
                         val presets = listOf(
                             "Are you free to meet tomorrow at 3 PM?",
-                            "Could you review the design by tonight?",
-                            "Which option works best for you?",
+                            "isko karo kya vote?",
+                            "Demain à 14h, ça te convient?",
+                            "¿Puedes revisar el documento hoy?",
+                            "明日ミーティングは可能ですか？",
                             "What is your status update for today?"
                         )
                         presets.forEach { preset ->
@@ -985,6 +989,132 @@ fun SettingsTab(
                             }
                         }
                     }
+                }
+            }
+        }
+
+        // Multi-Language Mode (Any language / Hinglish)
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                )
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(32.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Translate,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                        Column {
+                            Text(
+                                text = "Multi-Language Mode (\"Lang\")",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = if (settings.multiLanguageEnabled)
+                                    "Detects any language & code-mixed/Hinglish (e.g. 'isko karo kya vote?') and replies in the exact same language"
+                                else
+                                    "Standard English-only replies",
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                    Switch(
+                        checked = settings.multiLanguageEnabled,
+                        onCheckedChange = { checked ->
+                            onUpdateSettings(settings.copy(multiLanguageEnabled = checked))
+                        }
+                    )
+                }
+            }
+        }
+
+        // Question Scanning (Analyze on/off switch)
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                )
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(32.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(
+                                    if (settings.scanningEnabled) Color(0xFF15803D).copy(alpha = 0.2f) else MaterialTheme.colorScheme.surfaceVariant
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Radar,
+                                contentDescription = null,
+                                tint = if (settings.scanningEnabled) Color(0xFF15803D) else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                        Column {
+                            Text(
+                                text = "Analyze / Screen Scanning",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = if (settings.scanningEnabled)
+                                    "Active: scanning for questions in other apps"
+                                else
+                                    "Paused: zero background scanning or API calls",
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                    Switch(
+                        checked = settings.scanningEnabled,
+                        onCheckedChange = { checked ->
+                            onUpdateSettings(settings.copy(scanningEnabled = checked))
+                        }
+                    )
                 }
             }
         }
@@ -1642,6 +1772,34 @@ fun HistoryTab(
                                         tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                                         modifier = Modifier.size(16.dp)
                                     )
+                                }
+                            }
+
+                            if (!item.englishMeaning.isNullOrBlank()) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f))
+                                        .padding(horizontal = 8.dp, vertical = 5.dp)
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Translate,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(12.dp)
+                                        )
+                                        Text(
+                                            text = "Meaning: ${item.englishMeaning}",
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                                        )
+                                    }
                                 }
                             }
 

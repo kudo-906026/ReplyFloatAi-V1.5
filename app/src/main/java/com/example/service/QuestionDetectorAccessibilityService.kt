@@ -37,9 +37,14 @@ class QuestionDetectorAccessibilityService : AccessibilityService() {
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event == null) return
 
-        // Skip events from our own app
+        // 1. If scanning is paused by user, immediately ignore all accessibility events
+        if (!AppStateManager.settings.value.scanningEnabled) {
+            return
+        }
+
+        // Skip events from our own app and overlay windows
         val packageName = event.packageName?.toString() ?: ""
-        if (packageName == this.packageName) {
+        if (isOurAppPackage(packageName)) {
             return
         }
 
@@ -60,12 +65,22 @@ class QuestionDetectorAccessibilityService : AccessibilityService() {
     }
 
     private fun scanActiveWindowForQuestions(sourcePackage: String) {
+        // Double check scanning is enabled
+        if (!AppStateManager.settings.value.scanningEnabled) return
+        if (isOurAppPackage(sourcePackage)) return
+
         val rootNode = try {
             rootInActiveWindow
         } catch (e: Exception) {
             Log.e(TAG, "Error getting root in active window", e)
             null
         } ?: return
+
+        // Verify root node doesn't belong to our app/overlay
+        val rootPkg = rootNode.packageName?.toString() ?: ""
+        if (isOurAppPackage(rootPkg)) {
+            return
+        }
 
         try {
             val questions = mutableListOf<String>()
@@ -90,6 +105,12 @@ class QuestionDetectorAccessibilityService : AccessibilityService() {
     ) {
         if (node == null || depth > 15 || outQuestions.size >= 8) return
 
+        // Exclude our own app's nodes / overlay elements
+        val nodePkg = node.packageName?.toString() ?: ""
+        if (isOurAppPackage(nodePkg)) {
+            return
+        }
+
         // Check text and contentDescription
         val text = node.text?.toString()?.trim()
         val desc = node.contentDescription?.toString()?.trim()
@@ -112,6 +133,7 @@ class QuestionDetectorAccessibilityService : AccessibilityService() {
 
     private fun checkAndAddQuestion(text: String?, outQuestions: MutableList<String>) {
         if (text.isNullOrBlank() || text.length < 3) return
+        if (isInternalOverlayText(text)) return
 
         if (text.contains("?") || text.contains("？")) {
             val clean = text.trim()
@@ -119,6 +141,24 @@ class QuestionDetectorAccessibilityService : AccessibilityService() {
                 outQuestions.add(clean)
             }
         }
+    }
+
+    private fun isOurAppPackage(pkg: String): Boolean {
+        if (pkg.isBlank()) return false
+        return pkg == this.packageName ||
+                pkg == "com.example" ||
+                pkg.contains("replyfloatai", ignoreCase = true)
+    }
+
+    private fun isInternalOverlayText(text: String): Boolean {
+        val lower = text.lowercase()
+        return lower.contains("replyfloatai") ||
+                lower.contains("detected question") ||
+                lower.contains("suggested replies") ||
+                lower.contains("couldn't generate reply") ||
+                lower.contains("generating replies") ||
+                lower.contains("tap to retry") ||
+                lower.contains("gemini is crafting")
     }
 
     override fun onInterrupt() {

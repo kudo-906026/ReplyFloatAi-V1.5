@@ -52,12 +52,15 @@ data class ReplySettings(
     val autoGenerate: Boolean = true,
     val autoDeleteHistory: Boolean = true,
     val autoDeleteMinutes: Int = 5,
-    val customApiKey: String = ""
+    val customApiKey: String = "",
+    val multiLanguageEnabled: Boolean = false,
+    val scanningEnabled: Boolean = true
 )
 
 data class DetectedQuestion(
     val id: String = UUID.randomUUID().toString(),
     val text: String,
+    val englishMeaning: String? = null,
     val sourceApp: String? = null,
     val timestamp: Long = System.currentTimeMillis()
 )
@@ -65,7 +68,14 @@ data class DetectedQuestion(
 data class QuestionDetectionHistory(
     val id: String = UUID.randomUUID().toString(),
     val question: String,
+    val englishMeaning: String? = null,
     val replies: List<String> = emptyList(),
     val sourceApp: String? = null,
     val timestamp: Long = System.currentTimeMillis()
+)
+
+data class GeminiReplyResult(
+    val original: String,
+    val englishMeaning: String? = null,
+    val replies: List<String> = emptyList()
 )

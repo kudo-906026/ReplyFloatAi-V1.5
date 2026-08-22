@@ -71,7 +71,7 @@ object AppStateManager {
     )
     val history: StateFlow<List<QuestionDetectionHistory>> = _history.asStateFlow()
 
-    private var lastDetectedText: String = ""
+    private var lastProcessedQuestion: String? = null
     private var lastDetectionTime: Long = 0
 
     init {
@@ -120,19 +120,40 @@ object AppStateManager {
         _settings.update { it.copy(length = length) }
         // If we currently have a question, regenerate replies with the new length
         _currentQuestion.value?.text?.let { q ->
-            generateRepliesForQuestion(q)
+            generateRepliesForQuestion(q, force = true)
         }
     }
 
     fun updateReplyCount(count: Int) {
         _settings.update { it.copy(count = count.coerceIn(1, 3)) }
         _currentQuestion.value?.text?.let { q ->
-            generateRepliesForQuestion(q)
+            generateRepliesForQuestion(q, force = true)
         }
     }
 
     fun updateTone(tone: ReplyTone) {
         _settings.update { it.copy(tone = tone) }
+    }
+
+    fun toggleMultiLanguage() {
+        val newState = !_settings.value.multiLanguageEnabled
+        _settings.update { it.copy(multiLanguageEnabled = newState) }
+        _currentQuestion.value?.text?.let { q ->
+            generateRepliesForQuestion(q, force = true)
+        }
+    }
+
+    fun toggleScanning() {
+        val newState = !_settings.value.scanningEnabled
+        _settings.update { it.copy(scanningEnabled = newState) }
+    }
+
+    fun setMultiLanguageEnabled(enabled: Boolean) {
+        _settings.update { it.copy(multiLanguageEnabled = enabled) }
+    }
+
+    fun setScanningEnabled(enabled: Boolean) {
+        _settings.update { it.copy(scanningEnabled = enabled) }
     }
 
     fun setOverlayRunning(running: Boolean) {
@@ -147,17 +168,26 @@ object AppStateManager {
         _isOverlayExpanded.value = expanded
     }
 
-    fun onQuestionDetected(rawQuestion: String, sourceApp: String? = null) {
+    fun onQuestionDetected(rawQuestion: String, sourceApp: String? = null, force: Boolean = false) {
         val cleaned = cleanQuestion(rawQuestion)
         if (cleaned.isBlank()) return
 
         val now = System.currentTimeMillis()
-        // Deduplicate within 3 seconds for identical question
-        if (cleaned.equals(lastDetectedText, ignoreCase = true) && (now - lastDetectionTime) < 3000) {
+
+        // 1. Once a question has been successfully answered, don't regenerate replies for it again
+        // unless forced (e.g. manual user test) or the question text genuinely differs
+        if (!force && cleaned.equals(lastProcessedQuestion, ignoreCase = true)) {
+            Log.d(TAG, "Ignoring already answered/processed question: \"$cleaned\"")
             return
         }
 
-        lastDetectedText = cleaned
+        // 2. If already currently generating this exact question or showing its active replies
+        if (!force && cleaned.equals(_currentQuestion.value?.text, ignoreCase = true)) {
+            if (_isGenerating.value || _activeReplies.value.isNotEmpty()) {
+                return
+            }
+        }
+
         lastDetectionTime = now
 
         val questionObj = DetectedQuestion(
@@ -168,13 +198,22 @@ object AppStateManager {
         _currentQuestion.value = questionObj
 
         if (_settings.value.autoGenerate) {
-            generateRepliesForQuestion(cleaned, sourceApp)
+            generateRepliesForQuestion(cleaned, sourceApp, force = force)
         }
     }
 
-    fun generateRepliesForQuestion(questionText: String? = null, sourceApp: String? = null) {
+    fun generateRepliesForQuestion(
+        questionText: String? = null,
+        sourceApp: String? = null,
+        force: Boolean = true
+    ) {
         val text = questionText ?: _currentQuestion.value?.text ?: return
         if (text.isBlank()) return
+
+        // If not forced and already processed with active replies, skip
+        if (!force && text.equals(lastProcessedQuestion, ignoreCase = true) && _activeReplies.value.isNotEmpty()) {
+            return
+        }
 
         // 1. Cancel any previous in-flight Gemini request so it cannot overwrite this one
         generationJob?.cancel()
@@ -193,20 +232,39 @@ object AppStateManager {
                     count = currentCfg.count,
                     length = currentCfg.length,
                     tone = currentCfg.tone,
-                    customApiKey = currentCfg.customApiKey
+                    customApiKey = currentCfg.customApiKey,
+                    multiLanguage = currentCfg.multiLanguageEnabled
                 )
 
-                result.onSuccess { replyTexts ->
-                    val items = replyTexts.map { ReplyItem(text = it) }
+                result.onSuccess { geminiResult ->
+                    val items = geminiResult.replies.map { ReplyItem(text = it) }
                     _activeReplies.value = items
                     _errorMessage.value = null
+                    
+                    // Update current question with any refined text and english translation
+                    val resolvedOriginal = geminiResult.original.ifBlank { text }
+                    _currentQuestion.update { old ->
+                        old?.copy(
+                            text = resolvedOriginal,
+                            englishMeaning = geminiResult.englishMeaning
+                        ) ?: DetectedQuestion(
+                            text = resolvedOriginal,
+                            englishMeaning = geminiResult.englishMeaning,
+                            sourceApp = sourceApp
+                        )
+                    }
+
+                    // Mark question as successfully processed so subsequent re-scans won't re-trigger
+                    lastProcessedQuestion = text
+                    Log.d(TAG, "Successfully processed and cached answer for: \"$text\" (meaning: ${geminiResult.englishMeaning})")
 
                     // Add to history
                     if (items.isNotEmpty()) {
                         _history.update { oldList ->
                             val historyItem = QuestionDetectionHistory(
-                                question = text,
-                                replies = replyTexts,
+                                question = resolvedOriginal,
+                                englishMeaning = geminiResult.englishMeaning,
+                                replies = geminiResult.replies,
                                 sourceApp = sourceApp ?: _currentQuestion.value?.sourceApp,
                                 timestamp = System.currentTimeMillis()
                             )
@@ -217,6 +275,7 @@ object AppStateManager {
                     Log.e(TAG, "Failed to generate replies for \"$text\": ${ex.message}")
                     _activeReplies.value = emptyList()
                     _errorMessage.value = ex.message ?: "Couldn't generate reply, tap to retry"
+                    // Do not mark as processed on failure so retry can be attempted
                 }
             } catch (e: CancellationException) {
                 Log.d(TAG, "Previous generation was cancelled for question: \"$text\"")
