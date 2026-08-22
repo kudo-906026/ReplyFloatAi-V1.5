@@ -1,0 +1,6 @@
+{
+  "name": "replyFloatAi",
+  "description": "Floating AI reply assistant with on-screen question detection, floating overlay bar, and smart quick copy suggestions.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

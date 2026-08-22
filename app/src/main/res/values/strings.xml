@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">replyFloatAi</string>
+    <string name="accessibility_service_label">replyFloatAi Question Scanner</string>
+    <string name="accessibility_service_description">Scans on-screen text to detect questions marked with question marks and provides quick AI replies via floating overlay.</string>
+</resources>
