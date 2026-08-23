@@ -6,6 +6,7 @@ import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import com.example.state.AppStateManager
+import com.example.util.QuestionValidator
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -141,11 +142,9 @@ class QuestionDetectorAccessibilityService : AccessibilityService() {
         if (text.isNullOrBlank() || text.length < 3) return
         if (isInternalOverlayText(text)) return
 
-        if (text.contains("?") || text.contains("？")) {
-            val clean = text.trim()
-            if (clean.length in 4..300 && !outQuestions.contains(clean)) {
-                outQuestions.add(clean)
-            }
+        val extractedQuestion = QuestionValidator.cleanAndExtractQuestion(text)
+        if (extractedQuestion != null && !outQuestions.contains(extractedQuestion)) {
+            outQuestions.add(extractedQuestion)
         }
     }
 

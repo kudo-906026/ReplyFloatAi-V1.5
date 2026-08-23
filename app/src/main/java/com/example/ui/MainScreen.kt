@@ -320,6 +320,8 @@ fun MainScreen() {
                 1 -> SettingsTab(
                     settings = settings,
                     onUpdateSettings = { AppStateManager.updateSettings(it) },
+                    onUpdateSelectionMode = { AppStateManager.updateSelectionMode(it) },
+                    onUpdatePreferredProvider = { AppStateManager.updatePreferredProvider(it) },
                     onUpdateLength = { AppStateManager.updateReplyLength(it) },
                     onUpdateCount = { AppStateManager.updateReplyCount(it) },
                     onUpdateTone = { AppStateManager.updateTone(it) },

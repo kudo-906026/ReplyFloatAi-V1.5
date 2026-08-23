@@ -15,10 +15,10 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 
-object GroqProviderClient : AiProviderClient {
-    private const val TAG = "GroqProviderClient"
-    override val provider: AiProvider = AiProvider.GROQ
-    private const val BASE_URL = "https://api.groq.com/openai/v1/chat/completions"
+object GrokProviderClient : AiProviderClient {
+    private const val TAG = "GrokProviderClient"
+    override val provider: AiProvider = AiProvider.GROK
+    private const val BASE_URL = "https://api.x.ai/v1/chat/completions"
 
     private val okHttpClient = OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)
@@ -37,7 +37,7 @@ object GroqProviderClient : AiProviderClient {
         val trimmedKey = apiKey.trim()
         if (trimmedKey.isBlank()) {
             return@withContext Result.failure(
-                IllegalStateException("Missing Groq API Key. Please add your key in Settings.")
+                IllegalStateException("Missing Grok (xAI) API Key. Please add your key in Settings.")
             )
         }
 
@@ -51,12 +51,12 @@ object GroqProviderClient : AiProviderClient {
 
         try {
             val jsonBody = JSONObject().apply {
-                put("model", provider.defaultModel)
+                put("model", provider.defaultModel) // grok-2-latest
                 put("temperature", 0.7)
                 val messages = JSONArray().apply {
                     put(JSONObject().apply {
                         put("role", "system")
-                        put("content", "You are an intelligent instant-reply AI assistant for Android.")
+                        put("content", "You are an intelligent instant-reply AI assistant for Android powered by Grok.")
                     })
                     put(JSONObject().apply {
                         put("role", "user")
@@ -70,22 +70,24 @@ object GroqProviderClient : AiProviderClient {
             val request = Request.Builder()
                 .url(BASE_URL)
                 .addHeader("Authorization", "Bearer $trimmedKey")
+                .addHeader("Content-Type", "application/json")
                 .post(requestBody)
                 .build()
 
-            Log.d(TAG, "Executing Groq API request with model ${provider.defaultModel}")
+            Log.d(TAG, "Executing Grok (xAI) API request with model ${provider.defaultModel}")
             val response = okHttpClient.newCall(request).execute()
             val responseBody = response.body?.string() ?: ""
 
             if (!response.isSuccessful) {
                 val errorMsg = try {
                     val errJson = JSONObject(responseBody)
-                    errJson.optJSONObject("error")?.optString("message") ?: "HTTP ${response.code}"
+                    val errObj = errJson.optJSONObject("error")
+                    errObj?.optString("message") ?: errJson.optString("message", "HTTP ${response.code}: $responseBody")
                 } catch (e: Exception) {
                     "HTTP ${response.code}: $responseBody"
                 }
-                Log.e(TAG, "Groq API error (HTTP ${response.code}): $errorMsg")
-                return@withContext Result.failure(Exception("Groq error (${response.code}): $errorMsg"))
+                Log.e(TAG, "Grok API error (HTTP ${response.code}): $errorMsg")
+                return@withContext Result.failure(Exception("Grok error (${response.code}): $errorMsg"))
             }
 
             val responseJson = JSONObject(responseBody)
@@ -95,7 +97,7 @@ object GroqProviderClient : AiProviderClient {
             val text = message?.optString("content") ?: ""
 
             if (text.isBlank()) {
-                return@withContext Result.failure(Exception("Groq returned empty response"))
+                return@withContext Result.failure(Exception("Grok returned empty response"))
             }
 
             val parsedResult = if (multiLanguage) {
@@ -103,7 +105,7 @@ object GroqProviderClient : AiProviderClient {
             } else {
                 val parsedReplies = AiPromptHelper.parseReplies(text, count)
                 if (parsedReplies.isEmpty()) {
-                    return@withContext Result.failure(Exception("Could not parse replies from Groq response"))
+                    return@withContext Result.failure(Exception("Could not parse replies from Grok response"))
                 }
                 AiReplyResult(
                     original = question,
@@ -114,16 +116,16 @@ object GroqProviderClient : AiProviderClient {
             }
 
             if (parsedResult.replies.isEmpty()) {
-                return@withContext Result.failure(Exception("Could not parse replies from Groq response"))
+                return@withContext Result.failure(Exception("Could not parse replies from Grok response"))
             }
 
-            Log.d(TAG, "Groq success with ${parsedResult.replies.size} replies")
+            Log.d(TAG, "Grok success with ${parsedResult.replies.size} replies")
             Result.success(parsedResult)
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
         } catch (e: Exception) {
-            Log.e(TAG, "Groq exception", e)
-            Result.failure(Exception("Groq error: ${e.localizedMessage ?: "Network connection failure"}"))
+            Log.e(TAG, "Grok exception", e)
+            Result.failure(Exception("Grok error: ${e.localizedMessage ?: "Network connection failure"}"))
         }
     }
 }

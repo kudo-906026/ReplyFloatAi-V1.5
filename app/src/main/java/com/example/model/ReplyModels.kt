@@ -26,11 +26,11 @@ enum class AiProvider(
         defaultModel = "claude-3-5-haiku-20241022",
         hint = "Anthropic Claude Key (sk-ant-...)"
     ),
-    GROQ(
-        id = "groq",
-        displayName = "Groq",
-        defaultModel = "llama-3.3-70b-versatile",
-        hint = "Groq Cloud API Key (gsk_...)"
+    GROK(
+        id = "grok",
+        displayName = "Grok",
+        defaultModel = "grok-2-latest",
+        hint = "xAI API Key (xai-...)"
     );
 
     val modelName: String get() = defaultModel
@@ -38,6 +38,25 @@ enum class AiProvider(
     companion object {
         fun fromId(id: String): AiProvider {
             return entries.firstOrNull { it.id.equals(id, ignoreCase = true) } ?: GEMINI
+        }
+    }
+}
+
+enum class ProviderSelectionMode(val id: String, val label: String, val description: String) {
+    AUTO_FALLBACK(
+        id = "auto",
+        label = "Auto Fallback Chain",
+        description = "Sequentially attempts providers in fallback chain order on error or rate-limit"
+    ),
+    PREFERRED_PROVIDER(
+        id = "preferred",
+        label = "Preferred Provider",
+        description = "Uses your chosen provider first; falls back to others only if it fails"
+    );
+
+    companion object {
+        fun fromId(id: String): ProviderSelectionMode {
+            return entries.firstOrNull { it.id.equals(id, ignoreCase = true) } ?: AUTO_FALLBACK
         }
     }
 }
@@ -95,18 +114,21 @@ data class ReplySettings(
     val autoDeleteMinutes: Int = 5,
     val multiLanguageEnabled: Boolean = false,
     val scanningEnabled: Boolean = true,
+    // Provider Selection Mode
+    val selectionMode: ProviderSelectionMode = ProviderSelectionMode.AUTO_FALLBACK,
+    val preferredProvider: AiProvider = AiProvider.GEMINI,
     // Multi-provider keys
     val customApiKey: String = "", // Legacy alias for gemini
     val geminiApiKey: String = "",
     val openaiApiKey: String = "",
     val claudeApiKey: String = "",
-    val groqApiKey: String = "",
+    val grokApiKey: String = "",
     // Fallback chain ordering
     val providerChain: List<AiProvider> = listOf(
         AiProvider.GEMINI,
         AiProvider.OPENAI,
         AiProvider.CLAUDE,
-        AiProvider.GROQ
+        AiProvider.GROK
     )
 ) {
     val openAiApiKey: String get() = openaiApiKey
@@ -116,7 +138,7 @@ data class ReplySettings(
             AiProvider.GEMINI -> geminiApiKey.ifBlank { customApiKey }
             AiProvider.OPENAI -> openaiApiKey
             AiProvider.CLAUDE -> claudeApiKey
-            AiProvider.GROQ -> groqApiKey
+            AiProvider.GROK -> grokApiKey
         }.trim()
     }
 }

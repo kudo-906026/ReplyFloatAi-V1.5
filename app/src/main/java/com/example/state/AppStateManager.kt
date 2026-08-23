@@ -10,11 +10,13 @@ import android.widget.Toast
 import com.example.api.AiFallbackEngine
 import com.example.model.AiProvider
 import com.example.model.DetectedQuestion
+import com.example.model.ProviderSelectionMode
 import com.example.model.QuestionDetectionHistory
 import com.example.model.ReplyItem
 import com.example.model.ReplyLength
 import com.example.model.ReplySettings
 import com.example.model.ReplyTone
+import com.example.util.QuestionValidator
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -116,13 +118,21 @@ object AppStateManager {
                 AiProvider.GEMINI -> current.copy(geminiApiKey = key.trim(), customApiKey = key.trim())
                 AiProvider.OPENAI -> current.copy(openaiApiKey = key.trim())
                 AiProvider.CLAUDE -> current.copy(claudeApiKey = key.trim())
-                AiProvider.GROQ -> current.copy(groqApiKey = key.trim())
+                AiProvider.GROK -> current.copy(grokApiKey = key.trim())
             }
         }
     }
 
     fun updateProviderKey(provider: AiProvider, key: String) {
         updateProviderApiKey(provider, key)
+    }
+
+    fun updateSelectionMode(mode: ProviderSelectionMode) {
+        _settings.update { it.copy(selectionMode = mode) }
+    }
+
+    fun updatePreferredProvider(provider: AiProvider) {
+        _settings.update { it.copy(preferredProvider = provider) }
     }
 
     fun moveProviderInChain(fromIndex: Int, toIndex: Int) {
@@ -377,17 +387,6 @@ object AppStateManager {
     }
 
     private fun cleanQuestion(raw: String): String {
-        val trimmed = raw.trim()
-        val questionMarkIndex = trimmed.lastIndexOfAny(charArrayOf('?', '？'))
-        if (questionMarkIndex == -1) return trimmed
-
-        val sentenceStart = trimmed.substring(0, questionMarkIndex).lastIndexOfAny(charArrayOf('\n', '.', '!', ';'))
-        val extracted = if (sentenceStart != -1 && sentenceStart < questionMarkIndex) {
-            trimmed.substring(sentenceStart + 1, questionMarkIndex + 1).trim()
-        } else {
-            trimmed.substring(0, questionMarkIndex + 1).trim()
-        }
-
-        return extracted.take(300)
+        return QuestionValidator.cleanAndExtractQuestion(raw) ?: ""
     }
 }
