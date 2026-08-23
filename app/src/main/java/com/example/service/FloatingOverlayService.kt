@@ -52,7 +52,7 @@ class FloatingOverlayService : Service() {
 
     private fun startForegroundServiceNotification() {
         val channelId = "reply_float_ai_channel"
-        val channelName = "replyFloatAi Floating Service"
+        val channelName = "ReplyFloatAi Floating Service"
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
@@ -60,7 +60,7 @@ class FloatingOverlayService : Service() {
                 channelName,
                 NotificationManager.IMPORTANCE_LOW
             ).apply {
-                description = "Keeps replyFloatAi floating bar active over apps"
+                description = "Keeps ReplyFloatAi floating bar active over apps"
             }
             val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             manager.createNotificationChannel(channel)
@@ -74,9 +74,9 @@ class FloatingOverlayService : Service() {
         )
 
         val notification: Notification = NotificationCompat.Builder(this, channelId)
-            .setContentTitle("replyFloatAi Active")
+            .setContentTitle("ReplyFloatAi Active")
             .setContentText("Floating bar is running over other apps")
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setSmallIcon(R.drawable.ic_stat_reply_float)
             .setContentIntent(pendingIntent)
             .setOngoing(true)
             .build()

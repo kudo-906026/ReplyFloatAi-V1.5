@@ -22,6 +22,6 @@ dependencyResolutionManagement {
   }
 }
 
-rootProject.name = "replyFloatAi"
+rootProject.name = "ReplyFloatAi"
 
 include(":app")
