@@ -29,6 +29,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ChatBubbleOutline
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.DragHandle
@@ -64,7 +65,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -204,10 +204,11 @@ fun CollapsedFloatingBar(
                         modifier = Modifier.size(16.dp)
                     )
                 } else {
-                    Image(
-                        painter = painterResource(id = R.drawable.ic_app_logo),
+                    Icon(
+                        imageVector = Icons.Default.ChatBubbleOutline,
                         contentDescription = "ReplyFloat AI",
-                        modifier = Modifier.size(26.dp)
+                        tint = Color(0xFF38BDF8),
+                        modifier = Modifier.size(18.dp)
                     )
                 }
             }
@@ -221,7 +222,7 @@ fun CollapsedFloatingBar(
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     Text(
-                        text = "replyFloatAi",
+                        text = "ReplyFloatAi",
                         color = Color.White,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold
@@ -635,14 +636,15 @@ private fun OverlayHeader(
                     .background(Color(0xFF080C14)),
                 contentAlignment = Alignment.Center
             ) {
-                Image(
-                    painter = painterResource(id = R.drawable.ic_app_logo),
+                Icon(
+                    imageVector = Icons.Default.ChatBubbleOutline,
                     contentDescription = "ReplyFloat AI",
-                    modifier = Modifier.size(24.dp)
+                    tint = Color(0xFF38BDF8),
+                    modifier = Modifier.size(16.dp)
                 )
             }
             Text(
-                text = "replyFloatAi",
+                text = "ReplyFloatAi",
                 color = Color.White,
                 fontWeight = FontWeight.Bold,
                 fontSize = 14.sp

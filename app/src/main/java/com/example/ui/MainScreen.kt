@@ -45,6 +45,7 @@ import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.ChatBubbleOutline
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Close
@@ -112,8 +113,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.painterResource
-import com.example.R
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -181,15 +180,16 @@ fun MainScreen() {
                                 .border(1.dp, Color(0xFF38BDF8).copy(alpha = 0.4f), RoundedCornerShape(10.dp)),
                             contentAlignment = Alignment.Center
                         ) {
-                            Image(
-                                painter = painterResource(id = R.drawable.ic_app_logo),
-                                contentDescription = "ReplyFloat AI Logo",
-                                modifier = Modifier.size(34.dp).clip(RoundedCornerShape(9.dp))
+                            Icon(
+                                imageVector = Icons.Default.ChatBubbleOutline,
+                                contentDescription = "ReplyFloat AI",
+                                tint = Color(0xFF38BDF8),
+                                modifier = Modifier.size(20.dp)
                             )
                         }
                         Column {
                             Text(
-                                text = "replyFloatAi",
+                                text = "ReplyFloatAi",
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 18.sp,
                                 color = MaterialTheme.colorScheme.onSurface
