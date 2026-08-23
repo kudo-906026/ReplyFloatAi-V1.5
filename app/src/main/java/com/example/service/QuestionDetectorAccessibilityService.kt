@@ -30,7 +30,7 @@ class QuestionDetectorAccessibilityService : AccessibilityService() {
                 AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED
         info.feedbackType = AccessibilityServiceInfo.FEEDBACK_GENERIC
         info.flags = AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS
-        info.notificationTimeout = 800
+        info.notificationTimeout = 900
         serviceInfo = info
     }
 
@@ -48,18 +48,19 @@ class QuestionDetectorAccessibilityService : AccessibilityService() {
             return
         }
 
-        // For window content changes, skip non-structural/cursor-only events to prevent lag
-        if (event.eventType == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED) {
+        // Filter out rapid micro-events: skip non-textual cursor/selection/scroll fluctuations
+        val eventType = event.eventType
+        if (eventType == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED) {
             val changeTypes = event.contentChangeTypes
             if (changeTypes != 0 && (changeTypes and (AccessibilityEvent.CONTENT_CHANGE_TYPE_TEXT or AccessibilityEvent.CONTENT_CHANGE_TYPE_SUBTREE)) == 0) {
                 return
             }
         }
 
-        // Debounce scanning to ~850ms to ensure content stabilizes before scanning
+        // Debounce scanning to ~950ms to ensure the screen stops changing before analyzing
         scanJob?.cancel()
         scanJob = serviceScope.launch {
-            delay(850)
+            delay(950)
             scanActiveWindowForQuestions(packageName)
         }
     }
@@ -83,7 +84,7 @@ class QuestionDetectorAccessibilityService : AccessibilityService() {
         }
 
         try {
-            val questions = mutableListOf<String>()
+            val questions = ArrayList<String>(4)
             findQuestionsInNode(rootNode, questions, 0)
 
             if (questions.isNotEmpty()) {
@@ -103,11 +104,16 @@ class QuestionDetectorAccessibilityService : AccessibilityService() {
         outQuestions: MutableList<String>,
         depth: Int
     ) {
-        if (node == null || depth > 15 || outQuestions.size >= 8) return
+        if (node == null || depth > 10 || outQuestions.size >= 5) return
 
         // Exclude our own app's nodes / overlay elements
         val nodePkg = node.packageName?.toString() ?: ""
         if (isOurAppPackage(nodePkg)) {
+            return
+        }
+
+        // Skip invisible nodes to reduce traversal overhead
+        if (!node.isVisibleToUser) {
             return
         }
 

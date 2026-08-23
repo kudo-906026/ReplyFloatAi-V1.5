@@ -2,6 +2,46 @@ package com.example.model
 
 import java.util.UUID
 
+enum class AiProvider(
+    val id: String,
+    val displayName: String,
+    val defaultModel: String,
+    val hint: String
+) {
+    GEMINI(
+        id = "gemini",
+        displayName = "Gemini",
+        defaultModel = "gemini-2.5-flash",
+        hint = "Google AI Studio Key"
+    ),
+    OPENAI(
+        id = "openai",
+        displayName = "OpenAI",
+        defaultModel = "gpt-4o-mini",
+        hint = "OpenAI API Key (sk-...)"
+    ),
+    CLAUDE(
+        id = "claude",
+        displayName = "Claude",
+        defaultModel = "claude-3-5-haiku-20241022",
+        hint = "Anthropic Claude Key (sk-ant-...)"
+    ),
+    GROQ(
+        id = "groq",
+        displayName = "Groq",
+        defaultModel = "llama-3.3-70b-versatile",
+        hint = "Groq Cloud API Key (gsk_...)"
+    );
+
+    val modelName: String get() = defaultModel
+
+    companion object {
+        fun fromId(id: String): AiProvider {
+            return entries.firstOrNull { it.id.equals(id, ignoreCase = true) } ?: GEMINI
+        }
+    }
+}
+
 enum class ReplyLength(val label: String, val promptInstruction: String) {
     ONE_WORD(
         label = "1 word",
@@ -42,6 +82,7 @@ enum class ReplyTone(val label: String, val promptInstruction: String) {
 data class ReplyItem(
     val id: String = UUID.randomUUID().toString(),
     val text: String,
+    val generatedByProvider: AiProvider? = null,
     val timestamp: Long = System.currentTimeMillis()
 )
 
@@ -52,16 +93,40 @@ data class ReplySettings(
     val autoGenerate: Boolean = true,
     val autoDeleteHistory: Boolean = true,
     val autoDeleteMinutes: Int = 5,
-    val customApiKey: String = "",
     val multiLanguageEnabled: Boolean = false,
-    val scanningEnabled: Boolean = true
-)
+    val scanningEnabled: Boolean = true,
+    // Multi-provider keys
+    val customApiKey: String = "", // Legacy alias for gemini
+    val geminiApiKey: String = "",
+    val openaiApiKey: String = "",
+    val claudeApiKey: String = "",
+    val groqApiKey: String = "",
+    // Fallback chain ordering
+    val providerChain: List<AiProvider> = listOf(
+        AiProvider.GEMINI,
+        AiProvider.OPENAI,
+        AiProvider.CLAUDE,
+        AiProvider.GROQ
+    )
+) {
+    val openAiApiKey: String get() = openaiApiKey
+
+    fun getApiKeyFor(provider: AiProvider): String {
+        return when (provider) {
+            AiProvider.GEMINI -> geminiApiKey.ifBlank { customApiKey }
+            AiProvider.OPENAI -> openaiApiKey
+            AiProvider.CLAUDE -> claudeApiKey
+            AiProvider.GROQ -> groqApiKey
+        }.trim()
+    }
+}
 
 data class DetectedQuestion(
     val id: String = UUID.randomUUID().toString(),
     val text: String,
     val englishMeaning: String? = null,
     val sourceApp: String? = null,
+    val generatedByProvider: AiProvider? = null,
     val timestamp: Long = System.currentTimeMillis()
 )
 
@@ -71,11 +136,15 @@ data class QuestionDetectionHistory(
     val englishMeaning: String? = null,
     val replies: List<String> = emptyList(),
     val sourceApp: String? = null,
+    val generatedByProvider: AiProvider? = null,
     val timestamp: Long = System.currentTimeMillis()
 )
 
-data class GeminiReplyResult(
+data class AiReplyResult(
     val original: String,
     val englishMeaning: String? = null,
-    val replies: List<String> = emptyList()
+    val replies: List<String> = emptyList(),
+    val provider: AiProvider = AiProvider.GEMINI
 )
+
+typealias GeminiReplyResult = AiReplyResult

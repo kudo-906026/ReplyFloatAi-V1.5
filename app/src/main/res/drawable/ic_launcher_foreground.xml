@@ -1,9 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item
-        android:width="66dp"
-        android:height="66dp"
-        android:drawable="@drawable/reply_float_icon_1787404684141"
+        android:width="76dp"
+        android:height="76dp"
+        android:drawable="@drawable/ic_app_logo"
         android:gravity="center" />
 </layer-list>
+
 

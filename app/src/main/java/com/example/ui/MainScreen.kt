@@ -13,6 +13,8 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -39,6 +41,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
@@ -47,6 +51,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.OpenInNew
@@ -62,6 +67,7 @@ import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -106,12 +112,17 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
+import com.example.R
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import com.example.model.AiProvider
 import com.example.model.ReplyLength
 import com.example.model.ReplyTone
 import com.example.service.FloatingOverlayService
@@ -132,13 +143,13 @@ fun MainScreen() {
     val settings by AppStateManager.settings.collectAsState()
     val currentQuestion by AppStateManager.currentQuestion.collectAsState()
     val activeReplies by AppStateManager.activeReplies.collectAsState()
+    val activeProvider by AppStateManager.activeProvider.collectAsState()
     val isGenerating by AppStateManager.isGenerating.collectAsState()
     val errorMessage by AppStateManager.errorMessage.collectAsState()
     val history by AppStateManager.history.collectAsState()
 
     var selectedTab by remember { mutableIntStateOf(0) }
     var testInputText by remember { mutableStateOf("Are you free to meet tomorrow at 3 PM?") }
-    var showApiKeyDialog by remember { mutableStateOf(false) }
 
     // Re-check permissions when activity resumes
     DisposableEffect(lifecycleOwner) {
@@ -164,20 +175,16 @@ fun MainScreen() {
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(34.dp)
-                                .clip(CircleShape)
-                                .background(
-                                    Brush.linearGradient(
-                                        listOf(Color(0xFF8B1515), Color(0xFFFF5757))
-                                    )
-                                ),
+                                .size(36.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(Color(0xFF080C14))
+                                .border(1.dp, Color(0xFF38BDF8).copy(alpha = 0.4f), RoundedCornerShape(10.dp)),
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.AutoAwesome,
-                                contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier.size(18.dp)
+                            Image(
+                                painter = painterResource(id = R.drawable.ic_app_logo),
+                                contentDescription = "ReplyFloat AI Logo",
+                                modifier = Modifier.size(34.dp).clip(RoundedCornerShape(9.dp))
                             )
                         }
                         Column {
@@ -258,7 +265,7 @@ fun MainScreen() {
                 Tab(
                     selected = selectedTab == 1,
                     onClick = { selectedTab = 1 },
-                    text = { Text("Settings & Length", fontSize = 13.sp, fontWeight = FontWeight.SemiBold) },
+                    text = { Text("Settings & Providers", fontSize = 13.sp, fontWeight = FontWeight.SemiBold) },
                     icon = { Icon(Icons.Default.Settings, contentDescription = null, modifier = Modifier.size(18.dp)) }
                 )
                 Tab(
@@ -276,6 +283,7 @@ fun MainScreen() {
                     isOverlayRunning = isOverlayRunning,
                     currentQuestion = currentQuestion?.text,
                     activeReplies = activeReplies,
+                    activeProvider = activeProvider,
                     isGenerating = isGenerating,
                     errorMessage = errorMessage,
                     testInputText = testInputText,
@@ -303,6 +311,9 @@ fun MainScreen() {
                     },
                     onDismissReply = { id ->
                         AppStateManager.dismissReply(id)
+                    },
+                    onNavigateToSettings = {
+                        selectedTab = 1
                     }
                 )
 
@@ -311,7 +322,26 @@ fun MainScreen() {
                     onUpdateSettings = { AppStateManager.updateSettings(it) },
                     onUpdateLength = { AppStateManager.updateReplyLength(it) },
                     onUpdateCount = { AppStateManager.updateReplyCount(it) },
-                    onUpdateTone = { AppStateManager.updateTone(it) }
+                    onUpdateTone = { AppStateManager.updateTone(it) },
+                    onUpdateProviderKey = { provider, key -> AppStateManager.updateProviderKey(provider, key) },
+                    onMoveProviderUp = { index ->
+                        val currentChain = settings.providerChain.toMutableList()
+                        if (index > 0 && index < currentChain.size) {
+                            val temp = currentChain[index]
+                            currentChain[index] = currentChain[index - 1]
+                            currentChain[index - 1] = temp
+                            AppStateManager.updateProviderChain(currentChain)
+                        }
+                    },
+                    onMoveProviderDown = { index ->
+                        val currentChain = settings.providerChain.toMutableList()
+                        if (index >= 0 && index < currentChain.size - 1) {
+                            val temp = currentChain[index]
+                            currentChain[index] = currentChain[index + 1]
+                            currentChain[index + 1] = temp
+                            AppStateManager.updateProviderChain(currentChain)
+                        }
+                    }
                 )
 
                 2 -> HistoryTab(
@@ -339,6 +369,7 @@ fun ControlsAndTestTab(
     isOverlayRunning: Boolean,
     currentQuestion: String?,
     activeReplies: List<com.example.model.ReplyItem>,
+    activeProvider: AiProvider? = null,
     isGenerating: Boolean,
     errorMessage: String? = null,
     testInputText: String,
@@ -350,7 +381,8 @@ fun ControlsAndTestTab(
     onTestDetection: (String) -> Unit,
     onRetryGeneration: () -> Unit,
     onCopyReply: (com.example.model.ReplyItem) -> Unit,
-    onDismissReply: (String) -> Unit
+    onDismissReply: (String) -> Unit,
+    onNavigateToSettings: () -> Unit = {}
 ) {
     LazyColumn(
         modifier = Modifier
@@ -665,7 +697,7 @@ fun ControlsAndTestTab(
                                 strokeWidth = 2.dp
                             )
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Gemini is generating replies...")
+                            Text("Calling AI fallback chain...")
                         } else {
                             Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(6.dp))
@@ -693,7 +725,7 @@ fun ControlsAndTestTab(
                                     strokeWidth = 2.dp
                                 )
                                 Text(
-                                    text = "Generating replies with Gemini...",
+                                    text = "Generating replies across configured providers...",
                                     fontSize = 12.sp,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -725,7 +757,7 @@ fun ControlsAndTestTab(
                                         modifier = Modifier.size(18.dp)
                                     )
                                     Text(
-                                        text = "Couldn't generate reply",
+                                        text = "Generation Unavailable",
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 13.sp,
                                         color = MaterialTheme.colorScheme.onErrorContainer
@@ -734,29 +766,69 @@ fun ControlsAndTestTab(
                                 Text(
                                     text = errorMessage,
                                     fontSize = 12.sp,
-                                    color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.8f)
+                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                    color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.9f)
                                 )
-                                Button(
-                                    onClick = onRetryGeneration,
-                                    shape = RoundedCornerShape(8.dp),
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = MaterialTheme.colorScheme.error
-                                    )
+
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(14.dp))
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text("Tap to Retry", fontSize = 12.sp)
+                                    Button(
+                                        onClick = onRetryGeneration,
+                                        shape = RoundedCornerShape(8.dp),
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = MaterialTheme.colorScheme.error
+                                        )
+                                    ) {
+                                        Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(14.dp))
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("Retry Chain", fontSize = 12.sp)
+                                    }
+
+                                    OutlinedButton(
+                                        onClick = onNavigateToSettings,
+                                        shape = RoundedCornerShape(8.dp),
+                                        colors = ButtonDefaults.outlinedButtonColors(
+                                            contentColor = MaterialTheme.colorScheme.onErrorContainer
+                                        )
+                                    ) {
+                                        Icon(Icons.Default.Settings, contentDescription = null, modifier = Modifier.size(14.dp))
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("Open Settings", fontSize = 12.sp)
+                                    }
                                 }
                             }
                         }
                     } else if (activeReplies.isNotEmpty()) {
-                        Text(
-                            text = "SUGGESTED REPLIES (Tap Copy to put on clipboard & remove):",
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary,
-                            letterSpacing = 0.5.sp
-                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "SUGGESTED REPLIES:",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary,
+                                letterSpacing = 0.5.sp
+                            )
+                            if (activeProvider != null) {
+                                Surface(
+                                    shape = RoundedCornerShape(4.dp),
+                                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                                    border = BorderStroke(0.6.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f))
+                                ) {
+                                    Text(
+                                        text = "via ${activeProvider.displayName}",
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                    )
+                                }
+                            }
+                        }
 
                         activeReplies.forEach { reply ->
                             ReplyCardItem(
@@ -794,16 +866,265 @@ fun SettingsTab(
     onUpdateSettings: (com.example.model.ReplySettings) -> Unit,
     onUpdateLength: (ReplyLength) -> Unit,
     onUpdateCount: (Int) -> Unit,
-    onUpdateTone: (ReplyTone) -> Unit
+    onUpdateTone: (ReplyTone) -> Unit,
+    onUpdateProviderKey: (AiProvider, String) -> Unit = { _, _ -> },
+    onMoveProviderUp: (Int) -> Unit = {},
+    onMoveProviderDown: (Int) -> Unit = {}
 ) {
-    var apiKeyText by remember { mutableStateOf(settings.customApiKey) }
-
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
+        // Multi-Provider Fallback Chain Reordering & Status Card
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                ),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Tune,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Text(
+                                text = "AUTOMATIC FALLBACK CHAIN",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary,
+                                letterSpacing = 0.5.sp
+                            )
+                        }
+                    }
+
+                    Text(
+                        text = "When generating replies, providers are attempted in the order listed below. If a provider fails or encounters a quota/rate-limit (HTTP 429), the next provider in the chain is automatically called.",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))
+
+                    // Reorderable list of providers
+                    settings.providerChain.forEachIndexed { index, provider ->
+                        val hasKey = when (provider) {
+                            AiProvider.GEMINI -> settings.customApiKey.isNotBlank() || com.example.BuildConfig.GEMINI_API_KEY.isNotBlank()
+                            AiProvider.OPENAI -> settings.openAiApiKey.isNotBlank()
+                            AiProvider.CLAUDE -> settings.claudeApiKey.isNotBlank()
+                            AiProvider.GROQ -> settings.groqApiKey.isNotBlank()
+                        }
+
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                            border = BorderStroke(
+                                1.dp,
+                                if (index == 0) MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
+                                else MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
+                            ),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    // Order number badge
+                                    Box(
+                                        modifier = Modifier
+                                            .size(24.dp)
+                                            .clip(CircleShape)
+                                            .background(
+                                                if (index == 0) MaterialTheme.colorScheme.primary
+                                                else MaterialTheme.colorScheme.surfaceVariant
+                                            ),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = "${index + 1}",
+                                            color = if (index == 0) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+
+                                    Column {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            Text(
+                                                text = provider.displayName,
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 13.sp,
+                                                color = MaterialTheme.colorScheme.onSurface
+                                            )
+                                            if (index == 0) {
+                                                Surface(
+                                                    shape = RoundedCornerShape(4.dp),
+                                                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                                                ) {
+                                                    Text(
+                                                        text = "PRIMARY",
+                                                        fontSize = 8.5.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = MaterialTheme.colorScheme.primary,
+                                                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                                    )
+                                                }
+                                            }
+                                        }
+                                        Text(
+                                            text = if (hasKey) "Ready: ${provider.modelName}" else "No key entered yet",
+                                            fontSize = 10.5.sp,
+                                            color = if (hasKey) Color(0xFF10B981) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                                        )
+                                    }
+                                }
+
+                                // Up / Down reorder arrows
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(2.dp)
+                                ) {
+                                    IconButton(
+                                        onClick = { onMoveProviderUp(index) },
+                                        enabled = index > 0,
+                                        modifier = Modifier.size(30.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.ArrowUpward,
+                                            contentDescription = "Move ${provider.displayName} Up",
+                                            tint = if (index > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f),
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                    IconButton(
+                                        onClick = { onMoveProviderDown(index) },
+                                        enabled = index < settings.providerChain.size - 1,
+                                        modifier = Modifier.size(30.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.ArrowDownward,
+                                            contentDescription = "Move ${provider.displayName} Down",
+                                            tint = if (index < settings.providerChain.size - 1) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f),
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Multi-Provider API Key Inputs
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                )
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Key,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Text(
+                            text = "PROVIDER API KEYS",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary,
+                            letterSpacing = 0.5.sp
+                        )
+                    }
+
+                    Text(
+                        text = "Enter keys for as many providers as you have. You don't need all four — ReplyFloat will seamlessly route through whatever keys are provided.",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    // 1. Gemini
+                    ProviderApiKeyInputField(
+                        provider = AiProvider.GEMINI,
+                        currentKey = settings.customApiKey,
+                        isEnvKeyPresent = com.example.BuildConfig.GEMINI_API_KEY.isNotBlank(),
+                        hint = "AI Studio environment key active by default (or custom AIzaSy...)",
+                        onKeyChanged = { onUpdateProviderKey(AiProvider.GEMINI, it) }
+                    )
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
+
+                    // 2. OpenAI
+                    ProviderApiKeyInputField(
+                        provider = AiProvider.OPENAI,
+                        currentKey = settings.openAiApiKey,
+                        hint = "OpenAI key (sk-...)",
+                        onKeyChanged = { onUpdateProviderKey(AiProvider.OPENAI, it) }
+                    )
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
+
+                    // 3. Claude
+                    ProviderApiKeyInputField(
+                        provider = AiProvider.CLAUDE,
+                        currentKey = settings.claudeApiKey,
+                        hint = "Anthropic Claude key (sk-ant-...)",
+                        onKeyChanged = { onUpdateProviderKey(AiProvider.CLAUDE, it) }
+                    )
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
+
+                    // 4. Groq
+                    ProviderApiKeyInputField(
+                        provider = AiProvider.GROQ,
+                        currentKey = settings.groqApiKey,
+                        hint = "Groq Cloud key (gsk_...)",
+                        onKeyChanged = { onUpdateProviderKey(AiProvider.GROQ, it) }
+                    )
+                }
+            }
+        }
+
         // Reply Length Configuration
         item {
             Card(
@@ -835,21 +1156,18 @@ fun SettingsTab(
                         Surface(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clip(RoundedCornerShape(10.dp))
-                                .border(
-                                    1.dp,
-                                    if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
-                                    RoundedCornerShape(10.dp)
-                                )
-                                .background(
-                                    if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.1f) else Color.Transparent
-                                )
-                                .clickable { onUpdateLength(lengthOption) }
-                                .padding(12.dp),
-                            color = Color.Transparent
+                                .clickable { onUpdateLength(lengthOption) },
+                            shape = RoundedCornerShape(10.dp),
+                            color = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                            border = BorderStroke(
+                                1.dp,
+                                if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
+                            )
                         ) {
                             Row(
-                                modifier = Modifier.fillMaxWidth(),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(12.dp),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
@@ -1352,50 +1670,117 @@ fun SettingsTab(
                 }
             }
         }
+    }
+}
 
-        // Custom API Key Card
-        item {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                )
+@Composable
+fun ProviderApiKeyInputField(
+    provider: AiProvider,
+    currentKey: String,
+    isEnvKeyPresent: Boolean = false,
+    hint: String,
+    onKeyChanged: (String) -> Unit
+) {
+    var textValue by remember(currentKey) { mutableStateOf(currentKey) }
+    var isPasswordVisible by remember { mutableStateOf(false) }
+
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                Text(
+                    text = provider.displayName,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = "(${provider.modelName})",
+                    fontSize = 10.5.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            // Status chip
+            if (isEnvKeyPresent && textValue.isBlank()) {
+                Surface(
+                    shape = RoundedCornerShape(4.dp),
+                    color = Color(0xFF10B981).copy(alpha = 0.15f)
                 ) {
                     Text(
-                        text = "GEMINI API CONFIGURATION",
-                        fontSize = 11.sp,
+                        text = "AI Studio Key Active",
+                        fontSize = 9.sp,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary,
-                        letterSpacing = 0.5.sp
+                        color = Color(0xFF10B981),
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                     )
-
+                }
+            } else if (textValue.isNotBlank()) {
+                Surface(
+                    shape = RoundedCornerShape(4.dp),
+                    color = Color(0xFF38BDF8).copy(alpha = 0.15f)
+                ) {
                     Text(
-                        text = "Default uses injected environment key. You can also specify an optional custom key below:",
-                        fontSize = 11.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        text = "Custom Key Set",
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF0284C7),
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                     )
-
-                    OutlinedTextField(
-                        value = apiKeyText,
-                        onValueChange = {
-                            apiKeyText = it
-                            onUpdateSettings(settings.copy(customApiKey = it))
-                        },
-                        label = { Text("Custom Gemini API Key (Optional)") },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(10.dp),
-                        leadingIcon = {
-                            Icon(Icons.Default.Lock, contentDescription = null)
-                        }
+                }
+            } else {
+                Surface(
+                    shape = RoundedCornerShape(4.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant
+                ) {
+                    Text(
+                        text = "No Key",
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Normal,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                     )
                 }
             }
         }
+
+        OutlinedTextField(
+            value = textValue,
+            onValueChange = {
+                textValue = it
+                onKeyChanged(it)
+            },
+            placeholder = { Text(hint, fontSize = 11.sp) },
+            visualTransformation = if (isPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+            trailingIcon = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (textValue.isNotBlank()) {
+                        IconButton(onClick = {
+                            textValue = ""
+                            onKeyChanged("")
+                        }) {
+                            Icon(Icons.Default.Clear, contentDescription = "Clear", modifier = Modifier.size(16.dp))
+                        }
+                    }
+                    IconButton(onClick = { isPasswordVisible = !isPasswordVisible }) {
+                        Icon(
+                            imageVector = if (isPasswordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                            contentDescription = if (isPasswordVisible) "Hide key" else "Show key",
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
+            },
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(10.dp),
+            singleLine = true
+        )
     }
 }
 

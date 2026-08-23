@@ -7,7 +7,8 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import android.widget.Toast
-import com.example.api.GeminiClient
+import com.example.api.AiFallbackEngine
+import com.example.model.AiProvider
 import com.example.model.DetectedQuestion
 import com.example.model.QuestionDetectionHistory
 import com.example.model.ReplyItem
@@ -24,11 +25,10 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import java.util.UUID
 
 object AppStateManager {
     private const val TAG = "AppStateManager"
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var generationJob: Job? = null
 
     private val _settings = MutableStateFlow(ReplySettings())
@@ -39,6 +39,9 @@ object AppStateManager {
 
     private val _activeReplies = MutableStateFlow<List<ReplyItem>>(emptyList())
     val activeReplies: StateFlow<List<ReplyItem>> = _activeReplies.asStateFlow()
+
+    private val _activeProvider = MutableStateFlow<AiProvider?>(null)
+    val activeProvider: StateFlow<AiProvider?> = _activeProvider.asStateFlow()
 
     private val _isGenerating = MutableStateFlow(false)
     val isGenerating: StateFlow<Boolean> = _isGenerating.asStateFlow()
@@ -65,6 +68,7 @@ object AppStateManager {
                     "Available then, looking forward to it."
                 ),
                 sourceApp = "Messaging",
+                generatedByProvider = AiProvider.GEMINI,
                 timestamp = System.currentTimeMillis() - 30_000
             )
         )
@@ -75,10 +79,10 @@ object AppStateManager {
     private var lastDetectionTime: Long = 0
 
     init {
-        // Start continuous background auto-cleanup ticker
+        // Start lightweight background auto-cleanup ticker running on Dispatchers.Default
         scope.launch {
             while (true) {
-                kotlinx.coroutines.delay(2000L)
+                kotlinx.coroutines.delay(10_000L)
                 cleanupExpiredHistory()
             }
         }
@@ -86,7 +90,7 @@ object AppStateManager {
 
     fun cleanupExpiredHistory() {
         val cfg = _settings.value
-        if (!cfg.autoDeleteHistory) return
+        if (!cfg.autoDeleteHistory || _history.value.isEmpty()) return
 
         val maxAgeMs = cfg.autoDeleteMinutes.coerceIn(1, 10) * 60 * 1000L
         val now = System.currentTimeMillis()
@@ -95,7 +99,7 @@ object AppStateManager {
             val filtered = currentList.filter { item ->
                 (now - item.timestamp) < maxAgeMs
             }
-            filtered
+            if (filtered.size == currentList.size) currentList else filtered
         }
     }
 
@@ -104,6 +108,38 @@ object AppStateManager {
         if (newSettings.autoDeleteHistory) {
             cleanupExpiredHistory()
         }
+    }
+
+    fun updateProviderApiKey(provider: AiProvider, key: String) {
+        _settings.update { current ->
+            when (provider) {
+                AiProvider.GEMINI -> current.copy(geminiApiKey = key.trim(), customApiKey = key.trim())
+                AiProvider.OPENAI -> current.copy(openaiApiKey = key.trim())
+                AiProvider.CLAUDE -> current.copy(claudeApiKey = key.trim())
+                AiProvider.GROQ -> current.copy(groqApiKey = key.trim())
+            }
+        }
+    }
+
+    fun updateProviderKey(provider: AiProvider, key: String) {
+        updateProviderApiKey(provider, key)
+    }
+
+    fun moveProviderInChain(fromIndex: Int, toIndex: Int) {
+        _settings.update { current ->
+            val chain = current.providerChain.toMutableList()
+            if (fromIndex in chain.indices && toIndex in chain.indices) {
+                val item = chain.removeAt(fromIndex)
+                chain.add(toIndex, item)
+                current.copy(providerChain = chain)
+            } else {
+                current
+            }
+        }
+    }
+
+    fun updateProviderChain(newChain: List<AiProvider>) {
+        _settings.update { it.copy(providerChain = newChain) }
     }
 
     fun updateAutoDeleteSettings(enabled: Boolean, minutes: Int) {
@@ -215,7 +251,7 @@ object AppStateManager {
             return
         }
 
-        // 1. Cancel any previous in-flight Gemini request so it cannot overwrite this one
+        // 1. Cancel any previous in-flight AI request so it cannot overwrite this one
         generationJob?.cancel()
 
         // 2. Clear existing replies, clear error, and show loading indicator immediately
@@ -227,45 +263,54 @@ object AppStateManager {
             try {
                 val currentCfg = _settings.value
 
-                val result = GeminiClient.generateReplies(
+                // Execute the fallback chain across configured providers
+                val result = AiFallbackEngine.generateRepliesWithFallback(
                     question = text,
                     count = currentCfg.count,
                     length = currentCfg.length,
                     tone = currentCfg.tone,
-                    customApiKey = currentCfg.customApiKey,
-                    multiLanguage = currentCfg.multiLanguageEnabled
+                    multiLanguage = currentCfg.multiLanguageEnabled,
+                    settings = currentCfg
                 )
 
-                result.onSuccess { geminiResult ->
-                    val items = geminiResult.replies.map { ReplyItem(text = it) }
+                result.onSuccess { aiResult ->
+                    val provider = aiResult.provider
+                    _activeProvider.value = provider
+
+                    val items = aiResult.replies.map {
+                        ReplyItem(text = it, generatedByProvider = provider)
+                    }
                     _activeReplies.value = items
                     _errorMessage.value = null
-                    
-                    // Update current question with any refined text and english translation
-                    val resolvedOriginal = geminiResult.original.ifBlank { text }
+
+                    // Update current question with any refined text, english translation and provider
+                    val resolvedOriginal = aiResult.original.ifBlank { text }
                     _currentQuestion.update { old ->
                         old?.copy(
                             text = resolvedOriginal,
-                            englishMeaning = geminiResult.englishMeaning
+                            englishMeaning = aiResult.englishMeaning,
+                            generatedByProvider = provider
                         ) ?: DetectedQuestion(
                             text = resolvedOriginal,
-                            englishMeaning = geminiResult.englishMeaning,
-                            sourceApp = sourceApp
+                            englishMeaning = aiResult.englishMeaning,
+                            sourceApp = sourceApp,
+                            generatedByProvider = provider
                         )
                     }
 
-                    // Mark question as successfully processed so subsequent re-scans won't re-trigger
+                    // Mark question as successfully processed
                     lastProcessedQuestion = text
-                    Log.d(TAG, "Successfully processed and cached answer for: \"$text\" (meaning: ${geminiResult.englishMeaning})")
+                    Log.d(TAG, "Successfully processed via [${provider.displayName}] for: \"$text\"")
 
                     // Add to history
                     if (items.isNotEmpty()) {
                         _history.update { oldList ->
                             val historyItem = QuestionDetectionHistory(
                                 question = resolvedOriginal,
-                                englishMeaning = geminiResult.englishMeaning,
-                                replies = geminiResult.replies,
+                                englishMeaning = aiResult.englishMeaning,
+                                replies = aiResult.replies,
                                 sourceApp = sourceApp ?: _currentQuestion.value?.sourceApp,
+                                generatedByProvider = provider,
                                 timestamp = System.currentTimeMillis()
                             )
                             (listOf(historyItem) + oldList).take(30)
@@ -274,16 +319,16 @@ object AppStateManager {
                 }.onFailure { ex ->
                     Log.e(TAG, "Failed to generate replies for \"$text\": ${ex.message}")
                     _activeReplies.value = emptyList()
-                    _errorMessage.value = ex.message ?: "Couldn't generate reply, tap to retry"
-                    // Do not mark as processed on failure so retry can be attempted
+                    _activeProvider.value = null
+                    _errorMessage.value = ex.message ?: "All providers unavailable — check your API keys in Settings"
                 }
             } catch (e: CancellationException) {
                 Log.d(TAG, "Previous generation was cancelled for question: \"$text\"")
-                // Do not update states when cancelled by a newer request
             } catch (e: Exception) {
                 Log.e(TAG, "Error in generateRepliesForQuestion", e)
                 _activeReplies.value = emptyList()
-                _errorMessage.value = e.message ?: "Couldn't generate reply, tap to retry"
+                _activeProvider.value = null
+                _errorMessage.value = e.message ?: "All providers unavailable — check your API keys in Settings"
             } finally {
                 _isGenerating.value = false
             }
@@ -318,6 +363,7 @@ object AppStateManager {
     fun clearReplies() {
         _activeReplies.value = emptyList()
         _currentQuestion.value = null
+        _activeProvider.value = null
     }
 
     fun clearHistory() {
@@ -331,7 +377,6 @@ object AppStateManager {
     }
 
     private fun cleanQuestion(raw: String): String {
-        // Extract the sentence ending with ?
         val trimmed = raw.trim()
         val questionMarkIndex = trimmed.lastIndexOfAny(charArrayOf('?', '？'))
         if (questionMarkIndex == -1) return trimmed
