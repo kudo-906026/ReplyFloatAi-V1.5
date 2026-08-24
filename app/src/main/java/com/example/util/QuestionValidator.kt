@@ -5,6 +5,14 @@ import android.util.Log
 object QuestionValidator {
     private const val TAG = "QuestionValidator"
 
+    private fun logDebug(message: String) {
+        try {
+            Log.d(TAG, message)
+        } catch (_: Throwable) {
+            // Safe fallback in pure JVM unit test environment
+        }
+    }
+
     // Recognized natural language question words/starters (English, conversational, romanized/Hinglish, French, Spanish)
     private val QUESTION_STARTERS = setOf(
         // English Interrogatives & Auxiliaries
@@ -80,7 +88,7 @@ object QuestionValidator {
         // 3. Reject URLs, web paths, authentication redirect links, and query strings
         for (pattern in URL_OR_TECHNICAL_PATTERNS) {
             if (pattern.containsMatchIn(trimmed)) {
-                Log.d(TAG, "Rejected URL/technical pattern: \"$trimmed\"")
+                logDebug("Rejected URL/technical pattern: \"$trimmed\"")
                 return false
             }
         }
@@ -88,7 +96,7 @@ object QuestionValidator {
         // 4. Reject code syntax and database queries
         for (pattern in CODE_PATTERNS) {
             if (pattern.containsMatchIn(trimmed)) {
-                Log.d(TAG, "Rejected code pattern: \"$trimmed\"")
+                logDebug("Rejected code pattern: \"$trimmed\"")
                 return false
             }
         }
@@ -105,14 +113,14 @@ object QuestionValidator {
 
         // If symbols/special characters (like /, &, =, %, _) outnumber letters, reject as technical string
         if (specialCount > lettersCount * 0.4) {
-            Log.d(TAG, "Rejected due to high symbol ratio: \"$trimmed\" (special=$specialCount, letters=$lettersCount)")
+            logDebug("Rejected due to high symbol ratio: \"$trimmed\" (special=$specialCount, letters=$lettersCount)")
             return false
         }
 
         // If multiple slashes '/' exist without space, it's a file or URL path
         val slashCount = trimmed.count { it == '/' || it == '\\' }
         if (slashCount >= 2 && !trimmed.contains(" / ")) {
-            Log.d(TAG, "Rejected path slashes: \"$trimmed\"")
+            logDebug("Rejected path slashes: \"$trimmed\"")
             return false
         }
 
@@ -163,7 +171,7 @@ object QuestionValidator {
             if (!containsAnyStarter) {
                 // If it has no known question words and fewer than 3 words, reject false positive
                 if (words.size < 3) {
-                    Log.d(TAG, "Rejected: no question starter and too short: \"$trimmed\"")
+                    logDebug("Rejected: no question starter and too short: \"$trimmed\"")
                     return false
                 }
             }

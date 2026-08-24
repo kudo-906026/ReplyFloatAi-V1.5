@@ -19,7 +19,7 @@ import java.util.concurrent.TimeUnit
 object GeminiProviderClient : AiProviderClient {
     private const val TAG = "GeminiProviderClient"
     override val provider: AiProvider = AiProvider.GEMINI
-    private const val MODEL = "gemini-2.5-flash"
+    private const val MODEL = "gemini-3.1-flash-lite-preview"
     private const val BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models/$MODEL:generateContent"
 
     private val okHttpClient = OkHttpClient.Builder()

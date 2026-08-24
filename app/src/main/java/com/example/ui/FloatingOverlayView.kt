@@ -3,8 +3,11 @@ package com.example.ui
 import android.content.Context
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -29,6 +32,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.ChatBubbleOutline
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
@@ -71,8 +75,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.R
+import com.example.model.AiProvider
+import com.example.model.DiagnosticStatus
 import com.example.model.ReplyItem
 import com.example.model.ReplyLength
+import com.example.model.SystemHealthState
 import com.example.state.AppStateManager
 
 @Composable
@@ -89,52 +96,87 @@ fun FloatingOverlayContent(
     val isGenerating by AppStateManager.isGenerating.collectAsState()
     val errorMessage by AppStateManager.errorMessage.collectAsState()
     val settings by AppStateManager.settings.collectAsState()
+    val healthState by AppStateManager.diagnosticsState.collectAsState()
+    val isDiagnosticsOpen by AppStateManager.isDiagnosticsPanelOpen.collectAsState()
 
-    AnimatedContent(
-        targetState = isExpanded,
-        label = "OverlayExpandAnimation",
-        modifier = modifier
-    ) { expanded ->
-        if (expanded) {
-            ExpandedOverlayBar(
-                currentQuestion = currentQuestion?.text,
-                englishMeaning = currentQuestion?.englishMeaning,
-                sourceApp = currentQuestion?.sourceApp,
-                replies = activeReplies,
-                activeProvider = activeProvider,
-                isGenerating = isGenerating,
-                errorMessage = errorMessage,
-                selectedLength = settings.length,
-                selectedCount = settings.count,
-                autoDeleteEnabled = settings.autoDeleteHistory,
-                autoDeleteMinutes = settings.autoDeleteMinutes,
-                multiLanguageEnabled = settings.multiLanguageEnabled,
-                scanningEnabled = settings.scanningEnabled,
-                onLengthSelected = { AppStateManager.updateReplyLength(it) },
-                onCountSelected = { AppStateManager.updateReplyCount(it) },
-                onToggleMultiLanguage = { AppStateManager.toggleMultiLanguage() },
-                onToggleScanning = { AppStateManager.toggleScanning() },
-                onAutoDeleteMinutesChanged = { mins ->
-                    AppStateManager.updateAutoDeleteSettings(settings.autoDeleteHistory, mins)
-                },
-                onRegenerate = { AppStateManager.generateRepliesForQuestion() },
-                onCopyReply = { reply -> AppStateManager.copyAndDismissReply(context, reply) },
-                onDismissReply = { replyId -> AppStateManager.dismissReply(replyId) },
-                onCollapse = { AppStateManager.setOverlayExpanded(false) },
-                onClose = onCloseService,
-                onDragDelta = onDragDelta
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalAlignment = Alignment.Start
+    ) {
+        // Live Diagnostics Dialog Modal when opened
+        AnimatedVisibility(
+            visible = isDiagnosticsOpen,
+            enter = fadeIn() + slideInVertically(),
+            exit = fadeOut() + slideOutVertically()
+        ) {
+            DiagnosticsPanelDialog(
+                healthState = healthState,
+                onDismiss = { AppStateManager.setDiagnosticsPanelOpen(false) },
+                onClearErrors = { AppStateManager.clearAllErrors() },
+                onTestRequest = { AppStateManager.generateRepliesForQuestion(force = true) }
             )
-        } else {
-            CollapsedFloatingBar(
-                hasQuestion = currentQuestion != null,
-                questionSnippet = currentQuestion?.text,
-                repliesCount = activeReplies.size,
-                activeProvider = activeProvider,
-                isGenerating = isGenerating,
-                errorMessage = errorMessage,
-                onExpand = { AppStateManager.setOverlayExpanded(true) },
-                onDragDelta = onDragDelta
-            )
+        }
+
+        AnimatedContent(
+            targetState = isExpanded,
+            label = "OverlayExpandAnimation"
+        ) { expanded ->
+            if (expanded) {
+                ExpandedOverlayBar(
+                    currentQuestion = currentQuestion?.text,
+                    englishMeaning = currentQuestion?.englishMeaning,
+                    sourceApp = currentQuestion?.sourceApp,
+                    replies = activeReplies,
+                    activeProvider = activeProvider,
+                    isGenerating = isGenerating,
+                    errorMessage = errorMessage,
+                    healthState = healthState,
+                    selectedLength = settings.length,
+                    selectedCount = settings.count,
+                    autoDeleteEnabled = settings.autoDeleteHistory,
+                    autoDeleteMinutes = settings.autoDeleteMinutes,
+                    multiLanguageEnabled = settings.multiLanguageEnabled,
+                    scanningEnabled = settings.scanningEnabled,
+                    onLengthSelected = { AppStateManager.updateReplyLength(it) },
+                    onCountSelected = { AppStateManager.updateReplyCount(it) },
+                    onToggleMultiLanguage = { AppStateManager.toggleMultiLanguage() },
+                    onToggleScanning = { AppStateManager.toggleScanning() },
+                    onToggleDiagnostics = { AppStateManager.toggleDiagnosticsPanel() },
+                    onAutoDeleteMinutesChanged = { mins ->
+                        AppStateManager.updateAutoDeleteSettings(settings.autoDeleteHistory, mins)
+                    },
+                    onRegenerate = { AppStateManager.generateRepliesForQuestion() },
+                    onCopyReply = { reply -> AppStateManager.copyAndDismissReply(context, reply) },
+                    onDismissReply = { replyId -> AppStateManager.dismissReply(replyId) },
+                    onCollapse = { AppStateManager.setOverlayExpanded(false) },
+                    onClose = onCloseService,
+                    onDragDelta = onDragDelta
+                )
+            } else {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // Small Diagnostics Dot Indicator in corner of screen / floating widget
+                    FloatingDiagnosticsDot(
+                        healthState = healthState,
+                        onClick = { AppStateManager.toggleDiagnosticsPanel() },
+                        onDragDelta = onDragDelta
+                    )
+
+                    CollapsedFloatingBar(
+                        hasQuestion = currentQuestion != null,
+                        questionSnippet = currentQuestion?.text,
+                        repliesCount = activeReplies.size,
+                        activeProvider = activeProvider,
+                        isGenerating = isGenerating,
+                        errorMessage = errorMessage,
+                        onExpand = { AppStateManager.setOverlayExpanded(true) },
+                        onDragDelta = onDragDelta
+                    )
+                }
+            }
         }
     }
 }
@@ -293,6 +335,7 @@ fun ExpandedOverlayBar(
     activeProvider: com.example.model.AiProvider? = null,
     isGenerating: Boolean,
     errorMessage: String? = null,
+    healthState: SystemHealthState? = null,
     selectedLength: ReplyLength,
     selectedCount: Int,
     autoDeleteEnabled: Boolean = true,
@@ -303,6 +346,7 @@ fun ExpandedOverlayBar(
     onCountSelected: (Int) -> Unit,
     onToggleMultiLanguage: () -> Unit = {},
     onToggleScanning: () -> Unit = {},
+    onToggleDiagnostics: () -> Unit = {},
     onAutoDeleteMinutesChanged: (Int) -> Unit = {},
     onRegenerate: () -> Unit,
     onCopyReply: (ReplyItem) -> Unit,
@@ -327,6 +371,8 @@ fun ExpandedOverlayBar(
             // Header Bar
             OverlayHeader(
                 activeProvider = activeProvider,
+                healthState = healthState,
+                onToggleDiagnostics = onToggleDiagnostics,
                 onCollapse = onCollapse,
                 onClose = onClose,
                 onDragDelta = onDragDelta
@@ -603,6 +649,8 @@ fun ExpandedOverlayBar(
 @Composable
 private fun OverlayHeader(
     activeProvider: com.example.model.AiProvider? = null,
+    healthState: SystemHealthState? = null,
+    onToggleDiagnostics: () -> Unit = {},
     onCollapse: () -> Unit,
     onClose: () -> Unit,
     onDragDelta: (Float, Float) -> Unit
@@ -664,12 +712,59 @@ private fun OverlayHeader(
                     )
                 }
             }
+            if (healthState != null) {
+                val dotColor = when (healthState.overallStatus) {
+                    DiagnosticStatus.HEALTHY -> Color(0xFF10B981)
+                    DiagnosticStatus.WARNING -> Color(0xFFF59E0B)
+                    DiagnosticStatus.ERROR -> Color(0xFFEF4444)
+                }
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = dotColor.copy(alpha = 0.15f),
+                    border = BorderStroke(0.7.dp, dotColor.copy(alpha = 0.6f)),
+                    modifier = Modifier.clickable { onToggleDiagnostics() }
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(6.dp)
+                                .clip(CircleShape)
+                                .background(dotColor)
+                        )
+                        Text(
+                            text = when (healthState.overallStatus) {
+                                DiagnosticStatus.HEALTHY -> "OK"
+                                DiagnosticStatus.WARNING -> "Notice"
+                                DiagnosticStatus.ERROR -> "${healthState.errorCount}!"
+                            },
+                            color = dotColor,
+                            fontSize = 8.5.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
         }
 
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(2.dp)
         ) {
+            IconButton(
+                onClick = onToggleDiagnostics,
+                modifier = Modifier.size(28.dp).testTag("header_diagnostics_button")
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Build,
+                    contentDescription = "Diagnostics",
+                    tint = if (healthState?.overallStatus == DiagnosticStatus.ERROR) Color(0xFFEF4444) else Color.White.copy(alpha = 0.7f),
+                    modifier = Modifier.size(16.dp)
+                )
+            }
             IconButton(
                 onClick = onCollapse,
                 modifier = Modifier.size(28.dp).testTag("collapse_overlay_button")

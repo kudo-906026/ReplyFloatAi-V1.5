@@ -11,7 +11,7 @@ enum class AiProvider(
     GEMINI(
         id = "gemini",
         displayName = "Gemini",
-        defaultModel = "gemini-2.5-flash",
+        defaultModel = "gemini-3.1-flash-lite-preview",
         hint = "Google AI Studio Key"
     ),
     OPENAI(
@@ -170,3 +170,21 @@ data class AiReplyResult(
 )
 
 typealias GeminiReplyResult = AiReplyResult
+
+enum class ApiCallStatus {
+    IN_FLIGHT,
+    SUCCESS,
+    FAILED
+}
+
+data class ApiCallLog(
+    val id: String = UUID.randomUUID().toString(),
+    val provider: AiProvider,
+    val model: String,
+    val question: String,
+    val timestamp: Long = System.currentTimeMillis(),
+    val status: ApiCallStatus = ApiCallStatus.IN_FLIGHT,
+    val durationMs: Long = 0L,
+    val repliesCount: Int = 0,
+    val error: String? = null
+)

@@ -85,6 +85,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
@@ -146,6 +148,8 @@ fun MainScreen() {
     val isGenerating by AppStateManager.isGenerating.collectAsState()
     val errorMessage by AppStateManager.errorMessage.collectAsState()
     val history by AppStateManager.history.collectAsState()
+    val healthState by AppStateManager.diagnosticsState.collectAsState()
+    val isDiagnosticsOpen by AppStateManager.isDiagnosticsPanelOpen.collectAsState()
 
     var selectedTab by remember { mutableIntStateOf(0) }
     var testInputText by remember { mutableStateOf("Are you free to meet tomorrow at 3 PM?") }
@@ -203,7 +207,46 @@ fun MainScreen() {
                     }
                 },
                 actions = {
-                    // Quick Status Pill
+                    // System Health Diagnostics Pill
+                    val dotColor = when (healthState.overallStatus) {
+                        com.example.model.DiagnosticStatus.HEALTHY -> Color(0xFF10B981)
+                        com.example.model.DiagnosticStatus.WARNING -> Color(0xFFF59E0B)
+                        com.example.model.DiagnosticStatus.ERROR -> Color(0xFFEF4444)
+                    }
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(dotColor.copy(alpha = 0.15f))
+                            .border(1.dp, dotColor.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
+                            .clickable { AppStateManager.toggleDiagnosticsPanel() }
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(8.dp)
+                                    .clip(CircleShape)
+                                    .background(dotColor)
+                            )
+                            Text(
+                                text = when (healthState.overallStatus) {
+                                    com.example.model.DiagnosticStatus.HEALTHY -> "System Healthy"
+                                    com.example.model.DiagnosticStatus.WARNING -> "Warning"
+                                    com.example.model.DiagnosticStatus.ERROR -> "${healthState.errorCount} Issue"
+                                },
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = dotColor
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.width(6.dp))
+
+                    // Quick Overlay Status Pill
                     Box(
                         modifier = Modifier
                             .padding(end = 12.dp)
@@ -245,11 +288,14 @@ fun MainScreen() {
             )
         }
     ) { innerPadding ->
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
+            Column(
+                modifier = Modifier.fillMaxSize()
+            ) {
             // Top Navigation Tabs
             TabRow(
                 selectedTabIndex = selectedTab,
@@ -361,7 +407,25 @@ fun MainScreen() {
                 )
             }
         }
+
+        // Animated Live Diagnostics Modal Dialog
+        AnimatedVisibility(
+            visible = isDiagnosticsOpen,
+            enter = fadeIn(),
+            exit = fadeOut(),
+            modifier = Modifier.align(Alignment.TopCenter).padding(top = 16.dp)
+        ) {
+            DiagnosticsPanelDialog(
+                healthState = healthState,
+                onDismiss = { AppStateManager.setDiagnosticsPanelOpen(false) },
+                onClearErrors = { AppStateManager.clearAllErrors() },
+                onTestRequest = {
+                    AppStateManager.onQuestionDetected(testInputText, "App Sandbox", force = true)
+                }
+            )
+        }
     }
+}
 }
 
 @Composable
@@ -866,6 +930,8 @@ fun ControlsAndTestTab(
 fun SettingsTab(
     settings: com.example.model.ReplySettings,
     onUpdateSettings: (com.example.model.ReplySettings) -> Unit,
+    onUpdateSelectionMode: (com.example.model.ProviderSelectionMode) -> Unit = {},
+    onUpdatePreferredProvider: (AiProvider) -> Unit = {},
     onUpdateLength: (ReplyLength) -> Unit,
     onUpdateCount: (Int) -> Unit,
     onUpdateTone: (ReplyTone) -> Unit,
@@ -879,6 +945,143 @@ fun SettingsTab(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
+        // Provider Selection Mode Card
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                ),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Tune,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Text(
+                            text = "PROVIDER SELECTION MODE",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary,
+                            letterSpacing = 0.5.sp
+                        )
+                    }
+
+                    Text(
+                        text = "Choose how ReplyFloat decides which AI model to call for instant replies:",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    // Mode Selection Buttons (Auto Fallback vs Preferred Provider)
+                    com.example.model.ProviderSelectionMode.entries.forEach { mode ->
+                        val isSelected = settings.selectionMode == mode
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+                            else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                            border = BorderStroke(
+                                if (isSelected) 1.5.dp else 1.dp,
+                                if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
+                            ),
+                            onClick = { onUpdateSelectionMode(mode) },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                RadioButton(
+                                    selected = isSelected,
+                                    onClick = { onUpdateSelectionMode(mode) },
+                                    colors = RadioButtonDefaults.colors(
+                                        selectedColor = MaterialTheme.colorScheme.primary
+                                    )
+                                )
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = mode.label,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 13.sp,
+                                        color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        text = mode.description,
+                                        fontSize = 11.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        lineHeight = 14.sp
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // If Preferred Provider is selected, show provider selector
+                    if (settings.selectionMode == com.example.model.ProviderSelectionMode.PREFERRED_PROVIDER) {
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))
+
+                        Text(
+                            text = "SELECT PREFERRED PROVIDER:",
+                            fontSize = 10.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary,
+                            letterSpacing = 0.5.sp
+                        )
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            AiProvider.entries.forEach { provider ->
+                                val isSelected = settings.preferredProvider == provider
+                                Surface(
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clickable { onUpdatePreferredProvider(provider) }
+                                ) {
+                                    Column(
+                                        modifier = Modifier.padding(vertical = 8.dp, horizontal = 4.dp),
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.Center
+                                    ) {
+                                        Text(
+                                            text = provider.displayName,
+                                            fontSize = 11.5.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurface
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        Text(
+                            text = "Calls ${settings.preferredProvider.displayName} first. If it encounters a network error, auth failure, or quota limit (HTTP 429), it will gracefully fall back to the next configured provider in order.",
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f),
+                            fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
+                        )
+                    }
+                }
+            }
+        }
+
         // Multi-Provider Fallback Chain Reordering & Status Card
         item {
             Card(
@@ -903,13 +1106,13 @@ fun SettingsTab(
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             Icon(
-                                imageVector = Icons.Default.Tune,
+                                imageVector = Icons.Default.Layers,
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(20.dp)
                             )
                             Text(
-                                text = "AUTOMATIC FALLBACK CHAIN",
+                                text = "PROVIDER FALLBACK ORDER",
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.primary,
@@ -919,7 +1122,7 @@ fun SettingsTab(
                     }
 
                     Text(
-                        text = "When generating replies, providers are attempted in the order listed below. If a provider fails or encounters a quota/rate-limit (HTTP 429), the next provider in the chain is automatically called.",
+                        text = "Reorder the fallback sequence below. If an attempt fails, ReplyFloat immediately proceeds to the next ready provider in this sequence with full diagnostic logging.",
                         fontSize = 12.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -932,7 +1135,7 @@ fun SettingsTab(
                             AiProvider.GEMINI -> settings.customApiKey.isNotBlank() || com.example.BuildConfig.GEMINI_API_KEY.isNotBlank()
                             AiProvider.OPENAI -> settings.openAiApiKey.isNotBlank()
                             AiProvider.CLAUDE -> settings.claudeApiKey.isNotBlank()
-                            AiProvider.GROQ -> settings.groqApiKey.isNotBlank()
+                            AiProvider.GROK -> settings.grokApiKey.isNotBlank()
                         }
 
                         Surface(
@@ -940,7 +1143,7 @@ fun SettingsTab(
                             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
                             border = BorderStroke(
                                 1.dp,
-                                if (index == 0) MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
+                                if (index == 0 && settings.selectionMode == com.example.model.ProviderSelectionMode.AUTO_FALLBACK) MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
                                 else MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
                             ),
                             modifier = Modifier.fillMaxWidth()
@@ -987,7 +1190,7 @@ fun SettingsTab(
                                                 fontSize = 13.sp,
                                                 color = MaterialTheme.colorScheme.onSurface
                                             )
-                                            if (index == 0) {
+                                            if (index == 0 && settings.selectionMode == com.example.model.ProviderSelectionMode.AUTO_FALLBACK) {
                                                 Surface(
                                                     shape = RoundedCornerShape(4.dp),
                                                     color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
@@ -997,6 +1200,19 @@ fun SettingsTab(
                                                         fontSize = 8.5.sp,
                                                         fontWeight = FontWeight.Bold,
                                                         color = MaterialTheme.colorScheme.primary,
+                                                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                                    )
+                                                }
+                                            } else if (settings.selectionMode == com.example.model.ProviderSelectionMode.PREFERRED_PROVIDER && settings.preferredProvider == provider) {
+                                                Surface(
+                                                    shape = RoundedCornerShape(4.dp),
+                                                    color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.2f)
+                                                ) {
+                                                    Text(
+                                                        text = "PREFERRED",
+                                                        fontSize = 8.5.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = MaterialTheme.colorScheme.tertiary,
                                                         modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
                                                     )
                                                 }
@@ -1116,12 +1332,12 @@ fun SettingsTab(
 
                     HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
 
-                    // 4. Groq
+                    // 4. Grok (xAI)
                     ProviderApiKeyInputField(
-                        provider = AiProvider.GROQ,
-                        currentKey = settings.groqApiKey,
-                        hint = "Groq Cloud key (gsk_...)",
-                        onKeyChanged = { onUpdateProviderKey(AiProvider.GROQ, it) }
+                        provider = AiProvider.GROK,
+                        currentKey = settings.grokApiKey,
+                        hint = "xAI Grok key (xai-...)",
+                        onKeyChanged = { onUpdateProviderKey(AiProvider.GROK, it) }
                     )
                 }
             }

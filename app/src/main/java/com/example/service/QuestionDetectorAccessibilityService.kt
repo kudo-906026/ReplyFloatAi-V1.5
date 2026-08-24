@@ -19,6 +19,8 @@ class QuestionDetectorAccessibilityService : AccessibilityService() {
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var scanJob: Job? = null
+    private var lastEmittedQuestionNormalized: String? = null
+    private val localEmittedQuestions = LinkedHashSet<String>()
 
     override fun onServiceConnected() {
         super.onServiceConnected()
@@ -92,12 +94,38 @@ class QuestionDetectorAccessibilityService : AccessibilityService() {
                 // Get the most recent / deepest question
                 val targetQuestion = questions.lastOrNull()
                 if (!targetQuestion.isNullOrBlank()) {
-                    AppStateManager.onQuestionDetected(targetQuestion, sourcePackage)
+                    val normalized = normalizeForDedup(targetQuestion)
+                    if (normalized.isBlank()) return
+
+                    // Check if this exact question was already detected and emitted recently
+                    if (normalized == lastEmittedQuestionNormalized || localEmittedQuestions.contains(normalized)) {
+                        return
+                    }
+
+                    localEmittedQuestions.add(normalized)
+                    if (localEmittedQuestions.size > 60) {
+                        val it = localEmittedQuestions.iterator()
+                        if (it.hasNext()) {
+                            it.next()
+                            it.remove()
+                        }
+                    }
+                    lastEmittedQuestionNormalized = normalized
+
+                    Log.d(TAG, "[A11Y_NEW_QUESTION] Detected new on-screen question: \"$targetQuestion\"")
+                    AppStateManager.onQuestionDetected(targetQuestion, sourcePackage, force = false)
                 }
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error scanning accessibility nodes", e)
         }
+    }
+
+    private fun normalizeForDedup(raw: String): String {
+        return raw.lowercase()
+            .replace(Regex("[^a-zA-Z0-9\\s]"), "")
+            .replace(Regex("\\s+"), " ")
+            .trim()
     }
 
     private fun findQuestionsInNode(

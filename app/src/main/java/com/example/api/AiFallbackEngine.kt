@@ -88,9 +88,16 @@ object AiFallbackEngine {
 
             attemptedCount++
             val isPreferred = settings.selectionMode == ProviderSelectionMode.PREFERRED_PROVIDER && provider == settings.preferredProvider
-            Log.d(
-                TAG,
-                "Calling provider [${provider.displayName}] (model=${provider.defaultModel}, preferred=$isPreferred, attempt #$attemptedCount)..."
+            val callStartTime = System.currentTimeMillis()
+            val callId = com.example.state.AppStateManager.recordApiCallStart(
+                provider = provider,
+                model = provider.defaultModel,
+                question = question
+            )
+
+            Log.i(
+                "API_CALL_AUDIT",
+                ">>> [API CALL #${com.example.state.AppStateManager.totalApiCallsCount.value}] Provider: ${provider.displayName} | Model: ${provider.defaultModel} | Time: ${java.text.SimpleDateFormat("HH:mm:ss.SSS", java.util.Locale.US).format(java.util.Date(callStartTime))} | Question: \"$question\""
             )
 
             try {
@@ -103,28 +110,60 @@ object AiFallbackEngine {
                     multiLanguage = multiLanguage
                 )
 
+                val duration = System.currentTimeMillis() - callStartTime
+
                 if (result.isSuccess) {
                     val replyResult = result.getOrNull()
                     if (replyResult != null && replyResult.replies.isNotEmpty()) {
-                        Log.i(TAG, "Successfully generated ${replyResult.replies.size} replies via [${provider.displayName}]")
+                        Log.i(
+                            "API_CALL_AUDIT",
+                            "<<< [API CALL SUCCESS] ${provider.displayName} returned ${replyResult.replies.size} replies in ${duration}ms. Stopping chain immediately."
+                        )
+                        com.example.state.AppStateManager.recordApiCallSuccess(callId, duration, replyResult.replies.size)
+                        com.example.state.AppStateManager.recordProviderSuccess(provider)
                         return Result.success(replyResult.copy(provider = provider))
                     } else {
                         val emptyMsg = "Provider returned empty response list"
-                        Log.w(TAG, "Provider [${provider.displayName}] issue: $emptyMsg")
+                        Log.w("API_CALL_AUDIT", "<<< [API CALL EMPTY] Provider [${provider.displayName}] in ${duration}ms: $emptyMsg")
+                        com.example.state.AppStateManager.recordApiCallFailure(callId, duration, emptyMsg)
+                        com.example.state.AppStateManager.recordProviderError(
+                            provider = provider,
+                            plainReason = "Received empty response from AI model",
+                            technicalDetails = "Response payload did not contain parseable replies",
+                            suggestedFix = "Try changing the Reply Length or Tone in Settings."
+                        )
                         failureLogs.add("${provider.displayName}: $emptyMsg")
                     }
                 } else {
                     val exception = result.exceptionOrNull()
                     val errorMsg = exception?.message ?: "Unknown API failure"
-                    Log.w(TAG, "Provider [${provider.displayName}] failed: $errorMsg")
+                    val (plainReason, fix) = deriveDiagnosticReasonAndFix(provider, errorMsg)
+                    Log.w("API_CALL_AUDIT", "<<< [API CALL FAILED] Provider [${provider.displayName}] in ${duration}ms: $errorMsg")
+                    com.example.state.AppStateManager.recordApiCallFailure(callId, duration, errorMsg)
+                    com.example.state.AppStateManager.recordProviderError(
+                        provider = provider,
+                        plainReason = plainReason,
+                        technicalDetails = errorMsg,
+                        suggestedFix = fix
+                    )
                     failureLogs.add("${provider.displayName}: $errorMsg")
                 }
             } catch (e: CancellationException) {
-                // Do not intercept coroutine cancellation
+                val duration = System.currentTimeMillis() - callStartTime
+                com.example.state.AppStateManager.recordApiCallFailure(callId, duration, "Cancelled")
                 throw e
             } catch (e: Exception) {
+                val duration = System.currentTimeMillis() - callStartTime
                 val exMsg = e.localizedMessage ?: e.message ?: "Connection error"
-                Log.e(TAG, "Provider [${provider.displayName}] uncaught exception: $exMsg", e)
+                val (plainReason, fix) = deriveDiagnosticReasonAndFix(provider, exMsg)
+                Log.e("API_CALL_AUDIT", "<<< [API CALL EXCEPTION] Provider [${provider.displayName}] in ${duration}ms: $exMsg", e)
+                com.example.state.AppStateManager.recordApiCallFailure(callId, duration, exMsg)
+                com.example.state.AppStateManager.recordProviderError(
+                    provider = provider,
+                    plainReason = plainReason,
+                    technicalDetails = exMsg,
+                    suggestedFix = fix
+                )
                 failureLogs.add("${provider.displayName}: $exMsg")
             }
         }
@@ -147,4 +186,35 @@ object AiFallbackEngine {
         Log.e(TAG, "Fallback chain exhausted. Attempted: $attemptedCount provider(s). Final summary:\n$finalErrorMessage")
         return Result.failure(Exception(finalErrorMessage))
     }
+
+    private fun deriveDiagnosticReasonAndFix(provider: AiProvider, rawError: String): Pair<String, String> {
+        val lower = rawError.lowercase()
+        return when {
+            lower.contains("401") || lower.contains("unauthorized") || lower.contains("invalid api key") || lower.contains("api_key_invalid") || lower.contains("authentication") -> {
+                "401 Unauthorized — Invalid API key" to "Check that your ${provider.displayName} API key is entered correctly in Settings and is active."
+            }
+            lower.contains("429") || lower.contains("quota") || lower.contains("rate limit") || lower.contains("resource_exhausted") || lower.contains("rate_limit") -> {
+                "429 Too Many Requests — Quota/Rate limit exceeded" to "API quota exhausted on ${provider.displayName}. Auto-fallback will try remaining providers, or check your billing plan."
+            }
+            lower.contains("403") || lower.contains("permission_denied") || lower.contains("forbidden") -> {
+                "403 Forbidden — Permission denied" to "Verify your ${provider.displayName} API key has access permissions for model ${provider.defaultModel}."
+            }
+            lower.contains("404") || lower.contains("not found") -> {
+                "404 Not Found — Model endpoint unavailable" to "Model ${provider.defaultModel} was not found or is unsupported on your account tier."
+            }
+            lower.contains("500") || lower.contains("502") || lower.contains("503") || lower.contains("server error") -> {
+                "503 Service Unavailable — Provider server error" to "The ${provider.displayName} service is temporarily experiencing outages. ReplyFloat will fall back automatically."
+            }
+            lower.contains("timeout") || lower.contains("connect") || lower.contains("unknownhost") || lower.contains("socket") -> {
+                "Network timeout / Connection failure" to "Check device internet connection and verify ${provider.displayName} endpoints are reachable."
+            }
+            lower.contains("json") || lower.contains("parse") -> {
+                "Invalid response format" to "Model returned an unexpected response structure. Retrying or switching tone may resolve this."
+            }
+            else -> {
+                "API call failure ($rawError)" to "Review your ${provider.displayName} configuration in Settings."
+            }
+        }
+    }
 }
+
