@@ -43,7 +43,9 @@ import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.Assessment
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ChatBubbleOutline
 import androidx.compose.material.icons.filled.CheckCircle
@@ -52,6 +54,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.HealthAndSafety
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.Lock
@@ -149,7 +152,6 @@ fun MainScreen() {
     val errorMessage by AppStateManager.errorMessage.collectAsState()
     val history by AppStateManager.history.collectAsState()
     val healthState by AppStateManager.diagnosticsState.collectAsState()
-    val isDiagnosticsOpen by AppStateManager.isDiagnosticsPanelOpen.collectAsState()
 
     var selectedTab by remember { mutableIntStateOf(0) }
     var testInputText by remember { mutableStateOf("Are you free to meet tomorrow at 3 PM?") }
@@ -207,42 +209,11 @@ fun MainScreen() {
                     }
                 },
                 actions = {
-                    // System Health Diagnostics Pill
-                    val dotColor = when (healthState.overallStatus) {
-                        com.example.model.DiagnosticStatus.HEALTHY -> Color(0xFF10B981)
-                        com.example.model.DiagnosticStatus.WARNING -> Color(0xFFF59E0B)
-                        com.example.model.DiagnosticStatus.ERROR -> Color(0xFFEF4444)
-                    }
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(dotColor.copy(alpha = 0.15f))
-                            .border(1.dp, dotColor.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
-                            .clickable { AppStateManager.toggleDiagnosticsPanel() }
-                            .padding(horizontal = 8.dp, vertical = 4.dp)
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(8.dp)
-                                    .clip(CircleShape)
-                                    .background(dotColor)
-                            )
-                            Text(
-                                text = when (healthState.overallStatus) {
-                                    com.example.model.DiagnosticStatus.HEALTHY -> "System Healthy"
-                                    com.example.model.DiagnosticStatus.WARNING -> "Warning"
-                                    com.example.model.DiagnosticStatus.ERROR -> "${healthState.errorCount} Issue"
-                                },
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = dotColor
-                            )
-                        }
-                    }
+                    // System Health Diagnostics Badge (Tapping navigates directly to Diagnostics Tab)
+                    AppDiagnosticsBadge(
+                        healthState = healthState,
+                        onClick = { selectedTab = 3 }
+                    )
 
                     Spacer(modifier = Modifier.width(6.dp))
 
@@ -296,7 +267,7 @@ fun MainScreen() {
             Column(
                 modifier = Modifier.fillMaxSize()
             ) {
-            // Top Navigation Tabs
+            // Top Navigation Tabs (4 Tabs: Controls & Test, Settings & Providers, History, Diagnostics)
             TabRow(
                 selectedTabIndex = selectedTab,
                 containerColor = MaterialTheme.colorScheme.surface,
@@ -305,20 +276,46 @@ fun MainScreen() {
                 Tab(
                     selected = selectedTab == 0,
                     onClick = { selectedTab = 0 },
-                    text = { Text("Controls & Test", fontSize = 13.sp, fontWeight = FontWeight.SemiBold) },
+                    text = { Text("Controls", fontSize = 12.sp, fontWeight = FontWeight.SemiBold) },
                     icon = { Icon(Icons.Default.Tune, contentDescription = null, modifier = Modifier.size(18.dp)) }
                 )
                 Tab(
                     selected = selectedTab == 1,
                     onClick = { selectedTab = 1 },
-                    text = { Text("Settings & Providers", fontSize = 13.sp, fontWeight = FontWeight.SemiBold) },
+                    text = { Text("Settings", fontSize = 12.sp, fontWeight = FontWeight.SemiBold) },
                     icon = { Icon(Icons.Default.Settings, contentDescription = null, modifier = Modifier.size(18.dp)) }
                 )
                 Tab(
                     selected = selectedTab == 2,
                     onClick = { selectedTab = 2 },
-                    text = { Text("History (${history.size})", fontSize = 13.sp, fontWeight = FontWeight.SemiBold) },
+                    text = { Text("History (${history.size})", fontSize = 12.sp, fontWeight = FontWeight.SemiBold) },
                     icon = { Icon(Icons.Default.QuestionAnswer, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                )
+                Tab(
+                    selected = selectedTab == 3,
+                    onClick = { selectedTab = 3 },
+                    text = {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text("Diagnostics", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                            if (healthState.overallStatus != com.example.model.DiagnosticStatus.HEALTHY) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(7.dp)
+                                        .clip(CircleShape)
+                                        .background(
+                                            if (healthState.overallStatus == com.example.model.DiagnosticStatus.ERROR)
+                                                Color(0xFFEF4444)
+                                            else
+                                                Color(0xFFF59E0B)
+                                        )
+                                )
+                            }
+                        }
+                    },
+                    icon = { Icon(Icons.Default.HealthAndSafety, contentDescription = null, modifier = Modifier.size(18.dp)) }
                 )
             }
 
@@ -405,24 +402,19 @@ fun MainScreen() {
                         Toast.makeText(context, "Copied to clipboard!", Toast.LENGTH_SHORT).show()
                     }
                 )
-            }
-        }
 
-        // Animated Live Diagnostics Modal Dialog
-        AnimatedVisibility(
-            visible = isDiagnosticsOpen,
-            enter = fadeIn(),
-            exit = fadeOut(),
-            modifier = Modifier.align(Alignment.TopCenter).padding(top = 16.dp)
-        ) {
-            DiagnosticsPanelDialog(
-                healthState = healthState,
-                onDismiss = { AppStateManager.setDiagnosticsPanelOpen(false) },
-                onClearErrors = { AppStateManager.clearAllErrors() },
-                onTestRequest = {
-                    AppStateManager.onQuestionDetected(testInputText, "App Sandbox", force = true)
-                }
-            )
+                3 -> DiagnosticsTab(
+                    healthState = healthState,
+                    onRequestOverlayPermission = { requestOverlayPermission(context) },
+                    onRequestAccessibilityPermission = { requestAccessibilityPermission(context) },
+                    onNavigateToSettings = { selectedTab = 1 },
+                    onTestRequest = {
+                        val samplePrompt = testInputText.ifBlank { "What time should we meet tomorrow?" }
+                        AppStateManager.onQuestionDetected(samplePrompt, "App Sandbox", force = true)
+                    },
+                    onClearErrors = { AppStateManager.clearAllErrors() }
+                )
+            }
         }
     }
 }

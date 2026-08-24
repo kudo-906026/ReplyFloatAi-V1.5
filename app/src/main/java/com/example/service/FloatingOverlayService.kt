@@ -38,6 +38,7 @@ class FloatingOverlayService : Service() {
     override fun onCreate() {
         super.onCreate()
         Log.d(TAG, "FloatingOverlayService onCreate")
+        AppStateManager.init(this)
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
             Log.e(TAG, "Overlay permission not granted. Stopping service.")

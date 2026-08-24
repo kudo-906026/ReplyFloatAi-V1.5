@@ -96,87 +96,52 @@ fun FloatingOverlayContent(
     val isGenerating by AppStateManager.isGenerating.collectAsState()
     val errorMessage by AppStateManager.errorMessage.collectAsState()
     val settings by AppStateManager.settings.collectAsState()
-    val healthState by AppStateManager.diagnosticsState.collectAsState()
-    val isDiagnosticsOpen by AppStateManager.isDiagnosticsPanelOpen.collectAsState()
 
-    Column(
-        modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-        horizontalAlignment = Alignment.Start
-    ) {
-        // Live Diagnostics Dialog Modal when opened
-        AnimatedVisibility(
-            visible = isDiagnosticsOpen,
-            enter = fadeIn() + slideInVertically(),
-            exit = fadeOut() + slideOutVertically()
-        ) {
-            DiagnosticsPanelDialog(
-                healthState = healthState,
-                onDismiss = { AppStateManager.setDiagnosticsPanelOpen(false) },
-                onClearErrors = { AppStateManager.clearAllErrors() },
-                onTestRequest = { AppStateManager.generateRepliesForQuestion(force = true) }
+    AnimatedContent(
+        targetState = isExpanded,
+        label = "OverlayExpandAnimation",
+        modifier = modifier
+    ) { expanded ->
+        if (expanded) {
+            ExpandedOverlayBar(
+                currentQuestion = currentQuestion?.text,
+                englishMeaning = currentQuestion?.englishMeaning,
+                sourceApp = currentQuestion?.sourceApp,
+                replies = activeReplies,
+                activeProvider = activeProvider,
+                isGenerating = isGenerating,
+                errorMessage = errorMessage,
+                selectedLength = settings.length,
+                selectedCount = settings.count,
+                autoDeleteEnabled = settings.autoDeleteHistory,
+                autoDeleteMinutes = settings.autoDeleteMinutes,
+                multiLanguageEnabled = settings.multiLanguageEnabled,
+                scanningEnabled = settings.scanningEnabled,
+                onLengthSelected = { AppStateManager.updateReplyLength(it) },
+                onCountSelected = { AppStateManager.updateReplyCount(it) },
+                onToggleMultiLanguage = { AppStateManager.toggleMultiLanguage() },
+                onToggleScanning = { AppStateManager.toggleScanning() },
+                onAutoDeleteMinutesChanged = { mins ->
+                    AppStateManager.updateAutoDeleteSettings(settings.autoDeleteHistory, mins)
+                },
+                onRegenerate = { AppStateManager.generateRepliesForQuestion() },
+                onCopyReply = { reply -> AppStateManager.copyAndDismissReply(context, reply) },
+                onDismissReply = { replyId -> AppStateManager.dismissReply(replyId) },
+                onCollapse = { AppStateManager.setOverlayExpanded(false) },
+                onClose = { AppStateManager.closeMainBar() },
+                onDragDelta = onDragDelta
             )
-        }
-
-        AnimatedContent(
-            targetState = isExpanded,
-            label = "OverlayExpandAnimation"
-        ) { expanded ->
-            if (expanded) {
-                ExpandedOverlayBar(
-                    currentQuestion = currentQuestion?.text,
-                    englishMeaning = currentQuestion?.englishMeaning,
-                    sourceApp = currentQuestion?.sourceApp,
-                    replies = activeReplies,
-                    activeProvider = activeProvider,
-                    isGenerating = isGenerating,
-                    errorMessage = errorMessage,
-                    healthState = healthState,
-                    selectedLength = settings.length,
-                    selectedCount = settings.count,
-                    autoDeleteEnabled = settings.autoDeleteHistory,
-                    autoDeleteMinutes = settings.autoDeleteMinutes,
-                    multiLanguageEnabled = settings.multiLanguageEnabled,
-                    scanningEnabled = settings.scanningEnabled,
-                    onLengthSelected = { AppStateManager.updateReplyLength(it) },
-                    onCountSelected = { AppStateManager.updateReplyCount(it) },
-                    onToggleMultiLanguage = { AppStateManager.toggleMultiLanguage() },
-                    onToggleScanning = { AppStateManager.toggleScanning() },
-                    onToggleDiagnostics = { AppStateManager.toggleDiagnosticsPanel() },
-                    onAutoDeleteMinutesChanged = { mins ->
-                        AppStateManager.updateAutoDeleteSettings(settings.autoDeleteHistory, mins)
-                    },
-                    onRegenerate = { AppStateManager.generateRepliesForQuestion() },
-                    onCopyReply = { reply -> AppStateManager.copyAndDismissReply(context, reply) },
-                    onDismissReply = { replyId -> AppStateManager.dismissReply(replyId) },
-                    onCollapse = { AppStateManager.setOverlayExpanded(false) },
-                    onClose = onCloseService,
-                    onDragDelta = onDragDelta
-                )
-            } else {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    // Small Diagnostics Dot Indicator in corner of screen / floating widget
-                    FloatingDiagnosticsDot(
-                        healthState = healthState,
-                        onClick = { AppStateManager.toggleDiagnosticsPanel() },
-                        onDragDelta = onDragDelta
-                    )
-
-                    CollapsedFloatingBar(
-                        hasQuestion = currentQuestion != null,
-                        questionSnippet = currentQuestion?.text,
-                        repliesCount = activeReplies.size,
-                        activeProvider = activeProvider,
-                        isGenerating = isGenerating,
-                        errorMessage = errorMessage,
-                        onExpand = { AppStateManager.setOverlayExpanded(true) },
-                        onDragDelta = onDragDelta
-                    )
-                }
-            }
+        } else {
+            CollapsedFloatingBar(
+                hasQuestion = currentQuestion != null,
+                questionSnippet = currentQuestion?.text,
+                repliesCount = activeReplies.size,
+                activeProvider = activeProvider,
+                isGenerating = isGenerating,
+                errorMessage = errorMessage,
+                onExpand = { AppStateManager.setOverlayExpanded(true) },
+                onDragDelta = onDragDelta
+            )
         }
     }
 }
@@ -196,7 +161,8 @@ fun CollapsedFloatingBar(
     Surface(
         modifier = modifier
             .testTag("collapsed_floating_bar")
-            .shadow(8.dp, RoundedCornerShape(24.dp))
+            .shadow(6.dp, RoundedCornerShape(20.dp))
+            .clip(RoundedCornerShape(20.dp))
             .clickable { onExpand() }
             .pointerInput(Unit) {
                 detectDragGestures { change, dragAmount ->
@@ -204,124 +170,69 @@ fun CollapsedFloatingBar(
                     onDragDelta(dragAmount.x, dragAmount.y)
                 }
             },
-        shape = RoundedCornerShape(24.dp),
-        color = Color(0xF2180B0B),
+        shape = RoundedCornerShape(20.dp),
+        color = Color(0xD0120B0B),
         border = BorderStroke(
-            1.2.dp,
-            if (errorMessage != null) Color(0xFFEF4444) else Color(0xFFDC2626)
+            1.dp,
+            when {
+                errorMessage != null -> Color(0xFFEF4444).copy(alpha = 0.8f)
+                isGenerating -> Color(0xFF38BDF8).copy(alpha = 0.8f)
+                hasQuestion -> Color(0xFFDC2626).copy(alpha = 0.8f)
+                else -> Color.White.copy(alpha = 0.25f)
+            }
         )
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            // Drag handle icon
-            Icon(
-                imageVector = Icons.Default.DragHandle,
-                contentDescription = "Drag to move",
-                tint = Color.White.copy(alpha = 0.5f),
-                modifier = Modifier.size(16.dp)
-            )
-
             // Logo / Progress / Error
-            Box(
-                modifier = Modifier
-                    .size(28.dp)
-                    .clip(CircleShape)
-                    .background(Color(0xFF080C14)),
-                contentAlignment = Alignment.Center
-            ) {
-                if (isGenerating) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(18.dp),
-                        color = Color(0xFF38BDF8),
-                        strokeWidth = 2.dp
-                    )
-                } else if (errorMessage != null) {
-                    Icon(
-                        imageVector = Icons.Default.Warning,
-                        contentDescription = "Error",
-                        tint = Color(0xFFEF4444),
-                        modifier = Modifier.size(16.dp)
-                    )
-                } else {
-                    Icon(
-                        imageVector = Icons.Default.ChatBubbleOutline,
-                        contentDescription = "ReplyFloat AI",
-                        tint = Color(0xFF38BDF8),
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-            }
-
-            // Info text / Question badge & Provider indicator
-            Column(
-                modifier = Modifier.widthIn(max = 140.dp)
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Text(
-                        text = "ReplyFloatAi",
-                        color = Color.White,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    if (activeProvider != null && !isGenerating && errorMessage == null) {
-                        Surface(
-                            shape = RoundedCornerShape(4.dp),
-                            color = Color(0xFFDC2626).copy(alpha = 0.35f),
-                            border = BorderStroke(0.5.dp, Color(0xFFFF8A8A).copy(alpha = 0.5f))
-                        ) {
-                            Text(
-                                text = "via ${activeProvider.displayName}",
-                                color = Color(0xFFFFD4D4),
-                                fontSize = 8.sp,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
-                            )
-                        }
-                    }
-                }
-                Text(
-                    text = when {
-                        isGenerating -> "Thinking..."
-                        errorMessage != null -> "Error, tap to retry"
-                        hasQuestion && !questionSnippet.isNullOrBlank() -> questionSnippet
-                        else -> "Waiting for '?'..."
-                    },
-                    color = if (errorMessage != null) Color(0xFFFCA5A5) else if (hasQuestion) Color(0xFFFF8A8A) else Color(0xFFD4C8C8),
-                    fontSize = 10.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+            if (isGenerating) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(16.dp),
+                    color = Color(0xFF38BDF8),
+                    strokeWidth = 2.dp
+                )
+            } else if (errorMessage != null) {
+                Icon(
+                    imageVector = Icons.Default.Warning,
+                    contentDescription = "Error",
+                    tint = Color(0xFFEF4444),
+                    modifier = Modifier.size(16.dp)
+                )
+            } else {
+                Icon(
+                    imageVector = Icons.Default.ChatBubbleOutline,
+                    contentDescription = "ReplyFloat AI",
+                    tint = if (hasQuestion) Color(0xFFFF6B6B) else Color(0xFF38BDF8),
+                    modifier = Modifier.size(16.dp)
                 )
             }
 
-            // Replies badge if available and not generating
-            if (repliesCount > 0 && !isGenerating && errorMessage == null) {
-                Surface(
-                    shape = RoundedCornerShape(10.dp),
-                    color = Color(0xFF10B981)
-                ) {
-                    Text(
-                        text = "$repliesCount replies",
-                        color = Color.White,
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                    )
-                }
-            }
-
-            // Expand icon
-            Icon(
-                imageVector = Icons.Default.KeyboardArrowDown,
-                contentDescription = "Expand overlay",
-                tint = Color.White.copy(alpha = 0.8f),
-                modifier = Modifier.size(18.dp)
+            // Compact clean AI label / status
+            Text(
+                text = when {
+                    isGenerating -> "Thinking..."
+                    errorMessage != null -> "Error"
+                    hasQuestion && repliesCount > 0 -> "$repliesCount Replies"
+                    hasQuestion -> "Question"
+                    else -> "ReplyFloat AI"
+                },
+                color = Color.White,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold
             )
+
+            // Replies indicator dot if available and not generating
+            if (repliesCount > 0 && !isGenerating && errorMessage == null) {
+                Box(
+                    modifier = Modifier
+                        .size(6.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFF10B981))
+                )
+            }
         }
     }
 }
@@ -346,7 +257,6 @@ fun ExpandedOverlayBar(
     onCountSelected: (Int) -> Unit,
     onToggleMultiLanguage: () -> Unit = {},
     onToggleScanning: () -> Unit = {},
-    onToggleDiagnostics: () -> Unit = {},
     onAutoDeleteMinutesChanged: (Int) -> Unit = {},
     onRegenerate: () -> Unit,
     onCopyReply: (ReplyItem) -> Unit,
@@ -371,8 +281,6 @@ fun ExpandedOverlayBar(
             // Header Bar
             OverlayHeader(
                 activeProvider = activeProvider,
-                healthState = healthState,
-                onToggleDiagnostics = onToggleDiagnostics,
                 onCollapse = onCollapse,
                 onClose = onClose,
                 onDragDelta = onDragDelta
@@ -649,8 +557,6 @@ fun ExpandedOverlayBar(
 @Composable
 private fun OverlayHeader(
     activeProvider: com.example.model.AiProvider? = null,
-    healthState: SystemHealthState? = null,
-    onToggleDiagnostics: () -> Unit = {},
     onCollapse: () -> Unit,
     onClose: () -> Unit,
     onDragDelta: (Float, Float) -> Unit
@@ -712,80 +618,52 @@ private fun OverlayHeader(
                     )
                 }
             }
-            if (healthState != null) {
-                val dotColor = when (healthState.overallStatus) {
-                    DiagnosticStatus.HEALTHY -> Color(0xFF10B981)
-                    DiagnosticStatus.WARNING -> Color(0xFFF59E0B)
-                    DiagnosticStatus.ERROR -> Color(0xFFEF4444)
-                }
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = dotColor.copy(alpha = 0.15f),
-                    border = BorderStroke(0.7.dp, dotColor.copy(alpha = 0.6f)),
-                    modifier = Modifier.clickable { onToggleDiagnostics() }
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(6.dp)
-                                .clip(CircleShape)
-                                .background(dotColor)
-                        )
-                        Text(
-                            text = when (healthState.overallStatus) {
-                                DiagnosticStatus.HEALTHY -> "OK"
-                                DiagnosticStatus.WARNING -> "Notice"
-                                DiagnosticStatus.ERROR -> "${healthState.errorCount}!"
-                            },
-                            color = dotColor,
-                            fontSize = 8.5.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-            }
         }
 
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(2.dp)
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            IconButton(
-                onClick = onToggleDiagnostics,
-                modifier = Modifier.size(28.dp).testTag("header_diagnostics_button")
+            // Minimize button (Collapses main bar back to small bar)
+            Surface(
+                modifier = Modifier
+                    .size(28.dp)
+                    .clip(CircleShape)
+                    .clickable { onCollapse() }
+                    .testTag("collapse_overlay_button"),
+                shape = CircleShape,
+                color = Color(0x33FFFFFF),
+                border = BorderStroke(0.8.dp, Color(0x44FFFFFF))
             ) {
-                Icon(
-                    imageVector = Icons.Default.Build,
-                    contentDescription = "Diagnostics",
-                    tint = if (healthState?.overallStatus == DiagnosticStatus.ERROR) Color(0xFFEF4444) else Color.White.copy(alpha = 0.7f),
-                    modifier = Modifier.size(16.dp)
-                )
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Default.Remove,
+                        contentDescription = "Minimize to small bar",
+                        tint = Color.White.copy(alpha = 0.9f),
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
             }
-            IconButton(
-                onClick = onCollapse,
-                modifier = Modifier.size(28.dp).testTag("collapse_overlay_button")
+
+            // Close / X button (Fully closes/dismisses the main bar from screen)
+            Surface(
+                modifier = Modifier
+                    .size(28.dp)
+                    .clip(CircleShape)
+                    .clickable { onClose() }
+                    .testTag("close_overlay_button"),
+                shape = CircleShape,
+                color = Color(0x33EF4444),
+                border = BorderStroke(1.dp, Color(0x99EF4444))
             ) {
-                Icon(
-                    imageVector = Icons.Default.KeyboardArrowUp,
-                    contentDescription = "Collapse",
-                    tint = Color.White.copy(alpha = 0.7f),
-                    modifier = Modifier.size(18.dp)
-                )
-            }
-            IconButton(
-                onClick = onClose,
-                modifier = Modifier.size(28.dp).testTag("close_overlay_button")
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Close,
-                    contentDescription = "Close overlay",
-                    tint = Color.White.copy(alpha = 0.7f),
-                    modifier = Modifier.size(16.dp)
-                )
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "Close and dismiss window",
+                        tint = Color(0xFFFCA5A5),
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
             }
         }
     }

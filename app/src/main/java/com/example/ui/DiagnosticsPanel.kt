@@ -14,13 +14,13 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -33,16 +33,20 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Assessment
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DeleteSweep
-import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.filled.HealthAndSafety
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Lightbulb
+import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -67,7 +71,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -86,16 +89,14 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * Compact diagnostics indicator dot/badge shown in the corner of the screen.
- * Green: All systems normal
- * Yellow: Warning / Optional unconfigured item
- * Red: Issue / Failure in progress
+ * Clean, compact in-app diagnostics badge for the main app UI header.
+ * Shows a pulsing dot with system health state (Green / Yellow / Red).
+ * Tapping it switches to the Diagnostics tab.
  */
 @Composable
-fun FloatingDiagnosticsDot(
+fun AppDiagnosticsBadge(
     healthState: SystemHealthState,
     onClick: () -> Unit,
-    onDragDelta: (Float, Float) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "PulseTransition")
@@ -111,78 +112,445 @@ fun FloatingDiagnosticsDot(
 
     val dotColor by animateColorAsState(
         targetValue = when (healthState.overallStatus) {
-            DiagnosticStatus.HEALTHY -> Color(0xFF10B981) // Green
-            DiagnosticStatus.WARNING -> Color(0xFFF59E0B) // Amber
-            DiagnosticStatus.ERROR -> Color(0xFFEF4444)   // Red
+            DiagnosticStatus.HEALTHY -> Color(0xFF10B981)
+            DiagnosticStatus.WARNING -> Color(0xFFF59E0B)
+            DiagnosticStatus.ERROR -> Color(0xFFEF4444)
         },
         label = "DotColor"
     )
 
-    val backgroundColor by animateColorAsState(
-        targetValue = when (healthState.overallStatus) {
-            DiagnosticStatus.HEALTHY -> Color(0xE60D1F17)
-            DiagnosticStatus.WARNING -> Color(0xE6261C08)
-            DiagnosticStatus.ERROR -> Color(0xE6260B0B)
-        },
-        label = "BgColor"
-    )
-
     Surface(
         modifier = modifier
-            .testTag("floating_diagnostics_dot")
-            .shadow(6.dp, RoundedCornerShape(20.dp))
-            .clickable { onClick() }
-            .pointerInput(Unit) {
-                detectDragGestures { change, dragAmount ->
-                    change.consume()
-                    onDragDelta(dragAmount.x, dragAmount.y)
-                }
-            },
-        shape = RoundedCornerShape(20.dp),
-        color = backgroundColor,
-        border = BorderStroke(1.2.dp, dotColor.copy(alpha = 0.7f))
+            .testTag("app_diagnostics_badge")
+            .clip(RoundedCornerShape(16.dp))
+            .clickable { onClick() },
+        shape = RoundedCornerShape(16.dp),
+        color = dotColor.copy(alpha = 0.15f),
+        border = BorderStroke(1.dp, dotColor.copy(alpha = 0.5f))
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
+            horizontalArrangement = Arrangement.spacedBy(5.dp)
         ) {
-            // Pulsing status dot
             Box(
                 modifier = Modifier
-                    .size(10.dp)
+                    .size(8.dp)
                     .scale(pulseScale)
                     .clip(CircleShape)
                     .background(dotColor)
             )
-
-            // Health Status text / Badge
             Text(
                 text = when (healthState.overallStatus) {
-                    DiagnosticStatus.HEALTHY -> "System OK"
-                    DiagnosticStatus.WARNING -> "${healthState.warningCount} Notice"
+                    DiagnosticStatus.HEALTHY -> "System Healthy"
+                    DiagnosticStatus.WARNING -> "${healthState.warningCount} Notice${if (healthState.warningCount > 1) "s" else ""}"
                     DiagnosticStatus.ERROR -> "${healthState.errorCount} Issue${if (healthState.errorCount > 1) "s" else ""}"
                 },
                 fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
+                fontWeight = FontWeight.SemiBold,
                 color = dotColor
-            )
-
-            // Diagnostic Tool Icon
-            Icon(
-                imageVector = Icons.Default.Build,
-                contentDescription = "Diagnostics Health",
-                tint = dotColor.copy(alpha = 0.85f),
-                modifier = Modifier.size(12.dp)
             )
         }
     }
 }
 
 /**
- * Compact, interactive diagnostics panel dialog showing live system health,
- * individual component issues, actual error codes, suggested fixes,
- * and a real-time API call counter and audit log.
+ * 4th Tab inside the Main App UI: "Diagnostics"
+ * Displays full system health status (green/yellow/red), component breakdowns
+ * (Accessibility Service, Overlay Permission, AI providers, Question Detection),
+ * plain-language descriptions, technical error codes, suggested fixes,
+ * quick-fix actionable buttons, and a real-time API Calls Audit Log.
+ */
+@Composable
+fun DiagnosticsTab(
+    healthState: SystemHealthState,
+    onRequestOverlayPermission: () -> Unit,
+    onRequestAccessibilityPermission: () -> Unit,
+    onNavigateToSettings: () -> Unit,
+    onTestRequest: () -> Unit,
+    onClearErrors: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var selectedSection by remember { mutableStateOf(0) } // 0: Components Health, 1: API Audit Log
+    val totalApiCalls by AppStateManager.totalApiCallsCount.collectAsStateWithLifecycle()
+    val providerCallCounts by AppStateManager.providerCallCounts.collectAsStateWithLifecycle()
+    val apiCallLogs by AppStateManager.recentApiCallLogs.collectAsStateWithLifecycle()
+
+    val statusColor = when (healthState.overallStatus) {
+        DiagnosticStatus.HEALTHY -> Color(0xFF10B981)
+        DiagnosticStatus.WARNING -> Color(0xFFF59E0B)
+        DiagnosticStatus.ERROR -> Color(0xFFEF4444)
+    }
+
+    LazyColumn(
+        modifier = modifier
+            .testTag("diagnostics_tab_view")
+            .fillMaxSize()
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        // 1. Overall System Health Banner Card
+        item {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("system_health_banner_card"),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = when (healthState.overallStatus) {
+                        DiagnosticStatus.HEALTHY -> Color(0xFF0D2319)
+                        DiagnosticStatus.WARNING -> Color(0xFF261D09)
+                        DiagnosticStatus.ERROR -> Color(0xFF280E0E)
+                    }
+                ),
+                border = BorderStroke(1.2.dp, statusColor.copy(alpha = 0.6f))
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(statusColor.copy(alpha = 0.2f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = when (healthState.overallStatus) {
+                                        DiagnosticStatus.HEALTHY -> Icons.Default.CheckCircle
+                                        DiagnosticStatus.WARNING -> Icons.Default.Warning
+                                        DiagnosticStatus.ERROR -> Icons.Default.Error
+                                    },
+                                    contentDescription = "System Health Status",
+                                    tint = statusColor,
+                                    modifier = Modifier.size(22.dp)
+                                )
+                            }
+                            Column {
+                                Text(
+                                    text = when (healthState.overallStatus) {
+                                        DiagnosticStatus.HEALTHY -> "All Systems Operational"
+                                        DiagnosticStatus.WARNING -> "System Attention Needed"
+                                        DiagnosticStatus.ERROR -> "Issues Detected"
+                                    },
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
+                                )
+                                Text(
+                                    text = healthState.summaryText,
+                                    fontSize = 12.sp,
+                                    color = statusColor
+                                )
+                            }
+                        }
+
+                        // Live pulse pill
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = statusColor.copy(alpha = 0.15f),
+                            border = BorderStroke(0.8.dp, statusColor.copy(alpha = 0.4f))
+                        ) {
+                            Text(
+                                text = when (healthState.overallStatus) {
+                                    DiagnosticStatus.HEALTHY -> "ACTIVE"
+                                    DiagnosticStatus.WARNING -> "NOTICE"
+                                    DiagnosticStatus.ERROR -> "ACTION REQ"
+                                },
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = statusColor,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
+                        }
+                    }
+
+                    // 4 Metric Counters Grid
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        MetricSummaryBadge(
+                            label = "Errors",
+                            count = healthState.errorCount,
+                            color = Color(0xFFEF4444),
+                            modifier = Modifier.weight(1f)
+                        )
+                        MetricSummaryBadge(
+                            label = "Notices",
+                            count = healthState.warningCount,
+                            color = Color(0xFFF59E0B),
+                            modifier = Modifier.weight(1f)
+                        )
+                        MetricSummaryBadge(
+                            label = "Healthy",
+                            count = healthState.healthyCount,
+                            color = Color(0xFF10B981),
+                            modifier = Modifier.weight(1f)
+                        )
+                        MetricSummaryBadge(
+                            label = "API Calls",
+                            count = totalApiCalls,
+                            color = Color(0xFF38BDF8),
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+            }
+        }
+
+        // 2. Global Diagnostics Quick Actions
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(14.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                ),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Button(
+                        onClick = onTestRequest,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFFDC2626)
+                        ),
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.weight(1.3f),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.PlayArrow,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(text = "Test Providers (1 Call)", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
+
+                    OutlinedButton(
+                        onClick = onClearErrors,
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.weight(1f),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.DeleteSweep,
+                            contentDescription = null,
+                            modifier = Modifier.size(15.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(text = "Clear Errors", fontSize = 11.sp)
+                    }
+
+                    OutlinedButton(
+                        onClick = { AppStateManager.clearApiCallLogs() },
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.weight(1f),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = null,
+                            modifier = Modifier.size(15.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(text = "Reset Audit", fontSize = 11.sp)
+                    }
+                }
+            }
+        }
+
+        // 3. Section Switcher: Component Health vs. API Calls Audit Log
+        item {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(Color(0xFF1E1313))
+                    .padding(3.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Surface(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable { selectedSection = 0 },
+                    shape = RoundedCornerShape(8.dp),
+                    color = if (selectedSection == 0) Color(0xFFDC2626).copy(alpha = 0.35f) else Color.Transparent,
+                    border = if (selectedSection == 0) BorderStroke(0.8.dp, Color(0xFFEF4444).copy(alpha = 0.6f)) else null
+                ) {
+                    Row(
+                        modifier = Modifier.padding(vertical = 8.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Build,
+                            contentDescription = null,
+                            tint = if (selectedSection == 0) Color.White else Color.White.copy(alpha = 0.6f),
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "Component Health (${healthState.items.size})",
+                            fontSize = 12.sp,
+                            fontWeight = if (selectedSection == 0) FontWeight.Bold else FontWeight.Normal,
+                            color = if (selectedSection == 0) Color.White else Color.White.copy(alpha = 0.6f)
+                        )
+                    }
+                }
+
+                Surface(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable { selectedSection = 1 },
+                    shape = RoundedCornerShape(8.dp),
+                    color = if (selectedSection == 1) Color(0xFFDC2626).copy(alpha = 0.35f) else Color.Transparent,
+                    border = if (selectedSection == 1) BorderStroke(0.8.dp, Color(0xFFEF4444).copy(alpha = 0.6f)) else null
+                ) {
+                    Row(
+                        modifier = Modifier.padding(vertical = 8.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Assessment,
+                            contentDescription = null,
+                            tint = if (selectedSection == 1) Color.White else Color.White.copy(alpha = 0.6f),
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "API Audit Log ($totalApiCalls)",
+                            fontSize = 12.sp,
+                            fontWeight = if (selectedSection == 1) FontWeight.Bold else FontWeight.Normal,
+                            color = if (selectedSection == 1) Color.White else Color.White.copy(alpha = 0.6f)
+                        )
+                    }
+                }
+            }
+        }
+
+        // 4. Section Content
+        if (selectedSection == 0) {
+            // Components List with live status, descriptions, error codes, and fixes
+            items(healthState.items, key = { it.id }) { item ->
+                DiagnosticItemCard(
+                    item = item,
+                    onFixAction = { actionType ->
+                        when (actionType) {
+                            "accessibility" -> onRequestAccessibilityPermission()
+                            "overlay" -> onRequestOverlayPermission()
+                            "settings" -> onNavigateToSettings()
+                            "test" -> onTestRequest()
+                        }
+                    }
+                )
+            }
+        } else {
+            // API Calls Audit Log View
+            item {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(10.dp),
+                    color = Color(0xFF10B981).copy(alpha = 0.12f),
+                    border = BorderStroke(0.6.dp, Color(0xFF10B981).copy(alpha = 0.35f))
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.CheckCircle,
+                            contentDescription = null,
+                            tint = Color(0xFF34D399),
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Column {
+                            Text(
+                                text = "Atomic Dedup Engine Active",
+                                fontSize = 11.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFFD1FAE5)
+                            )
+                            Text(
+                                text = "Exactly 1 API call per detected question is guaranteed. No duplicate calls or concurrent leaks.",
+                                fontSize = 10.5.sp,
+                                color = Color(0xFFA7F3D0),
+                                lineHeight = 14.sp
+                            )
+                        }
+                    }
+                }
+            }
+
+            if (apiCallLogs.isEmpty()) {
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF160F0F))
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(32.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Assessment,
+                                contentDescription = null,
+                                tint = Color.White.copy(alpha = 0.4f),
+                                modifier = Modifier.size(36.dp)
+                            )
+                            Text(
+                                text = "No API calls recorded yet",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White.copy(alpha = 0.8f)
+                            )
+                            Text(
+                                text = "Trigger a question detection or tap 'Test Providers' to see the live telemetry log.",
+                                fontSize = 12.sp,
+                                color = Color.White.copy(alpha = 0.5f),
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                            )
+                        }
+                    }
+                }
+            } else {
+                items(apiCallLogs, key = { it.id }) { log ->
+                    ApiCallLogCard(log = log)
+                }
+            }
+        }
+
+        item {
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+    }
+}
+
+/**
+ * Interactive diagnostics panel dialog for modal viewing inside the app.
  */
 @Composable
 fun DiagnosticsPanelDialog(
@@ -581,6 +949,7 @@ private fun MetricSummaryBadge(
 @Composable
 fun DiagnosticItemCard(
     item: DiagnosticItem,
+    onFixAction: ((String) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val statusColor = when (item.status) {
@@ -610,7 +979,7 @@ fun DiagnosticItemCard(
         border = BorderStroke(1.dp, statusColor.copy(alpha = 0.35f))
     ) {
         Column(
-            modifier = Modifier.padding(12.dp),
+            modifier = Modifier.padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             // Component Title & Status Badge
@@ -632,7 +1001,7 @@ fun DiagnosticItemCard(
                     Text(
                         text = item.componentName,
                         fontWeight = FontWeight.Bold,
-                        fontSize = 13.sp,
+                        fontSize = 13.5.sp,
                         color = Color.White
                     )
                 }
@@ -674,7 +1043,7 @@ fun DiagnosticItemCard(
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         Text(
-                            text = "CODE:",
+                            text = "CODE/STATUS:",
                             fontSize = 9.sp,
                             fontWeight = FontWeight.Bold,
                             fontFamily = FontFamily.Monospace,
@@ -724,6 +1093,40 @@ fun DiagnosticItemCard(
                                 lineHeight = 15.sp
                             )
                         }
+                    }
+                }
+            }
+
+            // Contextual Action Button if an action is available
+            if (onFixAction != null && (item.status != DiagnosticStatus.HEALTHY || item.id.endsWith("_provider"))) {
+                val (buttonText, actionType, buttonIcon) = when {
+                    item.id == "accessibility_service" -> Triple("Open Accessibility Settings", "accessibility", Icons.Default.OpenInNew)
+                    item.id == "overlay_permission" -> Triple("Grant Overlay Permission", "overlay", Icons.Default.OpenInNew)
+                    item.id.endsWith("_provider") -> Triple("Configure Key in Settings", "settings", Icons.Default.Settings)
+                    item.id == "question_detection" -> Triple("Test in Sandbox", "test", Icons.Default.Tune)
+                    else -> Triple("Resolve Issue", "settings", Icons.Default.Build)
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    OutlinedButton(
+                        onClick = { onFixAction(actionType) },
+                        shape = RoundedCornerShape(8.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = Color(0xFF38BDF8)
+                        ),
+                        border = BorderStroke(1.dp, Color(0xFF38BDF8).copy(alpha = 0.5f)),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                    ) {
+                        Icon(
+                            imageVector = buttonIcon,
+                            contentDescription = null,
+                            modifier = Modifier.size(13.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(text = buttonText, fontSize = 10.5.sp, fontWeight = FontWeight.SemiBold)
                     }
                 }
             }

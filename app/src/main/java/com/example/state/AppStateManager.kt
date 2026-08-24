@@ -23,6 +23,7 @@ import com.example.model.ReplySettings
 import com.example.model.ReplyTone
 import com.example.model.SystemHealthState
 import com.example.util.QuestionValidator
+import com.example.util.SettingsPreferences
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -119,6 +120,7 @@ object AppStateManager {
 
     private var lastProcessedQuestion: String? = null
     private var lastDetectionTime: Long = 0
+    private var appContext: Context? = null
 
     init {
         recomputeDiagnostics()
@@ -129,6 +131,27 @@ object AppStateManager {
                 kotlinx.coroutines.delay(10_000L)
                 cleanupExpiredHistory()
             }
+        }
+    }
+
+    fun init(context: Context) {
+        val appCtx = context.applicationContext
+        appContext = appCtx
+        try {
+            val savedSettings = SettingsPreferences.loadSettings(appCtx)
+            _settings.value = savedSettings
+        } catch (e: Exception) {
+            Log.e(TAG, "Error loading saved settings from SharedPreferences", e)
+        }
+        recomputeDiagnostics()
+    }
+
+    private fun persistCurrentSettings() {
+        val ctx = appContext ?: return
+        try {
+            SettingsPreferences.saveSettings(ctx, _settings.value)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error saving settings to SharedPreferences", e)
         }
     }
 
@@ -149,6 +172,7 @@ object AppStateManager {
 
     fun updateSettings(newSettings: ReplySettings) {
         _settings.value = newSettings
+        persistCurrentSettings()
         if (newSettings.autoDeleteHistory) {
             cleanupExpiredHistory()
         }
@@ -164,6 +188,7 @@ object AppStateManager {
                 AiProvider.GROK -> current.copy(grokApiKey = key.trim())
             }
         }
+        persistCurrentSettings()
         recomputeDiagnostics()
     }
 
@@ -173,11 +198,13 @@ object AppStateManager {
 
     fun updateSelectionMode(mode: ProviderSelectionMode) {
         _settings.update { it.copy(selectionMode = mode) }
+        persistCurrentSettings()
         recomputeDiagnostics()
     }
 
     fun updatePreferredProvider(provider: AiProvider) {
         _settings.update { it.copy(preferredProvider = provider) }
+        persistCurrentSettings()
         recomputeDiagnostics()
     }
 
@@ -192,10 +219,12 @@ object AppStateManager {
                 current
             }
         }
+        persistCurrentSettings()
     }
 
     fun updateProviderChain(newChain: List<AiProvider>) {
         _settings.update { it.copy(providerChain = newChain) }
+        persistCurrentSettings()
     }
 
     fun updateAutoDeleteSettings(enabled: Boolean, minutes: Int) {
@@ -205,37 +234,45 @@ object AppStateManager {
                 autoDeleteMinutes = minutes.coerceIn(1, 10)
             )
         }
+        persistCurrentSettings()
         cleanupExpiredHistory()
     }
 
     fun updateReplyLength(length: ReplyLength) {
         _settings.update { it.copy(length = length) }
+        persistCurrentSettings()
     }
 
     fun updateReplyCount(count: Int) {
         _settings.update { it.copy(count = count.coerceIn(1, 3)) }
+        persistCurrentSettings()
     }
 
     fun updateTone(tone: ReplyTone) {
         _settings.update { it.copy(tone = tone) }
+        persistCurrentSettings()
     }
 
     fun toggleMultiLanguage() {
         val newState = !_settings.value.multiLanguageEnabled
         _settings.update { it.copy(multiLanguageEnabled = newState) }
+        persistCurrentSettings()
     }
 
     fun toggleScanning() {
         val newState = !_settings.value.scanningEnabled
         _settings.update { it.copy(scanningEnabled = newState) }
+        persistCurrentSettings()
     }
 
     fun setMultiLanguageEnabled(enabled: Boolean) {
         _settings.update { it.copy(multiLanguageEnabled = enabled) }
+        persistCurrentSettings()
     }
 
     fun setScanningEnabled(enabled: Boolean) {
         _settings.update { it.copy(scanningEnabled = enabled) }
+        persistCurrentSettings()
     }
 
     fun setOverlayRunning(running: Boolean) {
@@ -250,6 +287,13 @@ object AppStateManager {
 
     fun setOverlayExpanded(expanded: Boolean) {
         _isOverlayExpanded.value = expanded
+    }
+
+    fun closeMainBar() {
+        _isOverlayExpanded.value = false
+        _activeReplies.value = emptyList()
+        _currentQuestion.value = null
+        _errorMessage.value = null
     }
 
     fun setDiagnosticsPanelOpen(open: Boolean) {
@@ -492,6 +536,12 @@ object AppStateManager {
         val normalized = normalizeQuestion(cleaned)
         if (normalized.isBlank()) return
 
+        // 1. If scanning / Analyze is turned OFF in settings, ignore screen detection (unless forced)
+        if (!force && !_settings.value.scanningEnabled) {
+            Log.d(TAG, "[A11Y_DETECT] Analyze is OFF; skipping detection: \"$cleaned\"")
+            return
+        }
+
         val now = System.currentTimeMillis()
 
         if (!force) {
@@ -501,9 +551,10 @@ object AppStateManager {
                 return
             }
 
-            // Guard 2: Has this question already been processed / answered before?
-            if (seenQuestionsCache.contains(normalized)) {
-                Log.d(TAG, "[DEDUP] Question was already processed/cached previously: \"$cleaned\"")
+            // Guard 2: Active replies already visible on screen for this question
+            val currentNormalized = normalizeQuestion(_currentQuestion.value?.text ?: "")
+            if (currentNormalized == normalized && _activeReplies.value.isNotEmpty()) {
+                Log.d(TAG, "[DEDUP] Active replies already visible on screen for: \"$cleaned\"")
                 return
             }
 
@@ -513,10 +564,9 @@ object AppStateManager {
                 return
             }
 
-            // Guard 4: Active replies already visible for this question
-            val currentNormalized = normalizeQuestion(_currentQuestion.value?.text ?: "")
-            if (currentNormalized == normalized && _activeReplies.value.isNotEmpty()) {
-                Log.d(TAG, "[DEDUP] Active replies already visible on screen for: \"$cleaned\"")
+            // Guard 4: If this question was already detected and processed within the last 15 seconds, skip duplicate spam
+            if (seenQuestionsCache.contains(normalized) && (now - lastDetectionTime < 15_000L)) {
+                Log.d(TAG, "[DEDUP] Question was recently processed: \"$cleaned\"")
                 return
             }
         }
@@ -537,10 +587,10 @@ object AppStateManager {
             timestamp = now
         )
         _currentQuestion.value = questionObj
+        _isOverlayExpanded.value = true
 
-        if (_settings.value.autoGenerate) {
-            generateRepliesForQuestion(cleaned, sourceApp, force = force)
-        }
+        // Automatically call the AI to generate replies immediately without requiring any extra tap
+        generateRepliesForQuestion(questionText = cleaned, sourceApp = sourceApp, force = true)
     }
 
     fun generateRepliesForQuestion(
@@ -552,12 +602,6 @@ object AppStateManager {
         if (text.isBlank()) return
 
         val normalized = normalizeQuestion(text)
-
-        // If not forced and already generated with active replies, skip
-        if (!force && seenQuestionsCache.contains(normalized) && _activeReplies.value.isNotEmpty()) {
-            Log.d(TAG, "[DEDUP] Skipping generation, active replies already exist for: \"$text\"")
-            return
-        }
 
         // Cancel previous request
         generationJob?.cancel()

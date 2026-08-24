@@ -25,6 +25,7 @@ class QuestionDetectorAccessibilityService : AccessibilityService() {
     override fun onServiceConnected() {
         super.onServiceConnected()
         Log.d(TAG, "QuestionDetectorAccessibilityService connected")
+        AppStateManager.init(this)
         AppStateManager.setAccessibilityRunning(true)
 
         val info = serviceInfo ?: AccessibilityServiceInfo()
