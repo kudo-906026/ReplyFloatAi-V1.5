@@ -54,6 +54,8 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.Filter3
+import androidx.compose.material.icons.filled.FormatAlignLeft
 import androidx.compose.material.icons.filled.HealthAndSafety
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Layers
@@ -98,6 +100,8 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
+import androidx.compose.material3.TabRowDefaults
+import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -118,6 +122,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -132,6 +137,18 @@ import com.example.model.ReplyTone
 import com.example.service.FloatingOverlayService
 import com.example.service.QuestionDetectorAccessibilityService
 import com.example.state.AppStateManager
+import com.example.ui.theme.CrimsonLight
+import com.example.ui.theme.CrimsonPrimary
+import com.example.ui.theme.DarkBg
+import com.example.ui.theme.DarkCard
+import com.example.ui.theme.DarkCardBorder
+import com.example.ui.theme.DarkCardElevated
+import com.example.ui.theme.DarkSurfaceCard
+import com.example.ui.theme.DarkSurfaceVariant
+import com.example.ui.theme.StatusCyan
+import com.example.ui.theme.StatusGreen
+import com.example.ui.theme.StatusOrange
+import com.example.ui.theme.TextMuted
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -171,6 +188,7 @@ fun MainScreen() {
     }
 
     Scaffold(
+        containerColor = DarkBg,
         topBar = {
             TopAppBar(
                 title = {
@@ -182,14 +200,14 @@ fun MainScreen() {
                             modifier = Modifier
                                 .size(36.dp)
                                 .clip(RoundedCornerShape(10.dp))
-                                .background(Color(0xFF080C14))
-                                .border(1.dp, Color(0xFF38BDF8).copy(alpha = 0.4f), RoundedCornerShape(10.dp)),
+                                .background(CrimsonPrimary.copy(alpha = 0.18f))
+                                .border(1.dp, CrimsonPrimary.copy(alpha = 0.5f), RoundedCornerShape(10.dp)),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 imageVector = Icons.Default.ChatBubbleOutline,
                                 contentDescription = "ReplyFloat AI",
-                                tint = Color(0xFF38BDF8),
+                                tint = CrimsonPrimary,
                                 modifier = Modifier.size(20.dp)
                             )
                         }
@@ -201,9 +219,11 @@ fun MainScreen() {
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
-                                text = "AI Floating Assistant",
-                                fontSize = 11.sp,
-                                color = MaterialTheme.colorScheme.primary
+                                text = "AI FLOATING ASSISTANT",
+                                fontSize = 9.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 0.8.sp,
+                                color = CrimsonPrimary
                             )
                         }
                     }
@@ -223,11 +243,11 @@ fun MainScreen() {
                             .padding(end = 12.dp)
                             .clip(RoundedCornerShape(16.dp))
                             .background(
-                                if (isOverlayRunning) Color(0x3310B981) else Color(0x2264748B)
+                                if (isOverlayRunning) CrimsonPrimary.copy(alpha = 0.18f) else Color(0x2264748B)
                             )
                             .border(
                                 1.dp,
-                                if (isOverlayRunning) Color(0xFF10B981) else Color(0x4464748B),
+                                if (isOverlayRunning) CrimsonPrimary else Color(0x4464748B),
                                 RoundedCornerShape(16.dp)
                             )
                             .padding(horizontal = 10.dp, vertical = 4.dp)
@@ -238,23 +258,23 @@ fun MainScreen() {
                         ) {
                             Box(
                                 modifier = Modifier
-                                    .size(8.dp)
+                                    .size(7.dp)
                                     .clip(CircleShape)
                                     .background(
-                                        if (isOverlayRunning) Color(0xFF10B981) else Color(0xFF94A3B8)
+                                        if (isOverlayRunning) CrimsonPrimary else Color(0xFF94A3B8)
                                     )
                             )
                             Text(
                                 text = if (isOverlayRunning) "Overlay Active" else "Overlay Inactive",
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.SemiBold,
-                                color = if (isOverlayRunning) Color(0xFF10B981) else Color(0xFF94A3B8)
+                                color = if (isOverlayRunning) CrimsonPrimary else Color(0xFF94A3B8)
                             )
                         }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
+                    containerColor = DarkBg
                 )
             )
         }
@@ -262,6 +282,7 @@ fun MainScreen() {
         Box(
             modifier = Modifier
                 .fillMaxSize()
+                .background(DarkBg)
                 .padding(innerPadding)
         ) {
             Column(
@@ -270,30 +291,48 @@ fun MainScreen() {
             // Top Navigation Tabs (4 Tabs: Controls & Test, Settings & Providers, History, Diagnostics)
             TabRow(
                 selectedTabIndex = selectedTab,
-                containerColor = MaterialTheme.colorScheme.surface,
-                contentColor = MaterialTheme.colorScheme.primary
+                containerColor = DarkBg,
+                contentColor = CrimsonPrimary,
+                indicator = { tabPositions ->
+                    TabRowDefaults.SecondaryIndicator(
+                        Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
+                        color = CrimsonPrimary,
+                        height = 2.5.dp
+                    )
+                },
+                divider = {
+                    HorizontalDivider(color = DarkCardBorder)
+                }
             ) {
                 Tab(
                     selected = selectedTab == 0,
                     onClick = { selectedTab = 0 },
+                    selectedContentColor = CrimsonPrimary,
+                    unselectedContentColor = TextMuted,
                     text = { Text("Controls", fontSize = 12.sp, fontWeight = FontWeight.SemiBold) },
                     icon = { Icon(Icons.Default.Tune, contentDescription = null, modifier = Modifier.size(18.dp)) }
                 )
                 Tab(
                     selected = selectedTab == 1,
                     onClick = { selectedTab = 1 },
+                    selectedContentColor = CrimsonPrimary,
+                    unselectedContentColor = TextMuted,
                     text = { Text("Settings", fontSize = 12.sp, fontWeight = FontWeight.SemiBold) },
                     icon = { Icon(Icons.Default.Settings, contentDescription = null, modifier = Modifier.size(18.dp)) }
                 )
                 Tab(
                     selected = selectedTab == 2,
                     onClick = { selectedTab = 2 },
+                    selectedContentColor = CrimsonPrimary,
+                    unselectedContentColor = TextMuted,
                     text = { Text("History (${history.size})", fontSize = 12.sp, fontWeight = FontWeight.SemiBold) },
                     icon = { Icon(Icons.Default.QuestionAnswer, contentDescription = null, modifier = Modifier.size(18.dp)) }
                 )
                 Tab(
                     selected = selectedTab == 3,
                     onClick = { selectedTab = 3 },
+                    selectedContentColor = CrimsonPrimary,
+                    unselectedContentColor = TextMuted,
                     text = {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
@@ -307,7 +346,7 @@ fun MainScreen() {
                                         .clip(CircleShape)
                                         .background(
                                             if (healthState.overallStatus == com.example.model.DiagnosticStatus.ERROR)
-                                                Color(0xFFEF4444)
+                                                CrimsonPrimary
                                             else
                                                 Color(0xFFF59E0B)
                                         )
@@ -450,84 +489,85 @@ fun ControlsAndTestTab(
     ) {
         // Hero Floating Overlay Launch Card
         item {
-            Card(
+            ControlPanelCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .testTag("overlay_control_card"),
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                ),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                isSelected = isOverlayRunning,
+                shape = RoundedCornerShape(18.dp)
             ) {
-                Box(
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(
-                            Brush.linearGradient(
-                                colors = listOf(
-                                    Color(0xFF8B1515).copy(alpha = 0.2f),
-                                    Color(0xFFFF5757).copy(alpha = 0.15f)
-                                )
-                            )
-                        )
-                        .padding(18.dp)
+                        .padding(18.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
-                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column {
-                                Text(
-                                    text = "Floating AI Bar",
-                                    fontSize = 17.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                                Text(
-                                    text = "Floats over WhatsApp, Messenger, Gmail, and any app",
-                                    fontSize = 12.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text(
+                                text = "Floating AI Bar",
+                                fontSize = 17.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "Floats over WhatsApp, Messenger, Gmail, and any app",
+                                fontSize = 12.sp,
+                                color = TextMuted
+                            )
+                        }
 
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(if (isOverlayRunning) CrimsonPrimary.copy(alpha = 0.2f) else DarkBg)
+                                .border(1.dp, if (isOverlayRunning) CrimsonPrimary.copy(alpha = 0.6f) else DarkCardBorder, RoundedCornerShape(10.dp)),
+                            contentAlignment = Alignment.Center
+                        ) {
                             Icon(
                                 imageVector = Icons.Default.Layers,
                                 contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(28.dp)
+                                tint = if (isOverlayRunning) CrimsonPrimary else TextMuted,
+                                modifier = Modifier.size(22.dp)
                             )
                         }
+                    }
 
-                        // Start / Stop Toggle Button
-                        Button(
-                            onClick = {
-                                if (isOverlayRunning) onStopOverlay() else onStartOverlay()
-                            },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(48.dp)
-                                .testTag("toggle_overlay_button"),
-                            shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = if (isOverlayRunning) Color(0xFFDC2626) else Color(0xFF8B1515),
-                                contentColor = Color.White
-                            )
-                        ) {
-                            Icon(
-                                imageVector = if (isOverlayRunning) Icons.Default.Stop else Icons.Default.PlayArrow,
-                                contentDescription = null,
-                                modifier = Modifier.size(20.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = if (isOverlayRunning) "Stop Floating Overlay" else "Start Floating Overlay Bar",
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
+                    // Start / Stop Toggle Button
+                    Button(
+                        onClick = {
+                            if (isOverlayRunning) onStopOverlay() else onStartOverlay()
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp)
+                            .testTag("toggle_overlay_button")
+                            .then(if (isOverlayRunning) Modifier.crimsonGlow(radius = 10.dp, color = CrimsonPrimary.copy(alpha = 0.4f)) else Modifier),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (isOverlayRunning) CrimsonPrimary else Color(0xFF271518),
+                            contentColor = Color.White
+                        ),
+                        border = if (!isOverlayRunning) BorderStroke(1.dp, CrimsonPrimary.copy(alpha = 0.6f)) else null
+                    ) {
+                        Icon(
+                            imageVector = if (isOverlayRunning) Icons.Default.Stop else Icons.Default.PlayArrow,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp),
+                            tint = if (isOverlayRunning) Color.White else CrimsonPrimary
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = if (isOverlayRunning) "Stop Floating Overlay" else "Start Floating Overlay Bar",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
                     }
                 }
             }
@@ -535,23 +575,17 @@ fun ControlsAndTestTab(
 
         // Permissions Status Section
         item {
-            Card(
+            ControlPanelCard(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                )
+                shape = RoundedCornerShape(16.dp)
             ) {
                 Column(
                     modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Text(
-                        text = "SYSTEM PERMISSIONS",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary,
-                        letterSpacing = 0.5.sp
+                    ControlPanelSectionHeader(
+                        title = "SYSTEM PERMISSIONS",
+                        icon = Icons.Default.Lock
                     )
 
                     // 1. Overlay Permission Row
@@ -589,14 +623,16 @@ fun ControlsAndTestTab(
                             OutlinedButton(
                                 onClick = onRequestOverlayPermission,
                                 shape = RoundedCornerShape(8.dp),
+                                border = BorderStroke(1.dp, CrimsonPrimary),
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = CrimsonPrimary),
                                 modifier = Modifier.testTag("grant_overlay_perm_button")
                             ) {
-                                Text("Grant", fontSize = 11.sp)
+                                Text("Grant", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                             }
                         }
                     }
 
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+                    HorizontalDivider(color = DarkCardBorder)
 
                     // 2. Accessibility Service Row
                     Row(
@@ -633,9 +669,11 @@ fun ControlsAndTestTab(
                             OutlinedButton(
                                 onClick = onRequestAccessibilityPermission,
                                 shape = RoundedCornerShape(8.dp),
+                                border = BorderStroke(1.dp, CrimsonPrimary),
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = CrimsonPrimary),
                                 modifier = Modifier.testTag("grant_accessibility_perm_button")
                             ) {
-                                Text("Enable", fontSize = 11.sp)
+                                Text("Enable", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                             }
                         }
                     }
@@ -645,45 +683,23 @@ fun ControlsAndTestTab(
 
         // Live Floating Bar In-App Sandbox & Tester
         item {
-            Card(
+            ControlPanelCard(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                )
+                shape = RoundedCornerShape(16.dp)
             ) {
                 Column(
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.AutoAwesome,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Text(
-                                text = "Interactive Question Sandbox",
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-                    }
+                    ControlPanelSectionHeader(
+                        title = "INTERACTIVE QUESTION SANDBOX",
+                        icon = Icons.Default.AutoAwesome
+                    )
 
                     Text(
                         text = "Simulate on-screen text detection or test custom questions with Gemini:",
                         fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = TextMuted
                     )
 
                     // Preset Chips
@@ -704,8 +720,9 @@ fun ControlsAndTestTab(
                         presets.forEach { preset ->
                             Box(
                                 modifier = Modifier
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(DarkBg)
+                                    .border(1.dp, DarkCardBorder, RoundedCornerShape(8.dp))
                                     .clickable { onTestInputChange(preset) }
                                     .padding(horizontal = 10.dp, vertical = 6.dp)
                             ) {
@@ -722,15 +739,22 @@ fun ControlsAndTestTab(
                     OutlinedTextField(
                         value = testInputText,
                         onValueChange = onTestInputChange,
-                        label = { Text("Question containing '?'") },
+                        label = { Text("Question containing '?'", color = TextMuted) },
                         modifier = Modifier
                             .fillMaxWidth()
                             .testTag("question_input_field"),
                         shape = RoundedCornerShape(12.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = CrimsonPrimary,
+                            unfocusedBorderColor = DarkCardBorder,
+                            focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                            cursorColor = CrimsonPrimary
+                        ),
                         trailingIcon = {
                             if (testInputText.isNotBlank()) {
                                 IconButton(onClick = { onTestInputChange("") }) {
-                                    Icon(Icons.Default.DeleteOutline, contentDescription = "Clear")
+                                    Icon(Icons.Default.DeleteOutline, contentDescription = "Clear", tint = TextMuted)
                                 }
                             }
                         }
@@ -742,10 +766,12 @@ fun ControlsAndTestTab(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(44.dp)
-                            .testTag("trigger_test_ai_button"),
+                            .testTag("trigger_test_ai_button")
+                            .then(if (testInputText.isNotBlank() && !isGenerating) Modifier.crimsonGlow(radius = 8.dp, color = CrimsonPrimary.copy(alpha = 0.35f)) else Modifier),
                         shape = RoundedCornerShape(10.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.primary
+                            containerColor = CrimsonPrimary,
+                            disabledContainerColor = DarkBg
                         )
                     ) {
                         if (isGenerating) {
@@ -755,11 +781,11 @@ fun ControlsAndTestTab(
                                 strokeWidth = 2.dp
                             )
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Calling AI fallback chain...")
+                            Text("Calling AI fallback chain...", color = Color.White)
                         } else {
-                            Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color.White)
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text("Detect & Generate AI Replies")
+                            Text("Detect & Generate AI Replies", fontWeight = FontWeight.Bold, color = Color.White)
                         }
                     }
 
@@ -769,7 +795,8 @@ fun ControlsAndTestTab(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(12.dp))
-                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                                .background(DarkBg)
+                                .border(1.dp, CrimsonPrimary.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
                                 .padding(16.dp),
                             contentAlignment = Alignment.Center
                         ) {
@@ -779,13 +806,13 @@ fun ControlsAndTestTab(
                             ) {
                                 CircularProgressIndicator(
                                     modifier = Modifier.size(20.dp),
-                                    color = MaterialTheme.colorScheme.primary,
+                                    color = CrimsonPrimary,
                                     strokeWidth = 2.dp
                                 )
                                 Text(
                                     text = "Generating replies across configured providers...",
                                     fontSize = 12.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    color = TextMuted
                                 )
                             }
                         }
@@ -796,8 +823,9 @@ fun ControlsAndTestTab(
                                 .clickable { onRetryGeneration() },
                             shape = RoundedCornerShape(12.dp),
                             colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.errorContainer
-                            )
+                                containerColor = Color(0xFF2D1214)
+                            ),
+                            border = BorderStroke(1.dp, CrimsonPrimary.copy(alpha = 0.5f))
                         ) {
                             Column(
                                 modifier = Modifier.padding(14.dp),
@@ -811,21 +839,21 @@ fun ControlsAndTestTab(
                                     Icon(
                                         Icons.Default.Warning,
                                         contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.error,
+                                        tint = CrimsonPrimary,
                                         modifier = Modifier.size(18.dp)
                                     )
                                     Text(
                                         text = "Generation Unavailable",
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 13.sp,
-                                        color = MaterialTheme.colorScheme.onErrorContainer
+                                        color = CrimsonLight
                                     )
                                 }
                                 Text(
                                     text = errorMessage,
                                     fontSize = 12.sp,
                                     textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                                    color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.9f)
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.9f)
                                 )
 
                                 Row(
@@ -836,19 +864,20 @@ fun ControlsAndTestTab(
                                         onClick = onRetryGeneration,
                                         shape = RoundedCornerShape(8.dp),
                                         colors = ButtonDefaults.buttonColors(
-                                            containerColor = MaterialTheme.colorScheme.error
+                                            containerColor = CrimsonPrimary
                                         )
                                     ) {
-                                        Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(14.dp))
+                                        Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(14.dp), tint = Color.White)
                                         Spacer(modifier = Modifier.width(4.dp))
-                                        Text("Retry Chain", fontSize = 12.sp)
+                                        Text("Retry Chain", fontSize = 12.sp, color = Color.White)
                                     }
 
                                     OutlinedButton(
                                         onClick = onNavigateToSettings,
                                         shape = RoundedCornerShape(8.dp),
+                                        border = BorderStroke(1.dp, DarkCardBorder),
                                         colors = ButtonDefaults.outlinedButtonColors(
-                                            contentColor = MaterialTheme.colorScheme.onErrorContainer
+                                            contentColor = MaterialTheme.colorScheme.onSurface
                                         )
                                     ) {
                                         Icon(Icons.Default.Settings, contentDescription = null, modifier = Modifier.size(14.dp))
@@ -868,20 +897,20 @@ fun ControlsAndTestTab(
                                 text = "SUGGESTED REPLIES:",
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary,
+                                color = CrimsonPrimary,
                                 letterSpacing = 0.5.sp
                             )
                             if (activeProvider != null) {
                                 Surface(
                                     shape = RoundedCornerShape(4.dp),
-                                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
-                                    border = BorderStroke(0.6.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f))
+                                    color = CrimsonPrimary.copy(alpha = 0.15f),
+                                    border = BorderStroke(0.6.dp, CrimsonPrimary.copy(alpha = 0.4f))
                                 ) {
                                     Text(
                                         text = "via ${activeProvider.displayName}",
                                         fontSize = 9.sp,
                                         fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.primary,
+                                        color = CrimsonLight,
                                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                                     )
                                 }
@@ -901,6 +930,7 @@ fun ControlsAndTestTab(
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(8.dp))
                                 .background(Color(0x1510B981))
+                                .border(1.dp, Color(0x4410B981), RoundedCornerShape(8.dp))
                                 .padding(12.dp),
                             contentAlignment = Alignment.Center
                         ) {
@@ -939,54 +969,31 @@ fun SettingsTab(
     ) {
         // Provider Selection Mode Card
         item {
-            Card(
+            ControlPanelCard(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                ),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                shape = RoundedCornerShape(16.dp)
             ) {
                 Column(
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Tune,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Text(
-                            text = "PROVIDER SELECTION MODE",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary,
-                            letterSpacing = 0.5.sp
-                        )
-                    }
+                    ControlPanelSectionHeader(
+                        title = "PROVIDER SELECTION MODE",
+                        icon = Icons.Default.Tune
+                    )
 
                     Text(
                         text = "Choose how ReplyFloat decides which AI model to call for instant replies:",
                         fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = TextMuted
                     )
 
                     // Mode Selection Buttons (Auto Fallback vs Preferred Provider)
                     com.example.model.ProviderSelectionMode.entries.forEach { mode ->
                         val isSelected = settings.selectionMode == mode
-                        Surface(
+                        ControlPanelCard(
+                            isSelected = isSelected,
                             shape = RoundedCornerShape(12.dp),
-                            color = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
-                            else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
-                            border = BorderStroke(
-                                if (isSelected) 1.5.dp else 1.dp,
-                                if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
-                            ),
                             onClick = { onUpdateSelectionMode(mode) },
                             modifier = Modifier.fillMaxWidth()
                         ) {
@@ -1001,7 +1008,8 @@ fun SettingsTab(
                                     selected = isSelected,
                                     onClick = { onUpdateSelectionMode(mode) },
                                     colors = RadioButtonDefaults.colors(
-                                        selectedColor = MaterialTheme.colorScheme.primary
+                                        selectedColor = CrimsonPrimary,
+                                        unselectedColor = TextMuted
                                     )
                                 )
                                 Column(modifier = Modifier.weight(1f)) {
@@ -1009,12 +1017,12 @@ fun SettingsTab(
                                         text = mode.label,
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 13.sp,
-                                        color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                        color = if (isSelected) CrimsonLight else MaterialTheme.colorScheme.onSurface
                                     )
                                     Text(
                                         text = mode.description,
                                         fontSize = 11.sp,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        color = if (isSelected) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f) else TextMuted,
                                         lineHeight = 14.sp
                                     )
                                 }
@@ -1024,13 +1032,13 @@ fun SettingsTab(
 
                     // If Preferred Provider is selected, show provider selector
                     if (settings.selectionMode == com.example.model.ProviderSelectionMode.PREFERRED_PROVIDER) {
-                        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))
+                        HorizontalDivider(color = DarkCardBorder)
 
                         Text(
                             text = "SELECT PREFERRED PROVIDER:",
                             fontSize = 10.5.sp,
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary,
+                            color = CrimsonPrimary,
                             letterSpacing = 0.5.sp
                         )
 
@@ -1040,23 +1048,23 @@ fun SettingsTab(
                         ) {
                             AiProvider.entries.forEach { provider ->
                                 val isSelected = settings.preferredProvider == provider
-                                Surface(
+                                ControlPanelCard(
+                                    isSelected = isSelected,
                                     shape = RoundedCornerShape(10.dp),
-                                    color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
                                     modifier = Modifier
                                         .weight(1f)
                                         .clickable { onUpdatePreferredProvider(provider) }
                                 ) {
                                     Column(
-                                        modifier = Modifier.padding(vertical = 8.dp, horizontal = 4.dp),
+                                        modifier = Modifier.padding(vertical = 10.dp, horizontal = 4.dp),
                                         horizontalAlignment = Alignment.CenterHorizontally,
                                         verticalArrangement = Arrangement.Center
                                     ) {
                                         Text(
                                             text = provider.displayName,
                                             fontSize = 11.5.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurface
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                            color = if (isSelected) CrimsonLight else MaterialTheme.colorScheme.onSurface
                                         )
                                     }
                                 }
@@ -1066,7 +1074,7 @@ fun SettingsTab(
                         Text(
                             text = "Calls ${settings.preferredProvider.displayName} first. If it encounters a network error, auth failure, or quota limit (HTTP 429), it will gracefully fall back to the next configured provider in order.",
                             fontSize = 11.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f),
+                            color = TextMuted,
                             fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
                         )
                     }
@@ -1076,13 +1084,9 @@ fun SettingsTab(
 
         // Multi-Provider Fallback Chain Reordering & Status Card
         item {
-            Card(
+            ControlPanelCard(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                ),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                shape = RoundedCornerShape(16.dp)
             ) {
                 Column(
                     modifier = Modifier.padding(16.dp),
@@ -1093,33 +1097,19 @@ fun SettingsTab(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Layers,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(20.dp)
-                            )
-                            Text(
-                                text = "PROVIDER FALLBACK ORDER",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary,
-                                letterSpacing = 0.5.sp
-                            )
-                        }
+                        ControlPanelSectionHeader(
+                            title = "PROVIDER FALLBACK ORDER",
+                            icon = Icons.Default.Layers
+                        )
                     }
 
                     Text(
                         text = "Reorder the fallback sequence below. If an attempt fails, ReplyFloat immediately proceeds to the next ready provider in this sequence with full diagnostic logging.",
                         fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = TextMuted
                     )
 
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))
+                    HorizontalDivider(color = DarkCardBorder)
 
                     // Reorderable list of providers
                     settings.providerChain.forEachIndexed { index, provider ->
@@ -1130,14 +1120,12 @@ fun SettingsTab(
                             AiProvider.GROK -> settings.grokApiKey.isNotBlank()
                         }
 
-                        Surface(
+                        val isFirstInAuto = index == 0 && settings.selectionMode == com.example.model.ProviderSelectionMode.AUTO_FALLBACK
+                        val isPreferred = settings.selectionMode == com.example.model.ProviderSelectionMode.PREFERRED_PROVIDER && settings.preferredProvider == provider
+
+                        ControlPanelCard(
+                            isSelected = isFirstInAuto || isPreferred,
                             shape = RoundedCornerShape(12.dp),
-                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
-                            border = BorderStroke(
-                                1.dp,
-                                if (index == 0 && settings.selectionMode == com.example.model.ProviderSelectionMode.AUTO_FALLBACK) MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
-                                else MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
-                            ),
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Row(
@@ -1158,14 +1146,14 @@ fun SettingsTab(
                                             .size(24.dp)
                                             .clip(CircleShape)
                                             .background(
-                                                if (index == 0) MaterialTheme.colorScheme.primary
-                                                else MaterialTheme.colorScheme.surfaceVariant
+                                                if (index == 0) CrimsonPrimary
+                                                else DarkSurfaceVariant
                                             ),
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Text(
                                             text = "${index + 1}",
-                                            color = if (index == 0) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                                            color = if (index == 0) Color.White else TextMuted,
                                             fontSize = 11.sp,
                                             fontWeight = FontWeight.Bold
                                         )
@@ -1182,29 +1170,31 @@ fun SettingsTab(
                                                 fontSize = 13.sp,
                                                 color = MaterialTheme.colorScheme.onSurface
                                             )
-                                            if (index == 0 && settings.selectionMode == com.example.model.ProviderSelectionMode.AUTO_FALLBACK) {
+                                            if (isFirstInAuto) {
                                                 Surface(
                                                     shape = RoundedCornerShape(4.dp),
-                                                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                                                    color = CrimsonPrimary.copy(alpha = 0.2f),
+                                                    border = BorderStroke(1.dp, CrimsonPrimary.copy(alpha = 0.5f))
                                                 ) {
                                                     Text(
                                                         text = "PRIMARY",
                                                         fontSize = 8.5.sp,
                                                         fontWeight = FontWeight.Bold,
-                                                        color = MaterialTheme.colorScheme.primary,
+                                                        color = CrimsonLight,
                                                         modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
                                                     )
                                                 }
-                                            } else if (settings.selectionMode == com.example.model.ProviderSelectionMode.PREFERRED_PROVIDER && settings.preferredProvider == provider) {
+                                            } else if (isPreferred) {
                                                 Surface(
                                                     shape = RoundedCornerShape(4.dp),
-                                                    color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.2f)
+                                                    color = CrimsonPrimary.copy(alpha = 0.2f),
+                                                    border = BorderStroke(1.dp, CrimsonPrimary.copy(alpha = 0.5f))
                                                 ) {
                                                     Text(
                                                         text = "PREFERRED",
                                                         fontSize = 8.5.sp,
                                                         fontWeight = FontWeight.Bold,
-                                                        color = MaterialTheme.colorScheme.tertiary,
+                                                        color = CrimsonLight,
                                                         modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
                                                     )
                                                 }
@@ -1213,7 +1203,7 @@ fun SettingsTab(
                                         Text(
                                             text = if (hasKey) "Ready: ${provider.modelName}" else "No key entered yet",
                                             fontSize = 10.5.sp,
-                                            color = if (hasKey) Color(0xFF10B981) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                                            color = if (hasKey) StatusGreen else TextMuted
                                         )
                                     }
                                 }
@@ -1231,7 +1221,7 @@ fun SettingsTab(
                                         Icon(
                                             imageVector = Icons.Default.ArrowUpward,
                                             contentDescription = "Move ${provider.displayName} Up",
-                                            tint = if (index > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f),
+                                            tint = if (index > 0) CrimsonPrimary else TextMuted.copy(alpha = 0.3f),
                                             modifier = Modifier.size(16.dp)
                                         )
                                     }
@@ -1243,7 +1233,7 @@ fun SettingsTab(
                                         Icon(
                                             imageVector = Icons.Default.ArrowDownward,
                                             contentDescription = "Move ${provider.displayName} Down",
-                                            tint = if (index < settings.providerChain.size - 1) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f),
+                                            tint = if (index < settings.providerChain.size - 1) CrimsonPrimary else TextMuted.copy(alpha = 0.3f),
                                             modifier = Modifier.size(16.dp)
                                         )
                                     }
@@ -1257,52 +1247,35 @@ fun SettingsTab(
 
         // Multi-Provider API Key Inputs
         item {
-            Card(
+            ControlPanelCard(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                )
+                shape = RoundedCornerShape(16.dp)
             ) {
                 Column(
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Key,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Text(
-                            text = "PROVIDER API KEYS",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary,
-                            letterSpacing = 0.5.sp
-                        )
-                    }
+                    ControlPanelSectionHeader(
+                        title = "PROVIDER API KEYS",
+                        icon = Icons.Default.Key
+                    )
 
                     Text(
                         text = "Enter keys for as many providers as you have. You don't need all four — ReplyFloat will seamlessly route through whatever keys are provided.",
                         fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = TextMuted
                     )
 
                     // 1. Gemini
                     ProviderApiKeyInputField(
                         provider = AiProvider.GEMINI,
-                        currentKey = settings.customApiKey,
+                        currentKey = settings.geminiApiKey.ifBlank { settings.customApiKey },
                         isEnvKeyPresent = com.example.BuildConfig.GEMINI_API_KEY.isNotBlank(),
                         hint = "AI Studio environment key active by default (or custom AIzaSy...)",
                         onKeyChanged = { onUpdateProviderKey(AiProvider.GEMINI, it) }
                     )
 
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
+                    HorizontalDivider(color = DarkCardBorder)
 
                     // 2. OpenAI
                     ProviderApiKeyInputField(
@@ -1312,7 +1285,7 @@ fun SettingsTab(
                         onKeyChanged = { onUpdateProviderKey(AiProvider.OPENAI, it) }
                     )
 
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
+                    HorizontalDivider(color = DarkCardBorder)
 
                     // 3. Claude
                     ProviderApiKeyInputField(
@@ -1322,7 +1295,7 @@ fun SettingsTab(
                         onKeyChanged = { onUpdateProviderKey(AiProvider.CLAUDE, it) }
                     )
 
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
+                    HorizontalDivider(color = DarkCardBorder)
 
                     // 4. Grok (xAI)
                     ProviderApiKeyInputField(
@@ -1337,70 +1310,90 @@ fun SettingsTab(
 
         // Reply Length Configuration
         item {
-            Card(
+            ControlPanelCard(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                )
+                shape = RoundedCornerShape(16.dp)
             ) {
                 Column(
                     modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Text(
-                        text = "REPLY LENGTH",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary,
-                        letterSpacing = 0.5.sp
-                    )
-                    Text(
-                        text = "Choose the exact output format for Gemini replies:",
-                        fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    ControlPanelSectionHeader(
+                        title = "REPLY LENGTH",
+                        icon = Icons.Default.Tune
                     )
 
-                    ReplyLength.entries.forEach { lengthOption ->
-                        val isSelected = settings.length == lengthOption
-                        Surface(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { onUpdateLength(lengthOption) },
-                            shape = RoundedCornerShape(10.dp),
-                            color = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-                            border = BorderStroke(
-                                1.dp,
-                                if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
-                            )
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(12.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
+                    Text(
+                        text = "Choose the exact output format for AI response generation:",
+                        fontSize = 12.sp,
+                        color = TextMuted
+                    )
+
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        ReplyLength.entries.forEach { lengthOption ->
+                            val isSelected = settings.length == lengthOption
+                            ControlPanelCard(
+                                isSelected = isSelected,
+                                shape = RoundedCornerShape(12.dp),
+                                onClick = { onUpdateLength(lengthOption) },
+                                modifier = Modifier.fillMaxWidth()
                             ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = lengthOption.label,
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 14.sp,
-                                        color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                                    )
-                                    Text(
-                                        text = lengthOption.promptInstruction,
-                                        fontSize = 11.sp,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                                if (isSelected) {
-                                    Icon(
-                                        imageVector = Icons.Default.Check,
-                                        contentDescription = "Selected",
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(20.dp)
-                                    )
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(14.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .padding(end = 12.dp)
+                                    ) {
+                                        Text(
+                                            text = lengthOption.label,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
+                                            fontSize = 14.sp,
+                                            color = if (isSelected) CrimsonLight else MaterialTheme.colorScheme.onSurface
+                                        )
+                                        Spacer(modifier = Modifier.height(3.dp))
+                                        Text(
+                                            text = lengthOption.promptInstruction,
+                                            fontSize = 11.5.sp,
+                                            color = if (isSelected) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f) else TextMuted,
+                                            lineHeight = 15.sp
+                                        )
+                                    }
+                                    if (isSelected) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(24.dp)
+                                                .clip(CircleShape)
+                                                .background(CrimsonPrimary),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Check,
+                                                contentDescription = "Selected",
+                                                tint = Color.White,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
+                                    } else {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(24.dp)
+                                                .clip(CircleShape)
+                                                .border(
+                                                    1.dp,
+                                                    DarkCardBorder,
+                                                    CircleShape
+                                                )
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -1411,23 +1404,17 @@ fun SettingsTab(
 
         // Reply Count Configuration
         item {
-            Card(
+            ControlPanelCard(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                )
+                shape = RoundedCornerShape(16.dp)
             ) {
                 Column(
                     modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Text(
-                        text = "SUGGESTION COUNT (1 - 3)",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary,
-                        letterSpacing = 0.5.sp
+                    ControlPanelSectionHeader(
+                        title = "SUGGESTION COUNT (1 - 3)",
+                        icon = Icons.Default.Filter3
                     )
 
                     Row(
@@ -1436,20 +1423,36 @@ fun SettingsTab(
                     ) {
                         listOf(1, 2, 3).forEach { count ->
                             val isSelected = settings.count == count
-                            Button(
-                                onClick = { onUpdateCount(count) },
-                                modifier = Modifier.weight(1f),
+                            ControlPanelCard(
+                                isSelected = isSelected,
                                 shape = RoundedCornerShape(10.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
-                                    contentColor = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
-                                )
+                                onClick = { onUpdateCount(count) },
+                                modifier = Modifier.weight(1f)
                             ) {
-                                Text(
-                                    text = "$count ${if (count == 1) "Reply" else "Replies"}",
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                    fontSize = 13.sp
-                                )
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 12.dp, horizontal = 6.dp),
+                                    horizontalArrangement = Arrangement.Center,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    if (isSelected) {
+                                        Icon(
+                                            imageVector = Icons.Default.Check,
+                                            contentDescription = null,
+                                            tint = CrimsonPrimary,
+                                            modifier = Modifier
+                                                .size(16.dp)
+                                                .padding(end = 4.dp)
+                                        )
+                                    }
+                                    Text(
+                                        text = "$count ${if (count == 1) "Reply" else "Replies"}",
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                        fontSize = 13.sp,
+                                        color = if (isSelected) CrimsonLight else MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
                             }
                         }
                     }
@@ -1459,60 +1462,91 @@ fun SettingsTab(
 
         // Tone & Style Selector
         item {
-            Card(
+            ControlPanelCard(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                )
+                shape = RoundedCornerShape(16.dp)
             ) {
                 Column(
                     modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Text(
-                        text = "CONVERSATION TONE",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary,
-                        letterSpacing = 0.5.sp
+                    ControlPanelSectionHeader(
+                        title = "CONVERSATION TONE",
+                        icon = Icons.Default.ChatBubbleOutline
                     )
 
-                    ReplyTone.entries.forEach { tone ->
-                        val isSelected = settings.tone == tone
-                        Surface(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(8.dp))
-                                .clickable { onUpdateTone(tone) }
-                                .padding(vertical = 4.dp),
-                            color = Color.Transparent
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
+                    Text(
+                        text = "Set the personality and voice for AI-generated response suggestions:",
+                        fontSize = 12.sp,
+                        color = TextMuted
+                    )
+
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        ReplyTone.entries.forEach { tone ->
+                            val isSelected = settings.tone == tone
+                            ControlPanelCard(
+                                isSelected = isSelected,
+                                shape = RoundedCornerShape(12.dp),
+                                onClick = { onUpdateTone(tone) },
+                                modifier = Modifier.fillMaxWidth()
                             ) {
-                                Column {
-                                    Text(
-                                        text = tone.label,
-                                        fontSize = 13.sp,
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                        color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                                    )
-                                    Text(
-                                        text = tone.promptInstruction,
-                                        fontSize = 11.sp,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                                if (isSelected) {
-                                    Icon(
-                                        Icons.Default.Check,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(18.dp)
-                                    )
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(14.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Column(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .padding(end = 12.dp)
+                                    ) {
+                                        Text(
+                                            text = tone.label,
+                                            fontSize = 14.sp,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
+                                            color = if (isSelected) CrimsonLight else MaterialTheme.colorScheme.onSurface
+                                        )
+                                        Spacer(modifier = Modifier.height(3.dp))
+                                        Text(
+                                            text = tone.description,
+                                            fontSize = 11.5.sp,
+                                            color = if (isSelected) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f) else TextMuted,
+                                            lineHeight = 15.sp
+                                        )
+                                    }
+
+                                    if (isSelected) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(24.dp)
+                                                .clip(CircleShape)
+                                                .background(CrimsonPrimary),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Check,
+                                                contentDescription = "Selected",
+                                                tint = Color.White,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
+                                    } else {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(24.dp)
+                                                .clip(CircleShape)
+                                                .border(
+                                                    1.dp,
+                                                    DarkCardBorder,
+                                                    CircleShape
+                                                )
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -1523,12 +1557,9 @@ fun SettingsTab(
 
         // Multi-Language Mode (Any language / Hinglish)
         item {
-            Card(
+            ControlPanelCard(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                )
+                shape = RoundedCornerShape(16.dp)
             ) {
                 Row(
                     modifier = Modifier
@@ -1546,13 +1577,13 @@ fun SettingsTab(
                             modifier = Modifier
                                 .size(32.dp)
                                 .clip(RoundedCornerShape(8.dp))
-                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
+                                .background(CrimsonPrimary.copy(alpha = 0.15f)),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Translate,
                                 contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
+                                tint = CrimsonPrimary,
                                 modifier = Modifier.size(18.dp)
                             )
                         }
@@ -1569,11 +1600,11 @@ fun SettingsTab(
                                 else
                                     "Standard English-only replies",
                                 fontSize = 11.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = TextMuted
                             )
                         }
                     }
-                    Switch(
+                    ControlPanelSwitch(
                         checked = settings.multiLanguageEnabled,
                         onCheckedChange = { checked ->
                             onUpdateSettings(settings.copy(multiLanguageEnabled = checked))
@@ -1585,12 +1616,9 @@ fun SettingsTab(
 
         // Question Scanning (Analyze on/off switch)
         item {
-            Card(
+            ControlPanelCard(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                )
+                shape = RoundedCornerShape(16.dp)
             ) {
                 Row(
                     modifier = Modifier
@@ -1609,14 +1637,14 @@ fun SettingsTab(
                                 .size(32.dp)
                                 .clip(RoundedCornerShape(8.dp))
                                 .background(
-                                    if (settings.scanningEnabled) Color(0xFF15803D).copy(alpha = 0.2f) else MaterialTheme.colorScheme.surfaceVariant
+                                    if (settings.scanningEnabled) StatusGreen.copy(alpha = 0.2f) else DarkSurfaceVariant
                                 ),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Radar,
                                 contentDescription = null,
-                                tint = if (settings.scanningEnabled) Color(0xFF15803D) else MaterialTheme.colorScheme.onSurfaceVariant,
+                                tint = if (settings.scanningEnabled) StatusGreen else TextMuted,
                                 modifier = Modifier.size(18.dp)
                             )
                         }
@@ -1633,11 +1661,11 @@ fun SettingsTab(
                                 else
                                     "Paused: zero background scanning or API calls",
                                 fontSize = 11.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = TextMuted
                             )
                         }
                     }
-                    Switch(
+                    ControlPanelSwitch(
                         checked = settings.scanningEnabled,
                         onCheckedChange = { checked ->
                             onUpdateSettings(settings.copy(scanningEnabled = checked))
@@ -1649,12 +1677,9 @@ fun SettingsTab(
 
         // Auto-generation toggle
         item {
-            Card(
+            ControlPanelCard(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                )
+                shape = RoundedCornerShape(16.dp)
             ) {
                 Row(
                     modifier = Modifier
@@ -1673,10 +1698,10 @@ fun SettingsTab(
                         Text(
                             text = "Automatically calls Gemini as soon as a question mark is detected on screen",
                             fontSize = 11.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = TextMuted
                         )
                     }
-                    Switch(
+                    ControlPanelSwitch(
                         checked = settings.autoGenerate,
                         onCheckedChange = { checked ->
                             onUpdateSettings(settings.copy(autoGenerate = checked))
@@ -1688,12 +1713,9 @@ fun SettingsTab(
 
         // Auto-delete History (1-10 mins adjustable)
         item {
-            Card(
+            ControlPanelCard(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                )
+                shape = RoundedCornerShape(16.dp)
             ) {
                 Column(
                     modifier = Modifier.padding(16.dp),
@@ -1713,13 +1735,13 @@ fun SettingsTab(
                                 modifier = Modifier
                                     .size(32.dp)
                                     .clip(RoundedCornerShape(8.dp))
-                                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
+                                    .background(CrimsonPrimary.copy(alpha = 0.15f)),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Timer,
                                     contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
+                                    tint = CrimsonPrimary,
                                     modifier = Modifier.size(18.dp)
                                 )
                             }
@@ -1733,11 +1755,11 @@ fun SettingsTab(
                                 Text(
                                     text = if (settings.autoDeleteHistory) "Purges items after ${settings.autoDeleteMinutes} min" else "Disabled (kept until cleared)",
                                     fontSize = 11.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    color = TextMuted
                                 )
                             }
                         }
-                        Switch(
+                        ControlPanelSwitch(
                             checked = settings.autoDeleteHistory,
                             onCheckedChange = { checked ->
                                 onUpdateSettings(settings.copy(autoDeleteHistory = checked))
@@ -1754,7 +1776,7 @@ fun SettingsTab(
                             verticalArrangement = Arrangement.spacedBy(10.dp),
                             modifier = Modifier.padding(top = 4.dp)
                         ) {
-                            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))
+                            HorizontalDivider(color = DarkCardBorder)
 
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
@@ -1765,7 +1787,7 @@ fun SettingsTab(
                                     text = "EXPIRY DURATION (1 - 10 MINS)",
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.primary,
+                                    color = CrimsonPrimary,
                                     letterSpacing = 0.5.sp
                                 )
 
@@ -1786,7 +1808,7 @@ fun SettingsTab(
                                         Icon(
                                             Icons.Default.Remove,
                                             contentDescription = "Decrease minute",
-                                            tint = if (settings.autoDeleteMinutes > 1) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                                            tint = if (settings.autoDeleteMinutes > 1) CrimsonPrimary else TextMuted.copy(alpha = 0.4f),
                                             modifier = Modifier.size(16.dp)
                                         )
                                     }
@@ -1794,14 +1816,15 @@ fun SettingsTab(
                                     Box(
                                         modifier = Modifier
                                             .clip(RoundedCornerShape(6.dp))
-                                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f))
+                                            .background(CrimsonPrimary.copy(alpha = 0.15f))
+                                            .border(1.dp, CrimsonPrimary.copy(alpha = 0.4f), RoundedCornerShape(6.dp))
                                             .padding(horizontal = 8.dp, vertical = 3.dp)
                                     ) {
                                         Text(
                                             text = "${settings.autoDeleteMinutes} min${if (settings.autoDeleteMinutes > 1) "s" else ""}",
                                             fontSize = 12.sp,
                                             fontWeight = FontWeight.Bold,
-                                            color = MaterialTheme.colorScheme.primary
+                                            color = CrimsonLight
                                         )
                                     }
 
@@ -1817,7 +1840,7 @@ fun SettingsTab(
                                         Icon(
                                             Icons.Default.Add,
                                             contentDescription = "Increase minute",
-                                            tint = if (settings.autoDeleteMinutes < 10) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                                            tint = if (settings.autoDeleteMinutes < 10) CrimsonPrimary else TextMuted.copy(alpha = 0.4f),
                                             modifier = Modifier.size(16.dp)
                                         )
                                     }
@@ -1833,9 +1856,9 @@ fun SettingsTab(
                                 valueRange = 1f..10f,
                                 steps = 8, // 2, 3, 4, 5, 6, 7, 8, 9
                                 colors = SliderDefaults.colors(
-                                    thumbColor = MaterialTheme.colorScheme.primary,
-                                    activeTrackColor = MaterialTheme.colorScheme.primary,
-                                    inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
+                                    thumbColor = CrimsonPrimary,
+                                    activeTrackColor = CrimsonPrimary,
+                                    inactiveTrackColor = DarkSurfaceVariant
                                 )
                             )
 
@@ -1852,7 +1875,10 @@ fun SettingsTab(
                                         modifier = Modifier
                                             .clip(RoundedCornerShape(8.dp))
                                             .background(
-                                                if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+                                                if (isSelected) CrimsonPrimary else DarkSurfaceVariant
+                                            )
+                                            .then(
+                                                if (isSelected) Modifier.crimsonGlow() else Modifier.border(1.dp, DarkCardBorder, RoundedCornerShape(8.dp))
                                             )
                                             .clickable {
                                                 onUpdateSettings(settings.copy(autoDeleteMinutes = mins))
@@ -1864,7 +1890,7 @@ fun SettingsTab(
                                             text = "${mins}m",
                                             fontSize = 11.sp,
                                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                            color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+                                            color = if (isSelected) Color.White else TextMuted
                                         )
                                     }
                                 }
@@ -1873,7 +1899,7 @@ fun SettingsTab(
                             Text(
                                 text = "Detected questions and AI replies older than ${settings.autoDeleteMinutes} minute${if (settings.autoDeleteMinutes > 1) "s" else ""} will be deleted automatically.",
                                 fontSize = 11.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = TextMuted
                             )
                         }
                     }
@@ -1913,7 +1939,7 @@ fun ProviderApiKeyInputField(
                 Text(
                     text = "(${provider.modelName})",
                     fontSize = 10.5.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = TextMuted
                 )
             }
 
@@ -1921,39 +1947,42 @@ fun ProviderApiKeyInputField(
             if (isEnvKeyPresent && textValue.isBlank()) {
                 Surface(
                     shape = RoundedCornerShape(4.dp),
-                    color = Color(0xFF10B981).copy(alpha = 0.15f)
+                    color = StatusGreen.copy(alpha = 0.15f),
+                    border = BorderStroke(1.dp, StatusGreen.copy(alpha = 0.4f))
                 ) {
                     Text(
                         text = "AI Studio Key Active",
                         fontSize = 9.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color(0xFF10B981),
+                        color = StatusGreen,
                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                     )
                 }
             } else if (textValue.isNotBlank()) {
                 Surface(
                     shape = RoundedCornerShape(4.dp),
-                    color = Color(0xFF38BDF8).copy(alpha = 0.15f)
+                    color = StatusCyan.copy(alpha = 0.15f),
+                    border = BorderStroke(1.dp, StatusCyan.copy(alpha = 0.4f))
                 ) {
                     Text(
                         text = "Custom Key Set",
                         fontSize = 9.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color(0xFF0284C7),
+                        color = StatusCyan,
                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                     )
                 }
             } else {
                 Surface(
                     shape = RoundedCornerShape(4.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant
+                    color = DarkSurfaceVariant,
+                    border = BorderStroke(1.dp, DarkCardBorder)
                 ) {
                     Text(
                         text = "No Key",
                         fontSize = 9.sp,
                         fontWeight = FontWeight.Normal,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = TextMuted,
                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                     )
                 }
@@ -1966,7 +1995,7 @@ fun ProviderApiKeyInputField(
                 textValue = it
                 onKeyChanged(it)
             },
-            placeholder = { Text(hint, fontSize = 11.sp) },
+            placeholder = { Text(hint, fontSize = 11.sp, color = TextMuted) },
             visualTransformation = if (isPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
             trailingIcon = {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1975,21 +2004,30 @@ fun ProviderApiKeyInputField(
                             textValue = ""
                             onKeyChanged("")
                         }) {
-                            Icon(Icons.Default.Clear, contentDescription = "Clear", modifier = Modifier.size(16.dp))
+                            Icon(Icons.Default.Clear, contentDescription = "Clear", modifier = Modifier.size(16.dp), tint = TextMuted)
                         }
                     }
                     IconButton(onClick = { isPasswordVisible = !isPasswordVisible }) {
                         Icon(
                             imageVector = if (isPasswordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
                             contentDescription = if (isPasswordVisible) "Hide key" else "Show key",
-                            modifier = Modifier.size(16.dp)
+                            modifier = Modifier.size(16.dp),
+                            tint = TextMuted
                         )
                     }
                 }
             },
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(10.dp),
-            singleLine = true
+            singleLine = true,
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = CrimsonPrimary,
+                unfocusedBorderColor = DarkCardBorder,
+                focusedContainerColor = DarkSurfaceCard,
+                unfocusedContainerColor = DarkSurfaceCard,
+                focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                unfocusedTextColor = MaterialTheme.colorScheme.onSurface
+            )
         )
     }
 }
@@ -2019,12 +2057,9 @@ fun HistoryTab(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         // History Header Card with Auto-delete Status, Stepper & Clear Button
-        Card(
+        ControlPanelCard(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(14.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surface
-            )
+            shape = RoundedCornerShape(14.dp)
         ) {
             Column(
                 modifier = Modifier
@@ -2044,7 +2079,7 @@ fun HistoryTab(
                         Icon(
                             imageVector = Icons.Default.Timer,
                             contentDescription = null,
-                            tint = if (settings.autoDeleteHistory) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            tint = if (settings.autoDeleteHistory) CrimsonPrimary else TextMuted,
                             modifier = Modifier.size(18.dp)
                         )
                         Column {
@@ -2057,7 +2092,7 @@ fun HistoryTab(
                             Text(
                                 text = if (settings.autoDeleteHistory) "Purging after ${settings.autoDeleteMinutes} min" else "Auto-deletion disabled",
                                 fontSize = 10.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = TextMuted
                             )
                         }
                     }
@@ -2072,8 +2107,9 @@ fun HistoryTab(
                                 shape = RoundedCornerShape(8.dp),
                                 contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp, vertical = 2.dp),
                                 colors = ButtonDefaults.outlinedButtonColors(
-                                    contentColor = MaterialTheme.colorScheme.error
-                                )
+                                    contentColor = CrimsonPrimary
+                                ),
+                                border = BorderStroke(1.dp, CrimsonPrimary.copy(alpha = 0.5f))
                             ) {
                                 Icon(
                                     Icons.Default.DeleteOutline,
@@ -2085,12 +2121,11 @@ fun HistoryTab(
                             }
                         }
 
-                        Switch(
+                        ControlPanelSwitch(
                             checked = settings.autoDeleteHistory,
                             onCheckedChange = { checked ->
                                 onUpdateSettings(settings.copy(autoDeleteHistory = checked))
-                            },
-                            modifier = Modifier.size(height = 24.dp, width = 40.dp)
+                            }
                         )
                     }
                 }
@@ -2105,7 +2140,7 @@ fun HistoryTab(
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                         modifier = Modifier.padding(top = 2.dp)
                     ) {
-                        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.12f))
+                        HorizontalDivider(color = DarkCardBorder)
 
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -2116,7 +2151,7 @@ fun HistoryTab(
                                 text = "ADJUST TIME (1 - 10 MINS):",
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary,
+                                color = CrimsonPrimary,
                                 letterSpacing = 0.4.sp
                             )
 
@@ -2137,7 +2172,7 @@ fun HistoryTab(
                                     Icon(
                                         Icons.Default.Remove,
                                         contentDescription = "Decrease",
-                                        tint = if (settings.autoDeleteMinutes > 1) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
+                                        tint = if (settings.autoDeleteMinutes > 1) CrimsonPrimary else TextMuted.copy(alpha = 0.3f),
                                         modifier = Modifier.size(14.dp)
                                     )
                                 }
@@ -2145,14 +2180,15 @@ fun HistoryTab(
                                 Box(
                                     modifier = Modifier
                                         .clip(RoundedCornerShape(6.dp))
-                                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f))
+                                        .background(CrimsonPrimary.copy(alpha = 0.15f))
+                                        .border(1.dp, CrimsonPrimary.copy(alpha = 0.4f), RoundedCornerShape(6.dp))
                                         .padding(horizontal = 6.dp, vertical = 2.dp)
                                 ) {
                                     Text(
                                         text = "${settings.autoDeleteMinutes}m",
                                         fontSize = 11.sp,
                                         fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.primary
+                                        color = CrimsonLight
                                     )
                                 }
 
@@ -2168,7 +2204,7 @@ fun HistoryTab(
                                     Icon(
                                         Icons.Default.Add,
                                         contentDescription = "Increase",
-                                        tint = if (settings.autoDeleteMinutes < 10) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
+                                        tint = if (settings.autoDeleteMinutes < 10) CrimsonPrimary else TextMuted.copy(alpha = 0.3f),
                                         modifier = Modifier.size(14.dp)
                                     )
                                 }
@@ -2188,7 +2224,10 @@ fun HistoryTab(
                                     modifier = Modifier
                                         .clip(RoundedCornerShape(6.dp))
                                         .background(
-                                            if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                                            if (isSelected) CrimsonPrimary else DarkSurfaceVariant
+                                        )
+                                        .then(
+                                            if (isSelected) Modifier.crimsonGlow() else Modifier.border(1.dp, DarkCardBorder, RoundedCornerShape(6.dp))
                                         )
                                         .clickable {
                                             onUpdateSettings(settings.copy(autoDeleteMinutes = mins))
@@ -2200,7 +2239,7 @@ fun HistoryTab(
                                         text = "${mins}m",
                                         fontSize = 10.sp,
                                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                        color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+                                        color = if (isSelected) Color.White else TextMuted
                                     )
                                 }
                             }
@@ -2225,13 +2264,14 @@ fun HistoryTab(
                         modifier = Modifier
                             .size(48.dp)
                             .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.surfaceVariant),
+                            .background(DarkSurfaceVariant)
+                            .border(1.dp, DarkCardBorder, CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = Icons.Default.QuestionAnswer,
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            tint = TextMuted,
                             modifier = Modifier.size(24.dp)
                         )
                     }
@@ -2247,7 +2287,7 @@ fun HistoryTab(
                         } else {
                             "Questions with '?' will appear here automatically."
                         },
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = TextMuted,
                         fontSize = 12.sp,
                         textAlign = androidx.compose.ui.text.style.TextAlign.Center
                     )
@@ -2259,12 +2299,9 @@ fun HistoryTab(
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 items(history, key = { it.id }) { item ->
-                    Card(
+                    ControlPanelCard(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(14.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surface
-                        )
+                        shape = RoundedCornerShape(14.dp)
                     ) {
                         Column(
                             modifier = Modifier.padding(14.dp),
@@ -2293,13 +2330,14 @@ fun HistoryTab(
                                             Box(
                                                 modifier = Modifier
                                                     .clip(RoundedCornerShape(6.dp))
-                                                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                                                    .background(DarkSurfaceVariant)
+                                                    .border(1.dp, DarkCardBorder, RoundedCornerShape(6.dp))
                                                     .padding(horizontal = 6.dp, vertical = 2.dp)
                                             ) {
                                                 Text(
                                                     text = item.sourceApp,
                                                     fontSize = 9.sp,
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    color = TextMuted
                                                 )
                                             }
                                         }
@@ -2318,8 +2356,13 @@ fun HistoryTab(
                                                 modifier = Modifier
                                                     .clip(RoundedCornerShape(6.dp))
                                                     .background(
-                                                        if (remainingMs < 30_000) MaterialTheme.colorScheme.error.copy(alpha = 0.15f)
-                                                        else MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                                                        if (remainingMs < 30_000) CrimsonPrimary.copy(alpha = 0.2f)
+                                                        else CrimsonPrimary.copy(alpha = 0.15f)
+                                                    )
+                                                    .border(
+                                                        1.dp,
+                                                        if (remainingMs < 30_000) CrimsonPrimary else CrimsonPrimary.copy(alpha = 0.4f),
+                                                        RoundedCornerShape(6.dp)
                                                     )
                                                     .padding(horizontal = 6.dp, vertical = 2.dp)
                                             ) {
@@ -2330,14 +2373,14 @@ fun HistoryTab(
                                                     Icon(
                                                         imageVector = Icons.Default.Schedule,
                                                         contentDescription = null,
-                                                        tint = if (remainingMs < 30_000) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                                                        tint = CrimsonLight,
                                                         modifier = Modifier.size(10.dp)
                                                     )
                                                     Text(
                                                         text = "Expires in $countdownStr",
                                                         fontSize = 9.sp,
                                                         fontWeight = FontWeight.SemiBold,
-                                                        color = if (remainingMs < 30_000) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+                                                        color = CrimsonLight
                                                     )
                                                 }
                                             }
@@ -2351,7 +2394,7 @@ fun HistoryTab(
                                             Text(
                                                 text = timeStr,
                                                 fontSize = 10.sp,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                color = TextMuted
                                             )
                                         }
                                     }
@@ -2364,7 +2407,7 @@ fun HistoryTab(
                                     Icon(
                                         Icons.Default.Close,
                                         contentDescription = "Delete item",
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                                        tint = TextMuted,
                                         modifier = Modifier.size(16.dp)
                                     )
                                 }
@@ -2375,7 +2418,8 @@ fun HistoryTab(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .clip(RoundedCornerShape(8.dp))
-                                        .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f))
+                                        .background(DarkSurfaceVariant)
+                                        .border(1.dp, CrimsonPrimary.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
                                         .padding(horizontal = 8.dp, vertical = 5.dp)
                                 ) {
                                     Row(
@@ -2385,27 +2429,28 @@ fun HistoryTab(
                                         Icon(
                                             imageVector = Icons.Default.Translate,
                                             contentDescription = null,
-                                            tint = MaterialTheme.colorScheme.primary,
+                                            tint = CrimsonLight,
                                             modifier = Modifier.size(12.dp)
                                         )
                                         Text(
                                             text = "Meaning: ${item.englishMeaning}",
                                             fontSize = 11.sp,
                                             fontWeight = FontWeight.Medium,
-                                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                                            color = CrimsonLight
                                         )
                                     }
                                 }
                             }
 
-                            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))
+                            HorizontalDivider(color = DarkCardBorder)
 
                             item.replies.forEach { reply ->
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .clip(RoundedCornerShape(8.dp))
-                                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+                                        .background(DarkSurfaceVariant)
+                                        .border(1.dp, DarkCardBorder, RoundedCornerShape(8.dp))
                                         .padding(8.dp),
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.SpaceBetween
@@ -2423,7 +2468,7 @@ fun HistoryTab(
                                         Icon(
                                             Icons.Default.ContentCopy,
                                             contentDescription = "Copy",
-                                            tint = MaterialTheme.colorScheme.primary,
+                                            tint = CrimsonPrimary,
                                             modifier = Modifier.size(14.dp)
                                         )
                                     }

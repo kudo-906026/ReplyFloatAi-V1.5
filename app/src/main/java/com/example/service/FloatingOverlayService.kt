@@ -153,6 +153,17 @@ class FloatingOverlayService : Service() {
         AppStateManager.setOverlayRunning(false)
 
         try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                stopForeground(STOP_FOREGROUND_REMOVE)
+            } else {
+                @Suppress("DEPRECATION")
+                stopForeground(true)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error stopping foreground notification", e)
+        }
+
+        try {
             if (floatingView != null && windowManager != null) {
                 windowManager?.removeView(floatingView)
                 floatingView = null

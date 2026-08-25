@@ -11,6 +11,7 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.horizontalScroll
@@ -53,6 +54,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -81,6 +83,16 @@ import com.example.model.ReplyItem
 import com.example.model.ReplyLength
 import com.example.model.SystemHealthState
 import com.example.state.AppStateManager
+import com.example.ui.theme.CrimsonLight
+import com.example.ui.theme.CrimsonPrimary
+import com.example.ui.theme.DarkBg
+import com.example.ui.theme.DarkCardBorder
+import com.example.ui.theme.DarkSurfaceCard
+import com.example.ui.theme.DarkSurfaceVariant
+import com.example.ui.theme.StatusCyan
+import com.example.ui.theme.StatusGreen
+import com.example.ui.theme.StatusOrange
+import com.example.ui.theme.TextMuted
 
 @Composable
 fun FloatingOverlayContent(
@@ -128,7 +140,7 @@ fun FloatingOverlayContent(
                 onCopyReply = { reply -> AppStateManager.copyAndDismissReply(context, reply) },
                 onDismissReply = { replyId -> AppStateManager.dismissReply(replyId) },
                 onCollapse = { AppStateManager.setOverlayExpanded(false) },
-                onClose = { AppStateManager.closeMainBar() },
+                onClose = { onCloseService() },
                 onDragDelta = onDragDelta
             )
         } else {
@@ -158,10 +170,17 @@ fun CollapsedFloatingBar(
     onDragDelta: (Float, Float) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val borderColor = when {
+        errorMessage != null -> CrimsonPrimary
+        isGenerating -> StatusCyan
+        hasQuestion -> CrimsonPrimary
+        else -> DarkCardBorder
+    }
+
     Surface(
         modifier = modifier
             .testTag("collapsed_floating_bar")
-            .shadow(6.dp, RoundedCornerShape(20.dp))
+            .shadow(12.dp, RoundedCornerShape(20.dp), spotColor = CrimsonPrimary.copy(alpha = 0.5f))
             .clip(RoundedCornerShape(20.dp))
             .clickable { onExpand() }
             .pointerInput(Unit) {
@@ -171,41 +190,33 @@ fun CollapsedFloatingBar(
                 }
             },
         shape = RoundedCornerShape(20.dp),
-        color = Color(0xD0120B0B),
-        border = BorderStroke(
-            1.dp,
-            when {
-                errorMessage != null -> Color(0xFFEF4444).copy(alpha = 0.8f)
-                isGenerating -> Color(0xFF38BDF8).copy(alpha = 0.8f)
-                hasQuestion -> Color(0xFFDC2626).copy(alpha = 0.8f)
-                else -> Color.White.copy(alpha = 0.25f)
-            }
-        )
+        color = DarkBg.copy(alpha = 0.95f),
+        border = BorderStroke(1.2.dp, borderColor)
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             // Logo / Progress / Error
             if (isGenerating) {
                 CircularProgressIndicator(
                     modifier = Modifier.size(16.dp),
-                    color = Color(0xFF38BDF8),
+                    color = StatusCyan,
                     strokeWidth = 2.dp
                 )
             } else if (errorMessage != null) {
                 Icon(
                     imageVector = Icons.Default.Warning,
                     contentDescription = "Error",
-                    tint = Color(0xFFEF4444),
+                    tint = CrimsonPrimary,
                     modifier = Modifier.size(16.dp)
                 )
             } else {
                 Icon(
                     imageVector = Icons.Default.ChatBubbleOutline,
                     contentDescription = "ReplyFloat AI",
-                    tint = if (hasQuestion) Color(0xFFFF6B6B) else Color(0xFF38BDF8),
+                    tint = if (hasQuestion) CrimsonLight else StatusCyan,
                     modifier = Modifier.size(16.dp)
                 )
             }
@@ -228,9 +239,9 @@ fun CollapsedFloatingBar(
             if (repliesCount > 0 && !isGenerating && errorMessage == null) {
                 Box(
                     modifier = Modifier
-                        .size(6.dp)
+                        .size(7.dp)
                         .clip(CircleShape)
-                        .background(Color(0xFF10B981))
+                        .background(StatusGreen)
                 )
             }
         }
@@ -270,10 +281,10 @@ fun ExpandedOverlayBar(
         modifier = modifier
             .testTag("expanded_overlay_bar")
             .widthIn(min = 300.dp, max = 380.dp)
-            .shadow(12.dp, RoundedCornerShape(20.dp)),
+            .shadow(16.dp, RoundedCornerShape(20.dp), spotColor = CrimsonPrimary.copy(alpha = 0.6f)),
         shape = RoundedCornerShape(20.dp),
-        color = Color(0xF51A0808),
-        border = BorderStroke(1.2.dp, Color(0xFFDC2626).copy(alpha = 0.7f))
+        color = DarkBg.copy(alpha = 0.96f),
+        border = BorderStroke(1.2.dp, CrimsonPrimary.copy(alpha = 0.8f))
     ) {
         Column(
             modifier = Modifier.padding(14.dp)
@@ -297,15 +308,17 @@ fun ExpandedOverlayBar(
                 onRegenerate = onRegenerate
             )
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
             // Length Selector
             Text(
                 text = "LENGTH:",
-                color = Color(0xFFD4C8C8),
+                color = TextMuted,
                 fontSize = 10.sp,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 0.5.sp
             )
+            Spacer(modifier = Modifier.height(4.dp))
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -316,21 +329,27 @@ fun ExpandedOverlayBar(
                     val isSelected = selectedLength == len
                     Surface(
                         shape = RoundedCornerShape(8.dp),
-                        color = if (isSelected) Color(0xFF8B1515) else Color(0x33441818),
-                        modifier = Modifier.clickable { onLengthSelected(len) }
+                        color = if (isSelected) CrimsonPrimary else DarkSurfaceVariant,
+                        border = BorderStroke(
+                            1.dp,
+                            if (isSelected) CrimsonLight else DarkCardBorder
+                        ),
+                        modifier = Modifier
+                            .clickable { onLengthSelected(len) }
+                            .then(if (isSelected) Modifier.crimsonGlow() else Modifier)
                     ) {
                         Text(
                             text = len.label,
-                            color = if (isSelected) Color.White else Color(0xFFD4C8C8),
-                            fontSize = 10.sp,
+                            color = if (isSelected) Color.White else TextMuted,
+                            fontSize = 10.5.sp,
                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
                         )
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(6.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
             // Count Selector & Quick Action Toggles
             Row(
@@ -344,7 +363,7 @@ fun ExpandedOverlayBar(
                 ) {
                     Text(
                         text = "COUNT:",
-                        color = Color(0xFFD4C8C8),
+                        color = TextMuted,
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -353,15 +372,21 @@ fun ExpandedOverlayBar(
                         val isSelected = selectedCount == count
                         Surface(
                             shape = RoundedCornerShape(6.dp),
-                            color = if (isSelected) Color(0xFFB91C1C) else Color(0x33441818),
-                            modifier = Modifier.clickable { onCountSelected(count) }
+                            color = if (isSelected) CrimsonPrimary else DarkSurfaceVariant,
+                            border = BorderStroke(
+                                1.dp,
+                                if (isSelected) CrimsonLight else DarkCardBorder
+                            ),
+                            modifier = Modifier
+                                .clickable { onCountSelected(count) }
+                                .then(if (isSelected) Modifier.crimsonGlow() else Modifier)
                         ) {
                             Text(
                                 text = "$count",
-                                color = if (isSelected) Color.White else Color(0xFFD4C8C8),
-                                fontSize = 10.sp,
+                                color = if (isSelected) Color.White else TextMuted,
+                                fontSize = 10.5.sp,
                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                             )
                         }
                     }
@@ -375,29 +400,29 @@ fun ExpandedOverlayBar(
                     // Language Toggle
                     Surface(
                         shape = RoundedCornerShape(6.dp),
-                        color = if (multiLanguageEnabled) Color(0xFF0284C7) else Color(0x33441818),
+                        color = if (multiLanguageEnabled) StatusCyan.copy(alpha = 0.2f) else DarkSurfaceVariant,
                         border = BorderStroke(
-                            0.8.dp,
-                            if (multiLanguageEnabled) Color(0xFF38BDF8) else Color(0x44666666)
+                            1.dp,
+                            if (multiLanguageEnabled) StatusCyan else DarkCardBorder
                         ),
                         modifier = Modifier
                             .clickable { onToggleMultiLanguage() }
                             .testTag("lang_toggle_button")
                     ) {
                         Row(
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
+                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 4.dp),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(3.dp)
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Translate,
                                 contentDescription = null,
-                                tint = if (multiLanguageEnabled) Color.White else Color(0xFFB0A8A8),
+                                tint = if (multiLanguageEnabled) StatusCyan else TextMuted,
                                 modifier = Modifier.size(11.dp)
                             )
                             Text(
                                 text = if (multiLanguageEnabled) "Lang: ON" else "Lang: OFF",
-                                color = if (multiLanguageEnabled) Color.White else Color(0xFFB0A8A8),
+                                color = if (multiLanguageEnabled) StatusCyan else TextMuted,
                                 fontSize = 9.5.sp,
                                 fontWeight = if (multiLanguageEnabled) FontWeight.Bold else FontWeight.Medium
                             )
@@ -407,29 +432,29 @@ fun ExpandedOverlayBar(
                     // Analyze Toggle
                     Surface(
                         shape = RoundedCornerShape(6.dp),
-                        color = if (scanningEnabled) Color(0xFF15803D) else Color(0xFF4B5563),
+                        color = if (scanningEnabled) StatusGreen.copy(alpha = 0.2f) else DarkSurfaceVariant,
                         border = BorderStroke(
-                            0.8.dp,
-                            if (scanningEnabled) Color(0xFF4ADE80) else Color(0x449CA3AF)
+                            1.dp,
+                            if (scanningEnabled) StatusGreen else DarkCardBorder
                         ),
                         modifier = Modifier
                             .clickable { onToggleScanning() }
                             .testTag("analyze_toggle_button")
                     ) {
                         Row(
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
+                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 4.dp),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(3.dp)
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
                             Icon(
                                 imageVector = if (scanningEnabled) Icons.Default.Radar else Icons.Default.PauseCircle,
                                 contentDescription = null,
-                                tint = Color.White,
+                                tint = if (scanningEnabled) StatusGreen else TextMuted,
                                 modifier = Modifier.size(11.dp)
                             )
                             Text(
                                 text = if (scanningEnabled) "Analyze: ON" else "Analyze: OFF",
-                                color = Color.White,
+                                color = if (scanningEnabled) StatusGreen else TextMuted,
                                 fontSize = 9.5.sp,
                                 fontWeight = FontWeight.Bold
                             )
@@ -438,7 +463,7 @@ fun ExpandedOverlayBar(
                 }
             }
 
-            Spacer(modifier = Modifier.height(6.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
             // Auto-Delete History Timer Adjuster
             Row(
@@ -453,12 +478,12 @@ fun ExpandedOverlayBar(
                     Icon(
                         imageVector = Icons.Default.Timer,
                         contentDescription = null,
-                        tint = if (autoDeleteEnabled) Color(0xFFFF5757) else Color(0xFF887777),
+                        tint = if (autoDeleteEnabled) CrimsonLight else TextMuted,
                         modifier = Modifier.size(12.dp)
                     )
                     Text(
                         text = "AUTO-DELETE:",
-                        color = Color(0xFFD4C8C8),
+                        color = TextMuted,
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -479,13 +504,14 @@ fun ExpandedOverlayBar(
                                     }
                                 },
                             shape = CircleShape,
-                            color = Color(0x33441818)
+                            color = DarkSurfaceVariant,
+                            border = BorderStroke(1.dp, DarkCardBorder)
                         ) {
                             Box(contentAlignment = Alignment.Center) {
                                 Icon(
                                     imageVector = Icons.Default.Remove,
                                     contentDescription = "Decrease delete time",
-                                    tint = if (autoDeleteMinutes > 1) Color.White else Color(0xFF665555),
+                                    tint = if (autoDeleteMinutes > 1) Color.White else TextMuted,
                                     modifier = Modifier.size(12.dp)
                                 )
                             }
@@ -494,7 +520,8 @@ fun ExpandedOverlayBar(
                         // Time display
                         Surface(
                             shape = RoundedCornerShape(6.dp),
-                            color = Color(0xFF8B1515)
+                            color = CrimsonPrimary.copy(alpha = 0.3f),
+                            border = BorderStroke(0.8.dp, CrimsonPrimary)
                         ) {
                             Text(
                                 text = "${autoDeleteMinutes}m",
@@ -515,13 +542,14 @@ fun ExpandedOverlayBar(
                                     }
                                 },
                             shape = CircleShape,
-                            color = Color(0x33441818)
+                            color = DarkSurfaceVariant,
+                            border = BorderStroke(1.dp, DarkCardBorder)
                         ) {
                             Box(contentAlignment = Alignment.Center) {
                                 Icon(
                                     imageVector = Icons.Default.Add,
                                     contentDescription = "Increase delete time",
-                                    tint = if (autoDeleteMinutes < 10) Color.White else Color(0xFF665555),
+                                    tint = if (autoDeleteMinutes < 10) Color.White else TextMuted,
                                     modifier = Modifier.size(12.dp)
                                 )
                             }
@@ -530,7 +558,7 @@ fun ExpandedOverlayBar(
                 } else {
                     Text(
                         text = "Off",
-                        color = Color(0xFF887777),
+                        color = TextMuted,
                         fontSize = 10.sp
                     )
                 }
@@ -580,20 +608,21 @@ private fun OverlayHeader(
             Icon(
                 imageVector = Icons.Default.DragHandle,
                 contentDescription = "Drag overlay",
-                tint = Color.White.copy(alpha = 0.5f),
+                tint = TextMuted,
                 modifier = Modifier.size(16.dp)
             )
             Box(
                 modifier = Modifier
                     .size(26.dp)
                     .clip(RoundedCornerShape(7.dp))
-                    .background(Color(0xFF080C14)),
+                    .background(DarkSurfaceVariant)
+                    .border(1.dp, DarkCardBorder, RoundedCornerShape(7.dp)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = Icons.Default.ChatBubbleOutline,
                     contentDescription = "ReplyFloat AI",
-                    tint = Color(0xFF38BDF8),
+                    tint = CrimsonLight,
                     modifier = Modifier.size(16.dp)
                 )
             }
@@ -606,12 +635,12 @@ private fun OverlayHeader(
             if (activeProvider != null) {
                 Surface(
                     shape = RoundedCornerShape(6.dp),
-                    color = Color(0xFFDC2626).copy(alpha = 0.3f),
-                    border = BorderStroke(0.6.dp, Color(0xFFFF8A8A).copy(alpha = 0.6f))
+                    color = CrimsonPrimary.copy(alpha = 0.25f),
+                    border = BorderStroke(0.6.dp, CrimsonLight.copy(alpha = 0.6f))
                 ) {
                     Text(
                         text = "via ${activeProvider.displayName}",
-                        color = Color(0xFFFFD4D4),
+                        color = CrimsonLight,
                         fontSize = 9.sp,
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
@@ -632,8 +661,8 @@ private fun OverlayHeader(
                     .clickable { onCollapse() }
                     .testTag("collapse_overlay_button"),
                 shape = CircleShape,
-                color = Color(0x33FFFFFF),
-                border = BorderStroke(0.8.dp, Color(0x44FFFFFF))
+                color = DarkSurfaceVariant,
+                border = BorderStroke(1.dp, DarkCardBorder)
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
@@ -645,7 +674,7 @@ private fun OverlayHeader(
                 }
             }
 
-            // Close / X button (Fully closes/dismisses the main bar from screen)
+            // Close / X button (Fully stops the overlay service and removes floating bar)
             Surface(
                 modifier = Modifier
                     .size(28.dp)
@@ -653,14 +682,14 @@ private fun OverlayHeader(
                     .clickable { onClose() }
                     .testTag("close_overlay_button"),
                 shape = CircleShape,
-                color = Color(0x33EF4444),
-                border = BorderStroke(1.dp, Color(0x99EF4444))
+                color = CrimsonPrimary.copy(alpha = 0.25f),
+                border = BorderStroke(1.dp, CrimsonPrimary.copy(alpha = 0.8f))
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
                         imageVector = Icons.Default.Close,
-                        contentDescription = "Close and dismiss window",
-                        tint = Color(0xFFFCA5A5),
+                        contentDescription = "Stop floating service",
+                        tint = CrimsonLight,
                         modifier = Modifier.size(16.dp)
                     )
                 }
@@ -683,8 +712,8 @@ private fun OverlayQuestionSection(
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(10.dp),
-                color = Color(0x333A1818),
-                border = BorderStroke(0.8.dp, Color(0x44DC2626))
+                color = DarkSurfaceVariant,
+                border = BorderStroke(0.8.dp, DarkCardBorder)
             ) {
                 Column(
                     modifier = Modifier.padding(8.dp),
@@ -702,12 +731,12 @@ private fun OverlayQuestionSection(
                             Icon(
                                 imageVector = Icons.Default.Language,
                                 contentDescription = null,
-                                tint = Color(0xFFFF8A8A),
+                                tint = CrimsonLight,
                                 modifier = Modifier.size(11.dp)
                             )
                             Text(
                                 text = "ORIGINAL:",
-                                color = Color(0xFFFF8A8A),
+                                color = CrimsonLight,
                                 fontSize = 9.5.sp,
                                 fontWeight = FontWeight.Bold,
                                 letterSpacing = 0.5.sp
@@ -722,7 +751,7 @@ private fun OverlayQuestionSection(
                                 Icon(
                                     imageVector = Icons.Default.Refresh,
                                     contentDescription = "Regenerate",
-                                    tint = Color.White.copy(alpha = 0.7f),
+                                    tint = TextMuted,
                                     modifier = Modifier.size(13.dp)
                                 )
                             }
@@ -748,8 +777,8 @@ private fun OverlayQuestionSection(
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(10.dp),
-                color = Color(0x280284C7),
-                border = BorderStroke(0.8.dp, Color(0x4438BDF8))
+                color = StatusCyan.copy(alpha = 0.12f),
+                border = BorderStroke(0.8.dp, StatusCyan.copy(alpha = 0.35f))
             ) {
                 Column(
                     modifier = Modifier.padding(8.dp),
@@ -762,12 +791,12 @@ private fun OverlayQuestionSection(
                         Icon(
                             imageVector = Icons.Default.Translate,
                             contentDescription = null,
-                            tint = Color(0xFF7DD3FC),
+                            tint = StatusCyan,
                             modifier = Modifier.size(11.dp)
                         )
                         Text(
                             text = "MEANING (ENGLISH):",
-                            color = Color(0xFF7DD3FC),
+                            color = StatusCyan,
                             fontSize = 9.5.sp,
                             fontWeight = FontWeight.Bold,
                             letterSpacing = 0.5.sp
@@ -795,8 +824,8 @@ private fun OverlayQuestionSection(
         Surface(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(12.dp),
-            color = Color(0x333A1818),
-            border = BorderStroke(0.8.dp, Color(0x44DC2626))
+            color = DarkSurfaceVariant,
+            border = BorderStroke(0.8.dp, DarkCardBorder)
         ) {
             Column(
                 modifier = Modifier.padding(10.dp),
@@ -814,12 +843,12 @@ private fun OverlayQuestionSection(
                         Icon(
                             imageVector = Icons.Default.QuestionMark,
                             contentDescription = null,
-                            tint = Color(0xFFFF8A8A),
+                            tint = CrimsonLight,
                             modifier = Modifier.size(12.dp)
                         )
                         Text(
                             text = "DETECTED QUESTION",
-                            color = Color(0xFFFF8A8A),
+                            color = CrimsonLight,
                             fontSize = 10.sp,
                             fontWeight = FontWeight.SemiBold,
                             letterSpacing = 0.5.sp
@@ -834,7 +863,7 @@ private fun OverlayQuestionSection(
                             Icon(
                                 imageVector = Icons.Default.Refresh,
                                 contentDescription = "Regenerate",
-                                tint = Color.White.copy(alpha = 0.7f),
+                                tint = TextMuted,
                                 modifier = Modifier.size(14.dp)
                             )
                         }
@@ -874,7 +903,8 @@ private fun OverlayRepliesSection(
         Surface(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(12.dp),
-            color = Color(0x333A1818)
+            color = DarkSurfaceVariant,
+            border = BorderStroke(1.dp, DarkCardBorder)
         ) {
             Column(
                 modifier = Modifier.padding(vertical = 20.dp, horizontal = 16.dp),
@@ -883,7 +913,7 @@ private fun OverlayRepliesSection(
             ) {
                 CircularProgressIndicator(
                     modifier = Modifier.size(26.dp),
-                    color = Color(0xFFFF5757),
+                    color = CrimsonPrimary,
                     strokeWidth = 2.5.dp
                 )
                 Text(
@@ -900,8 +930,8 @@ private fun OverlayRepliesSection(
                 .fillMaxWidth()
                 .clickable { onRegenerate() },
             shape = RoundedCornerShape(12.dp),
-            color = Color(0x443F1212),
-            border = BorderStroke(1.dp, Color(0xFFEF4444))
+            color = DarkSurfaceVariant,
+            border = BorderStroke(1.dp, CrimsonPrimary.copy(alpha = 0.8f))
         ) {
             Column(
                 modifier = Modifier.padding(12.dp),
@@ -915,12 +945,12 @@ private fun OverlayRepliesSection(
                     Icon(
                         imageVector = Icons.Default.Warning,
                         contentDescription = null,
-                        tint = Color(0xFFEF4444),
+                        tint = CrimsonPrimary,
                         modifier = Modifier.size(18.dp)
                     )
                     Text(
                         text = "Generation Unavailable",
-                        color = Color(0xFFFCA5A5),
+                        color = CrimsonLight,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -942,7 +972,7 @@ private fun OverlayRepliesSection(
                         .testTag("retry_generation_button"),
                     shape = RoundedCornerShape(8.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFFDC2626),
+                        containerColor = CrimsonPrimary,
                         contentColor = Color.White
                     ),
                     contentPadding = ButtonDefaults.ButtonWithIconContentPadding
@@ -965,7 +995,8 @@ private fun OverlayRepliesSection(
         Surface(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(10.dp),
-            color = Color(0x223A1818)
+            color = DarkSurfaceVariant,
+            border = BorderStroke(1.dp, DarkCardBorder)
         ) {
             Column(
                 modifier = Modifier.padding(12.dp),
@@ -974,7 +1005,7 @@ private fun OverlayRepliesSection(
             ) {
                 Text(
                     text = if (hasQuestion) "All replies copied!" else "No active question",
-                    color = Color(0xFFD4C8C8),
+                    color = TextMuted,
                     fontSize = 11.sp
                 )
                 if (hasQuestion) {
@@ -984,7 +1015,7 @@ private fun OverlayRepliesSection(
                     ) {
                         Text(
                             text = "Generate More",
-                            color = Color(0xFFFF5757),
+                            color = CrimsonLight,
                             fontSize = 11.sp
                         )
                     }
@@ -1006,7 +1037,7 @@ private fun OverlayRepliesSection(
             ) {
                 Text(
                     text = if (multiLanguageEnabled) "REPLY (in original language):" else "SUGGESTED REPLIES:",
-                    color = Color(0xFFD4C8C8),
+                    color = TextMuted,
                     fontSize = 9.5.sp,
                     fontWeight = FontWeight.Bold,
                     letterSpacing = 0.5.sp
@@ -1015,12 +1046,12 @@ private fun OverlayRepliesSection(
                 if (activeProvider != null) {
                     Surface(
                         shape = RoundedCornerShape(4.dp),
-                        color = Color(0xFFDC2626).copy(alpha = 0.25f),
-                        border = BorderStroke(0.5.dp, Color(0xFFFF8A8A).copy(alpha = 0.4f))
+                        color = CrimsonPrimary.copy(alpha = 0.25f),
+                        border = BorderStroke(0.5.dp, CrimsonLight.copy(alpha = 0.4f))
                     ) {
                         Text(
                             text = "via ${activeProvider.displayName}",
-                            color = Color(0xFFFFC0C0),
+                            color = CrimsonLight,
                             fontSize = 8.5.sp,
                             fontWeight = FontWeight.SemiBold,
                             modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
@@ -1055,8 +1086,8 @@ fun ReplyCardItem(
             .fillMaxWidth()
             .testTag("reply_card_${reply.id}"),
         shape = RoundedCornerShape(12.dp),
-        color = Color(0x332D1212),
-        border = BorderStroke(0.8.dp, Color(0x44DC2626))
+        color = DarkSurfaceCard,
+        border = BorderStroke(1.dp, DarkCardBorder)
     ) {
         Column(
             modifier = Modifier.padding(10.dp)
@@ -1083,7 +1114,7 @@ fun ReplyCardItem(
                     Icon(
                         imageVector = Icons.Default.Close,
                         contentDescription = "Dismiss",
-                        tint = Color(0xFFD4C8C8),
+                        tint = TextMuted,
                         modifier = Modifier.size(14.dp)
                     )
                 }
@@ -1098,7 +1129,7 @@ fun ReplyCardItem(
                         .testTag("copy_reply_button"),
                     shape = RoundedCornerShape(8.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF8B1515),
+                        containerColor = CrimsonPrimary,
                         contentColor = Color.White
                     ),
                     contentPadding = ButtonDefaults.ButtonWithIconContentPadding

@@ -12,22 +12,22 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 
 private val DarkColorScheme = darkColorScheme(
-    primary = CoralGlow,
-    onPrimary = Color.Black,
-    primaryContainer = CrimsonPrimary,
+    primary = CrimsonPrimary,
+    onPrimary = Color.White,
+    primaryContainer = CrimsonDark,
     onPrimaryContainer = Color(0xFFFFEAEA),
-    secondary = AmberAccent,
+    secondary = CoralGlow,
     onSecondary = Color.Black,
-    secondaryContainer = CrimsonDark,
+    secondaryContainer = DarkCardElevated,
     onSecondaryContainer = Color(0xFFFFD1D1),
     tertiary = EmeraldSuccess,
-    background = DarkSurface,
-    onBackground = Color(0xFFFEE2E2),
+    background = DarkBg,
+    onBackground = Color(0xFFF5EBE6),
     surface = DarkCard,
-    onSurface = Color(0xFFFEE2E2),
+    onSurface = Color(0xFFF5EBE6),
     surfaceVariant = DarkCardElevated,
-    onSurfaceVariant = Color(0xFFD4C8C8),
-    outline = Color(0xFF5E4A4A)
+    onSurfaceVariant = TextMuted,
+    outline = DarkCardBorder
 )
 
 private val LightColorScheme = lightColorScheme(

@@ -13,6 +13,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -84,6 +85,16 @@ import com.example.model.DiagnosticItem
 import com.example.model.DiagnosticStatus
 import com.example.model.SystemHealthState
 import com.example.state.AppStateManager
+import com.example.ui.theme.CrimsonLight
+import com.example.ui.theme.CrimsonPrimary
+import com.example.ui.theme.DarkBg
+import com.example.ui.theme.DarkCardBorder
+import com.example.ui.theme.DarkSurfaceCard
+import com.example.ui.theme.DarkSurfaceVariant
+import com.example.ui.theme.StatusCyan
+import com.example.ui.theme.StatusGreen
+import com.example.ui.theme.StatusOrange
+import com.example.ui.theme.TextMuted
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -191,18 +202,11 @@ fun DiagnosticsTab(
     ) {
         // 1. Overall System Health Banner Card
         item {
-            Card(
+            ControlPanelCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .testTag("system_health_banner_card"),
                 shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = when (healthState.overallStatus) {
-                        DiagnosticStatus.HEALTHY -> Color(0xFF0D2319)
-                        DiagnosticStatus.WARNING -> Color(0xFF261D09)
-                        DiagnosticStatus.ERROR -> Color(0xFF280E0E)
-                    }
-                ),
                 border = BorderStroke(1.2.dp, statusColor.copy(alpha = 0.6f))
             ) {
                 Column(
@@ -222,7 +226,8 @@ fun DiagnosticsTab(
                                 modifier = Modifier
                                     .size(36.dp)
                                     .clip(RoundedCornerShape(10.dp))
-                                    .background(statusColor.copy(alpha = 0.2f)),
+                                    .background(statusColor.copy(alpha = 0.2f))
+                                    .border(1.dp, statusColor.copy(alpha = 0.4f), RoundedCornerShape(10.dp)),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
@@ -283,25 +288,25 @@ fun DiagnosticsTab(
                         MetricSummaryBadge(
                             label = "Errors",
                             count = healthState.errorCount,
-                            color = Color(0xFFEF4444),
+                            color = CrimsonPrimary,
                             modifier = Modifier.weight(1f)
                         )
                         MetricSummaryBadge(
                             label = "Notices",
                             count = healthState.warningCount,
-                            color = Color(0xFFF59E0B),
+                            color = StatusOrange,
                             modifier = Modifier.weight(1f)
                         )
                         MetricSummaryBadge(
                             label = "Healthy",
                             count = healthState.healthyCount,
-                            color = Color(0xFF10B981),
+                            color = StatusGreen,
                             modifier = Modifier.weight(1f)
                         )
                         MetricSummaryBadge(
                             label = "API Calls",
                             count = totalApiCalls,
-                            color = Color(0xFF38BDF8),
+                            color = StatusCyan,
                             modifier = Modifier.weight(1f)
                         )
                     }
@@ -311,13 +316,9 @@ fun DiagnosticsTab(
 
         // 2. Global Diagnostics Quick Actions
         item {
-            Card(
+            ControlPanelCard(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(14.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
-                ),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+                shape = RoundedCornerShape(14.dp)
             ) {
                 Row(
                     modifier = Modifier
@@ -329,31 +330,37 @@ fun DiagnosticsTab(
                     Button(
                         onClick = onTestRequest,
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFFDC2626)
+                            containerColor = CrimsonPrimary
                         ),
                         shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier.weight(1.3f),
+                        modifier = Modifier.weight(1.3f).crimsonGlow(),
                         contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Default.PlayArrow,
                             contentDescription = null,
-                            modifier = Modifier.size(16.dp)
+                            modifier = Modifier.size(16.dp),
+                            tint = Color.White
                         )
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text(text = "Test Providers (1 Call)", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Text(text = "Test Providers (1 Call)", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
                     }
 
                     OutlinedButton(
                         onClick = onClearErrors,
                         shape = RoundedCornerShape(10.dp),
                         modifier = Modifier.weight(1f),
+                        border = BorderStroke(1.dp, DarkCardBorder),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = MaterialTheme.colorScheme.onSurface
+                        ),
                         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Default.DeleteSweep,
                             contentDescription = null,
-                            modifier = Modifier.size(15.dp)
+                            modifier = Modifier.size(15.dp),
+                            tint = CrimsonLight
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(text = "Clear Errors", fontSize = 11.sp)
@@ -363,12 +370,17 @@ fun DiagnosticsTab(
                         onClick = { AppStateManager.clearApiCallLogs() },
                         shape = RoundedCornerShape(10.dp),
                         modifier = Modifier.weight(1f),
+                        border = BorderStroke(1.dp, DarkCardBorder),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = MaterialTheme.colorScheme.onSurface
+                        ),
                         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Default.Refresh,
                             contentDescription = null,
-                            modifier = Modifier.size(15.dp)
+                            modifier = Modifier.size(15.dp),
+                            tint = CrimsonLight
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(text = "Reset Audit", fontSize = 11.sp)
@@ -383,7 +395,8 @@ fun DiagnosticsTab(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(10.dp))
-                    .background(Color(0xFF1E1313))
+                    .background(DarkSurfaceVariant)
+                    .border(1.dp, DarkCardBorder, RoundedCornerShape(10.dp))
                     .padding(3.dp),
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
@@ -392,8 +405,8 @@ fun DiagnosticsTab(
                         .weight(1f)
                         .clickable { selectedSection = 0 },
                     shape = RoundedCornerShape(8.dp),
-                    color = if (selectedSection == 0) Color(0xFFDC2626).copy(alpha = 0.35f) else Color.Transparent,
-                    border = if (selectedSection == 0) BorderStroke(0.8.dp, Color(0xFFEF4444).copy(alpha = 0.6f)) else null
+                    color = if (selectedSection == 0) CrimsonPrimary.copy(alpha = 0.25f) else Color.Transparent,
+                    border = if (selectedSection == 0) BorderStroke(0.8.dp, CrimsonPrimary.copy(alpha = 0.6f)) else null
                 ) {
                     Row(
                         modifier = Modifier.padding(vertical = 8.dp),
@@ -403,7 +416,7 @@ fun DiagnosticsTab(
                         Icon(
                             imageVector = Icons.Default.Build,
                             contentDescription = null,
-                            tint = if (selectedSection == 0) Color.White else Color.White.copy(alpha = 0.6f),
+                            tint = if (selectedSection == 0) Color.White else TextMuted,
                             modifier = Modifier.size(14.dp)
                         )
                         Spacer(modifier = Modifier.width(6.dp))
@@ -411,7 +424,7 @@ fun DiagnosticsTab(
                             text = "Component Health (${healthState.items.size})",
                             fontSize = 12.sp,
                             fontWeight = if (selectedSection == 0) FontWeight.Bold else FontWeight.Normal,
-                            color = if (selectedSection == 0) Color.White else Color.White.copy(alpha = 0.6f)
+                            color = if (selectedSection == 0) Color.White else TextMuted
                         )
                     }
                 }
@@ -421,8 +434,8 @@ fun DiagnosticsTab(
                         .weight(1f)
                         .clickable { selectedSection = 1 },
                     shape = RoundedCornerShape(8.dp),
-                    color = if (selectedSection == 1) Color(0xFFDC2626).copy(alpha = 0.35f) else Color.Transparent,
-                    border = if (selectedSection == 1) BorderStroke(0.8.dp, Color(0xFFEF4444).copy(alpha = 0.6f)) else null
+                    color = if (selectedSection == 1) CrimsonPrimary.copy(alpha = 0.25f) else Color.Transparent,
+                    border = if (selectedSection == 1) BorderStroke(0.8.dp, CrimsonPrimary.copy(alpha = 0.6f)) else null
                 ) {
                     Row(
                         modifier = Modifier.padding(vertical = 8.dp),
@@ -432,7 +445,7 @@ fun DiagnosticsTab(
                         Icon(
                             imageVector = Icons.Default.Assessment,
                             contentDescription = null,
-                            tint = if (selectedSection == 1) Color.White else Color.White.copy(alpha = 0.6f),
+                            tint = if (selectedSection == 1) Color.White else TextMuted,
                             modifier = Modifier.size(14.dp)
                         )
                         Spacer(modifier = Modifier.width(6.dp))
@@ -440,7 +453,7 @@ fun DiagnosticsTab(
                             text = "API Audit Log ($totalApiCalls)",
                             fontSize = 12.sp,
                             fontWeight = if (selectedSection == 1) FontWeight.Bold else FontWeight.Normal,
-                            color = if (selectedSection == 1) Color.White else Color.White.copy(alpha = 0.6f)
+                            color = if (selectedSection == 1) Color.White else TextMuted
                         )
                     }
                 }
@@ -469,8 +482,8 @@ fun DiagnosticsTab(
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(10.dp),
-                    color = Color(0xFF10B981).copy(alpha = 0.12f),
-                    border = BorderStroke(0.6.dp, Color(0xFF10B981).copy(alpha = 0.35f))
+                    color = StatusGreen.copy(alpha = 0.12f),
+                    border = BorderStroke(0.6.dp, StatusGreen.copy(alpha = 0.35f))
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
@@ -480,7 +493,7 @@ fun DiagnosticsTab(
                         Icon(
                             imageVector = Icons.Default.CheckCircle,
                             contentDescription = null,
-                            tint = Color(0xFF34D399),
+                            tint = StatusGreen,
                             modifier = Modifier.size(16.dp)
                         )
                         Column {
@@ -488,12 +501,12 @@ fun DiagnosticsTab(
                                 text = "Atomic Dedup Engine Active",
                                 fontSize = 11.5.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = Color(0xFFD1FAE5)
+                                color = StatusGreen
                             )
                             Text(
                                 text = "Exactly 1 API call per detected question is guaranteed. No duplicate calls or concurrent leaks.",
                                 fontSize = 10.5.sp,
-                                color = Color(0xFFA7F3D0),
+                                color = StatusGreen.copy(alpha = 0.8f),
                                 lineHeight = 14.sp
                             )
                         }
@@ -503,10 +516,9 @@ fun DiagnosticsTab(
 
             if (apiCallLogs.isEmpty()) {
                 item {
-                    Card(
+                    ControlPanelCard(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = CardDefaults.cardColors(containerColor = Color(0xFF160F0F))
+                        shape = RoundedCornerShape(12.dp)
                     ) {
                         Column(
                             modifier = Modifier
@@ -518,19 +530,19 @@ fun DiagnosticsTab(
                             Icon(
                                 imageVector = Icons.Default.Assessment,
                                 contentDescription = null,
-                                tint = Color.White.copy(alpha = 0.4f),
+                                tint = TextMuted,
                                 modifier = Modifier.size(36.dp)
                             )
                             Text(
                                 text = "No API calls recorded yet",
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = Color.White.copy(alpha = 0.8f)
+                                color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
                                 text = "Trigger a question detection or tap 'Test Providers' to see the live telemetry log.",
                                 fontSize = 12.sp,
-                                color = Color.White.copy(alpha = 0.5f),
+                                color = TextMuted,
                                 textAlign = androidx.compose.ui.text.style.TextAlign.Center
                             )
                         }
@@ -572,13 +584,13 @@ fun DiagnosticsPanelDialog(
             .widthIn(max = 480.dp)
             .shadow(16.dp, RoundedCornerShape(20.dp)),
         shape = RoundedCornerShape(20.dp),
-        color = Color(0xFF140D0D),
+        color = DarkBg,
         border = BorderStroke(
             1.2.dp,
             when (healthState.overallStatus) {
-                DiagnosticStatus.HEALTHY -> Color(0xFF10B981).copy(alpha = 0.4f)
-                DiagnosticStatus.WARNING -> Color(0xFFF59E0B).copy(alpha = 0.5f)
-                DiagnosticStatus.ERROR -> Color(0xFFEF4444).copy(alpha = 0.6f)
+                DiagnosticStatus.HEALTHY -> StatusGreen.copy(alpha = 0.5f)
+                DiagnosticStatus.WARNING -> StatusOrange.copy(alpha = 0.5f)
+                DiagnosticStatus.ERROR -> CrimsonPrimary.copy(alpha = 0.7f)
             }
         )
     ) {
@@ -602,9 +614,9 @@ fun DiagnosticsPanelDialog(
                             .clip(CircleShape)
                             .background(
                                 when (healthState.overallStatus) {
-                                    DiagnosticStatus.HEALTHY -> Color(0xFF10B981)
-                                    DiagnosticStatus.WARNING -> Color(0xFFF59E0B)
-                                    DiagnosticStatus.ERROR -> Color(0xFFEF4444)
+                                    DiagnosticStatus.HEALTHY -> StatusGreen
+                                    DiagnosticStatus.WARNING -> StatusOrange
+                                    DiagnosticStatus.ERROR -> CrimsonPrimary
                                 }
                             )
                     )
@@ -620,9 +632,9 @@ fun DiagnosticsPanelDialog(
                             text = if (selectedTab == 0) healthState.summaryText else "API Calls Audit: $totalApiCalls Total",
                             fontSize = 11.sp,
                             color = when (healthState.overallStatus) {
-                                DiagnosticStatus.HEALTHY -> Color(0xFF34D399)
-                                DiagnosticStatus.WARNING -> Color(0xFFFBBF24)
-                                DiagnosticStatus.ERROR -> Color(0xFFF87171)
+                                DiagnosticStatus.HEALTHY -> StatusGreen
+                                DiagnosticStatus.WARNING -> StatusOrange
+                                DiagnosticStatus.ERROR -> CrimsonLight
                             }
                         )
                     }
@@ -646,7 +658,8 @@ fun DiagnosticsPanelDialog(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(8.dp))
-                    .background(Color(0xFF221616))
+                    .background(DarkSurfaceVariant)
+                    .border(1.dp, DarkCardBorder, RoundedCornerShape(8.dp))
                     .padding(2.dp),
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
@@ -655,14 +668,14 @@ fun DiagnosticsPanelDialog(
                         .weight(1f)
                         .clickable { selectedTab = 0 },
                     shape = RoundedCornerShape(6.dp),
-                    color = if (selectedTab == 0) Color(0xFFDC2626).copy(alpha = 0.35f) else Color.Transparent,
-                    border = if (selectedTab == 0) BorderStroke(0.8.dp, Color(0xFFEF4444).copy(alpha = 0.5f)) else null
+                    color = if (selectedTab == 0) CrimsonPrimary.copy(alpha = 0.25f) else Color.Transparent,
+                    border = if (selectedTab == 0) BorderStroke(0.8.dp, CrimsonPrimary.copy(alpha = 0.5f)) else null
                 ) {
                     Text(
                         text = "System Health",
                         fontSize = 11.sp,
                         fontWeight = if (selectedTab == 0) FontWeight.Bold else FontWeight.Normal,
-                        color = if (selectedTab == 0) Color.White else Color.White.copy(alpha = 0.6f),
+                        color = if (selectedTab == 0) Color.White else TextMuted,
                         modifier = Modifier.padding(vertical = 6.dp),
                         textAlign = androidx.compose.ui.text.style.TextAlign.Center
                     )
@@ -673,8 +686,8 @@ fun DiagnosticsPanelDialog(
                         .weight(1f)
                         .clickable { selectedTab = 1 },
                     shape = RoundedCornerShape(6.dp),
-                    color = if (selectedTab == 1) Color(0xFFDC2626).copy(alpha = 0.35f) else Color.Transparent,
-                    border = if (selectedTab == 1) BorderStroke(0.8.dp, Color(0xFFEF4444).copy(alpha = 0.5f)) else null
+                    color = if (selectedTab == 1) CrimsonPrimary.copy(alpha = 0.25f) else Color.Transparent,
+                    border = if (selectedTab == 1) BorderStroke(0.8.dp, CrimsonPrimary.copy(alpha = 0.5f)) else null
                 ) {
                     Row(
                         modifier = Modifier.padding(vertical = 6.dp),
@@ -685,12 +698,12 @@ fun DiagnosticsPanelDialog(
                             text = "API Calls Log",
                             fontSize = 11.sp,
                             fontWeight = if (selectedTab == 1) FontWeight.Bold else FontWeight.Normal,
-                            color = if (selectedTab == 1) Color.White else Color.White.copy(alpha = 0.6f)
+                            color = if (selectedTab == 1) Color.White else TextMuted
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Surface(
                             shape = CircleShape,
-                            color = if (totalApiCalls > 0) Color(0xFFEF4444) else Color.Gray.copy(alpha = 0.4f)
+                            color = if (totalApiCalls > 0) CrimsonPrimary else Color.Gray.copy(alpha = 0.4f)
                         ) {
                             Text(
                                 text = totalApiCalls.toString(),
@@ -713,24 +726,24 @@ fun DiagnosticsPanelDialog(
                     MetricSummaryBadge(
                         label = "Errors",
                         count = healthState.errorCount,
-                        color = Color(0xFFEF4444),
+                        color = CrimsonPrimary,
                         modifier = Modifier.weight(1f)
                     )
                     MetricSummaryBadge(
                         label = "Notices",
                         count = healthState.warningCount,
-                        color = Color(0xFFF59E0B),
+                        color = StatusOrange,
                         modifier = Modifier.weight(1f)
                     )
                     MetricSummaryBadge(
                         label = "Healthy",
                         count = healthState.healthyCount,
-                        color = Color(0xFF10B981),
+                        color = StatusGreen,
                         modifier = Modifier.weight(1f)
                     )
                 }
 
-                HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
+                HorizontalDivider(color = DarkCardBorder)
 
                 // Scrollable Diagnostic Items List
                 LazyColumn(
@@ -744,7 +757,7 @@ fun DiagnosticsPanelDialog(
                     }
                 }
 
-                HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
+                HorizontalDivider(color = DarkCardBorder)
 
                 // Bottom Actions Row
                 Row(
@@ -755,16 +768,17 @@ fun DiagnosticsPanelDialog(
                     OutlinedButton(
                         onClick = onClearErrors,
                         colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = Color.White.copy(alpha = 0.8f)
+                            contentColor = MaterialTheme.colorScheme.onSurface
                         ),
-                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.25f)),
+                        border = BorderStroke(1.dp, DarkCardBorder),
                         shape = RoundedCornerShape(10.dp),
                         contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Default.DeleteSweep,
                             contentDescription = null,
-                            modifier = Modifier.size(14.dp)
+                            modifier = Modifier.size(14.dp),
+                            tint = CrimsonLight
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(text = "Clear Errors", fontSize = 11.sp)
@@ -773,7 +787,7 @@ fun DiagnosticsPanelDialog(
                     Button(
                         onClick = onTestRequest,
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFFDC2626)
+                            containerColor = CrimsonPrimary
                         ),
                         shape = RoundedCornerShape(10.dp),
                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
@@ -781,10 +795,11 @@ fun DiagnosticsPanelDialog(
                         Icon(
                             imageVector = Icons.Default.PlayArrow,
                             contentDescription = null,
-                            modifier = Modifier.size(14.dp)
+                            modifier = Modifier.size(14.dp),
+                            tint = Color.White
                         )
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text(text = "Test Providers", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Text(text = "Test Providers", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
                     }
                 }
             } else {
@@ -796,7 +811,7 @@ fun DiagnosticsPanelDialog(
                     MetricSummaryBadge(
                         label = "Total Calls",
                         count = totalApiCalls,
-                        color = Color(0xFF38BDF8),
+                        color = StatusCyan,
                         modifier = Modifier.weight(1f)
                     )
                     MetricSummaryBadge(
@@ -816,8 +831,8 @@ fun DiagnosticsPanelDialog(
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(6.dp),
-                    color = Color(0xFF10B981).copy(alpha = 0.12f),
-                    border = BorderStroke(0.6.dp, Color(0xFF10B981).copy(alpha = 0.3f))
+                    color = StatusGreen.copy(alpha = 0.12f),
+                    border = BorderStroke(0.6.dp, StatusGreen.copy(alpha = 0.3f))
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
@@ -827,13 +842,13 @@ fun DiagnosticsPanelDialog(
                         Icon(
                             imageVector = Icons.Default.CheckCircle,
                             contentDescription = null,
-                            tint = Color(0xFF34D399),
+                            tint = StatusGreen,
                             modifier = Modifier.size(13.dp)
                         )
                         Text(
                             text = "Strict Dedup: Exactly 1 API call per unique question enforced.",
                             fontSize = 10.sp,
-                            color = Color(0xFFD1FAE5)
+                            color = StatusGreen
                         )
                     }
                 }
@@ -848,7 +863,7 @@ fun DiagnosticsPanelDialog(
                         Text(
                             text = "No API calls recorded yet.\nAsk a question or tap 'Test Providers' to start.",
                             fontSize = 11.5.sp,
-                            color = Color.White.copy(alpha = 0.5f),
+                            color = TextMuted,
                             textAlign = androidx.compose.ui.text.style.TextAlign.Center
                         )
                     }
@@ -865,7 +880,7 @@ fun DiagnosticsPanelDialog(
                     }
                 }
 
-                HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
+                HorizontalDivider(color = DarkCardBorder)
 
                 // Bottom Actions Row for API Logs
                 Row(
@@ -876,16 +891,17 @@ fun DiagnosticsPanelDialog(
                     OutlinedButton(
                         onClick = { AppStateManager.clearApiCallLogs() },
                         colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = Color.White.copy(alpha = 0.8f)
+                            contentColor = MaterialTheme.colorScheme.onSurface
                         ),
-                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.25f)),
+                        border = BorderStroke(1.dp, DarkCardBorder),
                         shape = RoundedCornerShape(10.dp),
                         contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Default.DeleteSweep,
                             contentDescription = null,
-                            modifier = Modifier.size(14.dp)
+                            modifier = Modifier.size(14.dp),
+                            tint = CrimsonLight
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(text = "Reset Counter & Logs", fontSize = 11.sp)
@@ -894,7 +910,7 @@ fun DiagnosticsPanelDialog(
                     Button(
                         onClick = onTestRequest,
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFFDC2626)
+                            containerColor = CrimsonPrimary
                         ),
                         shape = RoundedCornerShape(10.dp),
                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
@@ -902,10 +918,11 @@ fun DiagnosticsPanelDialog(
                         Icon(
                             imageVector = Icons.Default.PlayArrow,
                             contentDescription = null,
-                            modifier = Modifier.size(14.dp)
+                            modifier = Modifier.size(14.dp),
+                            tint = Color.White
                         )
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text(text = "Test Providers (1 Call)", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Text(text = "Test Providers (1 Call)", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
                     }
                 }
             }
@@ -953,9 +970,9 @@ fun DiagnosticItemCard(
     modifier: Modifier = Modifier
 ) {
     val statusColor = when (item.status) {
-        DiagnosticStatus.HEALTHY -> Color(0xFF10B981)
-        DiagnosticStatus.WARNING -> Color(0xFFF59E0B)
-        DiagnosticStatus.ERROR -> Color(0xFFEF4444)
+        DiagnosticStatus.HEALTHY -> StatusGreen
+        DiagnosticStatus.WARNING -> StatusOrange
+        DiagnosticStatus.ERROR -> CrimsonPrimary
     }
 
     val statusIcon = when (item.status) {
@@ -970,12 +987,9 @@ fun DiagnosticItemCard(
         DiagnosticStatus.ERROR -> "ISSUE"
     }
 
-    Card(
+    ControlPanelCard(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = Color(0xFF1C1313)
-        ),
         border = BorderStroke(1.dp, statusColor.copy(alpha = 0.35f))
     ) {
         Column(
@@ -1034,8 +1048,8 @@ fun DiagnosticItemCard(
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(6.dp),
-                    color = Color(0xFF0D0808),
-                    border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.15f))
+                    color = DarkSurfaceVariant,
+                    border = BorderStroke(0.5.dp, DarkCardBorder)
                 ) {
                     Row(
                         modifier = Modifier.padding(8.dp),
@@ -1065,8 +1079,8 @@ fun DiagnosticItemCard(
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(8.dp),
-                    color = Color(0xFF0284C7).copy(alpha = 0.12f),
-                    border = BorderStroke(0.6.dp, Color(0xFF38BDF8).copy(alpha = 0.35f))
+                    color = StatusCyan.copy(alpha = 0.12f),
+                    border = BorderStroke(0.6.dp, StatusCyan.copy(alpha = 0.35f))
                 ) {
                     Row(
                         modifier = Modifier.padding(8.dp),
@@ -1076,7 +1090,7 @@ fun DiagnosticItemCard(
                         Icon(
                             imageVector = Icons.Default.Lightbulb,
                             contentDescription = "Suggested Fix",
-                            tint = Color(0xFF38BDF8),
+                            tint = StatusCyan,
                             modifier = Modifier.size(14.dp)
                         )
                         Column {
@@ -1084,7 +1098,7 @@ fun DiagnosticItemCard(
                                 text = "SUGGESTED FIX:",
                                 fontSize = 9.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = Color(0xFF38BDF8)
+                                color = StatusCyan
                             )
                             Text(
                                 text = item.suggestedFix,
@@ -1115,9 +1129,9 @@ fun DiagnosticItemCard(
                         onClick = { onFixAction(actionType) },
                         shape = RoundedCornerShape(8.dp),
                         colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = Color(0xFF38BDF8)
+                            contentColor = StatusCyan
                         ),
-                        border = BorderStroke(1.dp, Color(0xFF38BDF8).copy(alpha = 0.5f)),
+                        border = BorderStroke(1.dp, StatusCyan.copy(alpha = 0.5f)),
                         contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
                     ) {
                         Icon(
@@ -1143,9 +1157,9 @@ fun ApiCallLogCard(
     val formattedTime = remember(log.timestamp) { timeFormat.format(Date(log.timestamp)) }
 
     val statusColor = when (log.status) {
-        ApiCallStatus.SUCCESS -> Color(0xFF10B981)
-        ApiCallStatus.FAILED -> Color(0xFFEF4444)
-        ApiCallStatus.IN_FLIGHT -> Color(0xFFF59E0B)
+        ApiCallStatus.SUCCESS -> StatusGreen
+        ApiCallStatus.FAILED -> CrimsonPrimary
+        ApiCallStatus.IN_FLIGHT -> StatusOrange
     }
 
     val statusText = when (log.status) {
@@ -1154,12 +1168,9 @@ fun ApiCallLogCard(
         ApiCallStatus.IN_FLIGHT -> "CALLING..."
     }
 
-    Card(
+    ControlPanelCard(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(10.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = Color(0xFF1A1212)
-        ),
         border = BorderStroke(0.8.dp, statusColor.copy(alpha = 0.4f))
     ) {
         Column(
@@ -1184,15 +1195,15 @@ fun ApiCallLogCard(
                     )
                     Surface(
                         shape = RoundedCornerShape(4.dp),
-                        color = Color(0xFF38BDF8).copy(alpha = 0.15f),
-                        border = BorderStroke(0.5.dp, Color(0xFF38BDF8).copy(alpha = 0.4f))
+                        color = StatusCyan.copy(alpha = 0.15f),
+                        border = BorderStroke(0.5.dp, StatusCyan.copy(alpha = 0.4f))
                     ) {
                         Text(
                             text = "${log.provider.displayName} · ${log.model}",
                             fontSize = 9.sp,
                             fontWeight = FontWeight.SemiBold,
                             fontFamily = FontFamily.Monospace,
-                            color = Color(0xFF7DD3FC),
+                            color = StatusCyan,
                             modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
                         )
                     }
@@ -1229,7 +1240,8 @@ fun ApiCallLogCard(
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(6.dp),
-                color = Color(0xFF0F0A0A)
+                color = DarkSurfaceVariant,
+                border = BorderStroke(0.5.dp, DarkCardBorder)
             ) {
                 Row(
                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
@@ -1240,7 +1252,7 @@ fun ApiCallLogCard(
                         text = "Q:",
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color(0xFFEF4444)
+                        color = CrimsonPrimary
                     )
                     Text(
                         text = log.question,
@@ -1274,7 +1286,7 @@ fun ApiCallLogCard(
                         text = log.error,
                         fontSize = 9.5.sp,
                         fontFamily = FontFamily.Monospace,
-                        color = Color(0xFFF87171),
+                        color = CrimsonLight,
                         maxLines = 1
                     )
                 }

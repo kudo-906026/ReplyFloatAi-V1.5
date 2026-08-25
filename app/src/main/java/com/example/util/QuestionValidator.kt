@@ -196,11 +196,14 @@ object QuestionValidator {
         val sentenceStart = trimmed.substring(0, questionMarkIndex)
             .lastIndexOfAny(charArrayOf('\n', '.', '!', ';'))
 
-        val candidate = if (sentenceStart != -1 && sentenceStart < questionMarkIndex) {
+        var candidate = if (sentenceStart != -1 && sentenceStart < questionMarkIndex) {
             trimmed.substring(sentenceStart + 1, questionMarkIndex + 1).trim()
         } else {
             trimmed.substring(0, questionMarkIndex + 1).trim()
         }
+
+        // Clean out common chat prefixes such as "Player1: ", "[Guild] ", or "(Team) "
+        candidate = candidate.replace(Regex("^(?:\\[[^\\]]+\\]|\\([^\\)]+\\)|[a-zA-Z0-9_\\-\\s]{1,20}:)\\s*"), "").trim()
 
         return if (isGenuineQuestion(candidate)) {
             candidate.take(300)

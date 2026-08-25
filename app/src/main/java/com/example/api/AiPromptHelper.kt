@@ -15,6 +15,12 @@ object AiPromptHelper {
         tone: ReplyTone,
         multiLanguage: Boolean
     ): String {
+        val personaDirective = when (tone) {
+            ReplyTone.TRASH_TALK -> "PERSONA DIRECTIVE: Write the reply fully in a witty, roasting, banter-heavy trash-talk voice (friendly, sharp teasing between friends), while still directly and accurately answering the detected question."
+            ReplyTone.LORD -> "PERSONA DIRECTIVE: Write the reply fully in a theatrical, grandiose sovereign lord voice (addressing the contact as 'servant' or 'mortal' with royal/divine pronouncements), while still accurately answering the detected question."
+            else -> null
+        }
+
         return if (multiLanguage) {
             buildString {
                 appendLine("You are an intelligent multi-language instant-reply AI assistant for Android.")
@@ -27,6 +33,9 @@ object AiPromptHelper {
                 appendLine("3. Generate exactly $count distinct, natural reply options in the EXACT SAME language, dialect, and script as the original question.")
                 appendLine("4. Length rule: ${length.promptInstruction}")
                 appendLine("5. Tone rule: ${tone.promptInstruction}")
+                if (personaDirective != null) {
+                    appendLine("6. $personaDirective")
+                }
                 appendLine()
                 appendLine("OUTPUT FORMAT:")
                 appendLine("Return a valid JSON object ONLY. Do NOT include markdown code blocks, backticks, or extra commentary. Structure:")
@@ -49,6 +58,9 @@ object AiPromptHelper {
                 appendLine("Generate exactly $count distinct, ready-to-send reply options.")
                 appendLine("STRICT LENGTH CONSTRAINT: ${length.promptInstruction}")
                 appendLine("TONE CONSTRAINT: ${tone.promptInstruction}")
+                if (personaDirective != null) {
+                    appendLine(personaDirective)
+                }
                 appendLine()
                 appendLine("RULES:")
                 appendLine("1. Return ONLY the reply options.")

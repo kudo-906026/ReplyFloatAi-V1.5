@@ -277,6 +277,14 @@ object AppStateManager {
 
     fun setOverlayRunning(running: Boolean) {
         _isOverlayRunning.value = running
+        if (!running) {
+            _isOverlayExpanded.value = false
+            _activeReplies.value = emptyList()
+            _currentQuestion.value = null
+            _errorMessage.value = null
+            generationJob?.cancel()
+            _isGenerating.value = false
+        }
         recomputeDiagnostics()
     }
 

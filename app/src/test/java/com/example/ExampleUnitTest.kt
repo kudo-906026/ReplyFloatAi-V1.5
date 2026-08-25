@@ -103,5 +103,76 @@ class ExampleUnitTest {
     assertTrue(modified.multiLanguageEnabled)
     assertFalse(modified.scanningEnabled)
   }
+
+  @Test
+  fun testProviderApiKeys_allFourProvidersHandled() {
+    val settings = ReplySettings(
+      geminiApiKey = "AIzaSyGeminiTestKey123",
+      openaiApiKey = "sk-OpenAiTestKey456",
+      claudeApiKey = "sk-ant-ClaudeTestKey789",
+      grokApiKey = "xai-GrokTestKey012"
+    )
+
+    assertEquals("AIzaSyGeminiTestKey123", settings.getApiKeyFor(com.example.model.AiProvider.GEMINI))
+    assertEquals("sk-OpenAiTestKey456", settings.getApiKeyFor(com.example.model.AiProvider.OPENAI))
+    assertEquals("sk-ant-ClaudeTestKey789", settings.getApiKeyFor(com.example.model.AiProvider.CLAUDE))
+    assertEquals("xai-GrokTestKey012", settings.getApiKeyFor(com.example.model.AiProvider.GROK))
+  }
+
+  @Test
+  fun testGameChatQuestionValidation() {
+    val gameChat1 = "Player1: Anyone ready to start the raid?"
+    val extracted1 = com.example.util.QuestionValidator.cleanAndExtractQuestion(gameChat1)
+    assertEquals("Anyone ready to start the raid?", extracted1)
+
+    val gameChat2 = "[Guild] where are we meeting for the boss?"
+    val extracted2 = com.example.util.QuestionValidator.cleanAndExtractQuestion(gameChat2)
+    assertEquals("where are we meeting for the boss?", extracted2)
+  }
+
+  @Test
+  fun testTrashTalkAndLordTones() {
+    val trashTalk = com.example.model.ReplyTone.TRASH_TALK
+    val lord = com.example.model.ReplyTone.LORD
+
+    assertEquals("Trash Talk", trashTalk.label)
+    assertTrue(trashTalk.description.contains("Savage"))
+    assertEquals("Lord", lord.label)
+    assertTrue(lord.description.contains("sovereign being"))
+
+    val promptTrashTalk = com.example.api.AiPromptHelper.buildPrompt(
+      question = "Are you going to beat me in this match?",
+      count = 2,
+      length = com.example.model.ReplyLength.ONE_LINE,
+      tone = trashTalk,
+      multiLanguage = false
+    )
+    assertTrue(promptTrashTalk.contains("PERSONA DIRECTIVE"))
+    assertTrue(promptTrashTalk.contains("trash-talk"))
+
+    val promptLord = com.example.api.AiPromptHelper.buildPrompt(
+      question = "What time are we meeting?",
+      count = 2,
+      length = com.example.model.ReplyLength.ONE_LINE,
+      tone = lord,
+      multiLanguage = false
+    )
+    assertTrue(promptLord.contains("PERSONA DIRECTIVE"))
+    assertTrue(promptLord.contains("mortal") || promptLord.contains("servant"))
+  }
+
+  @Test
+  fun testStopOverlayStateCleanup() {
+    com.example.state.AppStateManager.setOverlayRunning(true)
+    com.example.state.AppStateManager.setOverlayExpanded(true)
+    assertTrue(com.example.state.AppStateManager.isOverlayRunning.value)
+    assertTrue(com.example.state.AppStateManager.isOverlayExpanded.value)
+
+    com.example.state.AppStateManager.setOverlayRunning(false)
+    assertFalse(com.example.state.AppStateManager.isOverlayRunning.value)
+    assertFalse(com.example.state.AppStateManager.isOverlayExpanded.value)
+    assertTrue(com.example.state.AppStateManager.activeReplies.value.isEmpty())
+    assertEquals(null, com.example.state.AppStateManager.currentQuestion.value)
+  }
 }
 

@@ -90,12 +90,52 @@ enum class ReplyLength(val label: String, val promptInstruction: String) {
     }
 }
 
-enum class ReplyTone(val label: String, val promptInstruction: String) {
-    CASUAL("Casual & Friendly", "Friendly, warm, and natural conversational tone."),
-    PROFESSIONAL("Professional", "Polite, articulate, respectful, and business-appropriate."),
-    CONCISE("Direct", "Direct, straightforward, and to the point without extra fluff."),
-    ENTHUSIASTIC("Enthusiastic", "Upbeat, positive, energetic, and engaging."),
-    WITTY("Witty", "Light-hearted, clever, and pleasantly playful.")
+enum class ReplyTone(
+    val label: String,
+    val description: String,
+    val promptInstruction: String
+) {
+    CASUAL(
+        label = "Casual & Friendly",
+        description = "Friendly, warm, and natural conversational tone.",
+        promptInstruction = "Friendly, warm, and natural conversational tone."
+    ),
+    PROFESSIONAL(
+        label = "Professional",
+        description = "Polite, articulate, respectful, and business-appropriate.",
+        promptInstruction = "Polite, articulate, respectful, and business-appropriate."
+    ),
+    CONCISE(
+        label = "Direct",
+        description = "Direct, straightforward, and to the point without extra fluff.",
+        promptInstruction = "Direct, straightforward, and to the point without extra fluff."
+    ),
+    ENTHUSIASTIC(
+        label = "Enthusiastic",
+        description = "Upbeat, positive, energetic, and engaging.",
+        promptInstruction = "Upbeat, positive, energetic, and engaging."
+    ),
+    WITTY(
+        label = "Witty",
+        description = "Light-hearted, clever, and pleasantly playful.",
+        promptInstruction = "Light-hearted, clever, and pleasantly playful."
+    ),
+    TRASH_TALK(
+        label = "Trash Talk",
+        description = "Savage, teasing, and playfully roasting — banter-heavy comebacks.",
+        promptInstruction = "Savage, teasing, and playfully roasting persona delivering banter-heavy comebacks. Write witty and cutting replies in a joking, competitive-banter style (like friendly trash talk between friends; humorous and sharp, not genuinely cruel or targeting real vulnerabilities), while fully answering the detected question in this persona's voice."
+    ),
+    LORD(
+        label = "Lord",
+        description = "A theatrical, larger-than-life persona that speaks as an all-powerful sovereign being — grandiose, commanding, and mythic in tone, referring to the user's contact as 'servant' or 'mortal' and framing every answer as a divine pronouncement.",
+        promptInstruction = "A theatrical, larger-than-life fictional roleplay persona of an all-powerful sovereign being. Speak in a grandiose, commanding, and mythic tone, addressing the user's contact as 'servant' or 'mortal' and framing every answer as a divine pronouncement or royal decree, while still answering the actual detected question in this persona's voice."
+    );
+
+    companion object {
+        fun fromName(name: String): ReplyTone {
+            return entries.firstOrNull { it.name.equals(name, ignoreCase = true) } ?: CASUAL
+        }
+    }
 }
 
 data class ReplyItem(
