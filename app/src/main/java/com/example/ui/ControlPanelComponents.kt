@@ -48,19 +48,25 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.ui.theme.AccentBlue
+import com.example.ui.theme.AccentBlueLight
+import com.example.ui.theme.AccentGreen
+import com.example.ui.theme.AccentPurple
+import com.example.ui.theme.AccentRed
 import com.example.ui.theme.CrimsonPrimary
 import com.example.ui.theme.DarkBg
 import com.example.ui.theme.DarkCard
 import com.example.ui.theme.DarkCardBorder
 import com.example.ui.theme.DarkCardElevated
+import com.example.ui.theme.DarkSurfaceVariant
 import com.example.ui.theme.TextMuted
 
 /**
- * Modifier that draws a soft outer glow shadow around active elements
+ * Modifier that draws a soft outer glow shadow matching the element's category color
  */
-fun Modifier.crimsonGlow(
+fun Modifier.softGlow(
     radius: Dp = 8.dp,
-    color: Color = CrimsonPrimary.copy(alpha = 0.35f),
+    color: Color = AccentBlue.copy(alpha = 0.35f),
     shapeRadius: Dp = 14.dp
 ): Modifier = this.drawBehind {
     drawIntoCanvas { canvas ->
@@ -86,13 +92,23 @@ fun Modifier.crimsonGlow(
 }
 
 /**
- * Sleek rounded pill switch with animated transitions and glowing active state
+ * Backward-compatible alias for softGlow
+ */
+fun Modifier.crimsonGlow(
+    radius: Dp = 8.dp,
+    color: Color = AccentRed.copy(alpha = 0.35f),
+    shapeRadius: Dp = 14.dp
+): Modifier = softGlow(radius = radius, color = color, shapeRadius = shapeRadius)
+
+/**
+ * Pill-shaped switch with smooth color transitions and customizable category-based active color
  */
 @Composable
 fun ControlPanelSwitch(
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
+    activeColor: Color = AccentBlue,
     enabled: Boolean = true
 ) {
     val trackWidth = 46.dp
@@ -108,25 +124,25 @@ fun ControlPanelSwitch(
     )
 
     val trackColor by animateColorAsState(
-        targetValue = if (checked) CrimsonPrimary else Color(0xFF221614),
+        targetValue = if (checked) activeColor else Color(0xFF19202E),
         animationSpec = tween(durationMillis = 200),
         label = "switch_track"
     )
 
     val borderColor by animateColorAsState(
-        targetValue = if (checked) Color(0xFFFF5E6E) else Color(0xFF382320),
+        targetValue = if (checked) activeColor.copy(alpha = 0.85f) else DarkCardBorder,
         animationSpec = tween(durationMillis = 200),
         label = "switch_border"
     )
 
     val thumbColor by animateColorAsState(
-        targetValue = if (checked) Color.White else Color(0xFF9E8E8B),
+        targetValue = if (checked) Color.White else Color(0xFF94A3B8),
         animationSpec = tween(durationMillis = 200),
         label = "switch_thumb_color"
     )
 
     val glowModifier = if (checked) {
-        Modifier.crimsonGlow(radius = 6.dp, color = CrimsonPrimary.copy(alpha = 0.4f), shapeRadius = 14.dp)
+        Modifier.softGlow(radius = 6.dp, color = activeColor.copy(alpha = 0.4f), shapeRadius = 14.dp)
     } else {
         Modifier
     }
@@ -157,12 +173,13 @@ fun ControlPanelSwitch(
 }
 
 /**
- * Standard Control Panel Card with subtle border and optional active glowing border
+ * Standard Control Panel Card with subtle border and colored glow matching its category
  */
 @Composable
 fun ControlPanelCard(
     modifier: Modifier = Modifier,
     isSelected: Boolean = false,
+    activeColor: Color = AccentBlue,
     onClick: (() -> Unit)? = null,
     shapeRadius: Dp = 14.dp,
     shape: androidx.compose.ui.graphics.Shape = RoundedCornerShape(shapeRadius),
@@ -170,7 +187,7 @@ fun ControlPanelCard(
     content: @Composable () -> Unit
 ) {
     val targetBorderColor by animateColorAsState(
-        targetValue = if (isSelected) CrimsonPrimary else DarkCardBorder,
+        targetValue = if (isSelected) activeColor else DarkCardBorder,
         animationSpec = tween(durationMillis = 200),
         label = "card_border"
     )
@@ -182,7 +199,7 @@ fun ControlPanelCard(
     )
 
     val glowModifier = if (isSelected) {
-        Modifier.crimsonGlow(radius = 10.dp, color = CrimsonPrimary.copy(alpha = 0.28f), shapeRadius = shapeRadius)
+        Modifier.softGlow(radius = 10.dp, color = activeColor.copy(alpha = 0.28f), shapeRadius = shapeRadius)
     } else {
         Modifier
     }
@@ -200,13 +217,15 @@ fun ControlPanelCard(
 }
 
 /**
- * Section Header for Control Panel modules
+ * Section Header for Control Panel modules with custom category accent color
  */
 @Composable
 fun ControlPanelSectionHeader(
     title: String,
     icon: ImageVector? = null,
+    accentColor: Color = AccentBlue,
     badgeText: String? = null,
+    badgeColor: Color = accentColor,
     modifier: Modifier = Modifier
 ) {
     Row(
@@ -223,14 +242,14 @@ fun ControlPanelSectionHeader(
                     modifier = Modifier
                         .size(26.dp)
                         .clip(RoundedCornerShape(6.dp))
-                        .background(CrimsonPrimary.copy(alpha = 0.15f))
-                        .border(1.dp, CrimsonPrimary.copy(alpha = 0.35f), RoundedCornerShape(6.dp)),
+                        .background(accentColor.copy(alpha = 0.15f))
+                        .border(1.dp, accentColor.copy(alpha = 0.35f), RoundedCornerShape(6.dp)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = icon,
                         contentDescription = null,
-                        tint = CrimsonPrimary,
+                        tint = accentColor,
                         modifier = Modifier.size(15.dp)
                     )
                 }
@@ -239,7 +258,7 @@ fun ControlPanelSectionHeader(
                 text = title,
                 fontSize = 11.5.sp,
                 fontWeight = FontWeight.Bold,
-                color = CrimsonPrimary,
+                color = accentColor,
                 letterSpacing = 0.8.sp
             )
         }
@@ -247,15 +266,15 @@ fun ControlPanelSectionHeader(
         if (badgeText != null) {
             Surface(
                 shape = RoundedCornerShape(6.dp),
-                color = CrimsonPrimary.copy(alpha = 0.12f),
-                border = BorderStroke(1.dp, CrimsonPrimary.copy(alpha = 0.3f))
+                color = badgeColor.copy(alpha = 0.12f),
+                border = BorderStroke(1.dp, badgeColor.copy(alpha = 0.3f))
             ) {
                 Text(
                     text = badgeText,
                     fontSize = 10.sp,
                     fontFamily = FontFamily.Monospace,
                     fontWeight = FontWeight.Bold,
-                    color = CrimsonPrimary,
+                    color = badgeColor,
                     modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                 )
             }

@@ -148,10 +148,13 @@ object AppStateManager {
 
     private fun persistCurrentSettings() {
         val ctx = appContext ?: return
-        try {
-            SettingsPreferences.saveSettings(ctx, _settings.value)
-        } catch (e: Exception) {
-            Log.e(TAG, "Error saving settings to SharedPreferences", e)
+        val currentCfg = _settings.value
+        scope.launch(Dispatchers.IO) {
+            try {
+                SettingsPreferences.saveSettings(ctx, currentCfg)
+            } catch (e: Exception) {
+                Log.e(TAG, "Error saving settings to SharedPreferences", e)
+            }
         }
     }
 

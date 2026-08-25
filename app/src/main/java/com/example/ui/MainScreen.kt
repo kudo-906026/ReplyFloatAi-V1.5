@@ -62,6 +62,7 @@ import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.QuestionAnswer
 import androidx.compose.material.icons.filled.Radar
 import androidx.compose.material.icons.filled.Refresh
@@ -111,6 +112,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -137,6 +139,14 @@ import com.example.model.ReplyTone
 import com.example.service.FloatingOverlayService
 import com.example.service.QuestionDetectorAccessibilityService
 import com.example.state.AppStateManager
+import com.example.ui.theme.AccentBlue
+import com.example.ui.theme.AccentBlueGlow
+import com.example.ui.theme.AccentBlueLight
+import com.example.ui.theme.AccentGreen
+import com.example.ui.theme.AccentGreenLight
+import com.example.ui.theme.AccentPurple
+import com.example.ui.theme.AccentPurpleLight
+import com.example.ui.theme.AccentRed
 import com.example.ui.theme.CrimsonLight
 import com.example.ui.theme.CrimsonPrimary
 import com.example.ui.theme.DarkBg
@@ -149,6 +159,7 @@ import com.example.ui.theme.StatusCyan
 import com.example.ui.theme.StatusGreen
 import com.example.ui.theme.StatusOrange
 import com.example.ui.theme.TextMuted
+import com.example.ui.theme.TextSubtle
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -200,14 +211,14 @@ fun MainScreen() {
                             modifier = Modifier
                                 .size(36.dp)
                                 .clip(RoundedCornerShape(10.dp))
-                                .background(CrimsonPrimary.copy(alpha = 0.18f))
-                                .border(1.dp, CrimsonPrimary.copy(alpha = 0.5f), RoundedCornerShape(10.dp)),
+                                .background(AccentBlue.copy(alpha = 0.18f))
+                                .border(1.dp, AccentBlue.copy(alpha = 0.5f), RoundedCornerShape(10.dp)),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 imageVector = Icons.Default.ChatBubbleOutline,
                                 contentDescription = "ReplyFloat AI",
-                                tint = CrimsonPrimary,
+                                tint = AccentBlue,
                                 modifier = Modifier.size(20.dp)
                             )
                         }
@@ -223,7 +234,7 @@ fun MainScreen() {
                                 fontSize = 9.5.sp,
                                 fontWeight = FontWeight.Bold,
                                 letterSpacing = 0.8.sp,
-                                color = CrimsonPrimary
+                                color = AccentBlue
                             )
                         }
                     }
@@ -237,38 +248,38 @@ fun MainScreen() {
 
                     Spacer(modifier = Modifier.width(6.dp))
 
-                    // Quick Overlay Status Pill
+                    // Quick Overlay Status Pill (Green for Active)
                     Box(
                         modifier = Modifier
                             .padding(end = 12.dp)
                             .clip(RoundedCornerShape(16.dp))
                             .background(
-                                if (isOverlayRunning) CrimsonPrimary.copy(alpha = 0.18f) else Color(0x2264748B)
+                                if (isOverlayRunning) AccentGreen.copy(alpha = 0.18f) else DarkSurfaceVariant
                             )
                             .border(
                                 1.dp,
-                                if (isOverlayRunning) CrimsonPrimary else Color(0x4464748B),
+                                if (isOverlayRunning) AccentGreen else DarkCardBorder,
                                 RoundedCornerShape(16.dp)
                             )
                             .padding(horizontal = 10.dp, vertical = 4.dp)
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            horizontalArrangement = Arrangement.spacedBy(5.dp)
                         ) {
                             Box(
                                 modifier = Modifier
                                     .size(7.dp)
                                     .clip(CircleShape)
                                     .background(
-                                        if (isOverlayRunning) CrimsonPrimary else Color(0xFF94A3B8)
+                                        if (isOverlayRunning) AccentGreen else TextMuted
                                     )
                             )
                             Text(
                                 text = if (isOverlayRunning) "Overlay Active" else "Overlay Inactive",
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.SemiBold,
-                                color = if (isOverlayRunning) CrimsonPrimary else Color(0xFF94A3B8)
+                                color = if (isOverlayRunning) AccentGreen else TextMuted
                             )
                         }
                     }
@@ -288,175 +299,175 @@ fun MainScreen() {
             Column(
                 modifier = Modifier.fillMaxSize()
             ) {
-            // Top Navigation Tabs (4 Tabs: Controls & Test, Settings & Providers, History, Diagnostics)
-            TabRow(
-                selectedTabIndex = selectedTab,
-                containerColor = DarkBg,
-                contentColor = CrimsonPrimary,
-                indicator = { tabPositions ->
-                    TabRowDefaults.SecondaryIndicator(
-                        Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
-                        color = CrimsonPrimary,
-                        height = 2.5.dp
+                // Top Navigation Tabs (4 Tabs: Controls, Settings, History, Diagnostics)
+                TabRow(
+                    selectedTabIndex = selectedTab,
+                    containerColor = DarkBg,
+                    contentColor = AccentBlue,
+                    indicator = { tabPositions ->
+                        TabRowDefaults.SecondaryIndicator(
+                            Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
+                            color = AccentBlue,
+                            height = 2.5.dp
+                        )
+                    },
+                    divider = {
+                        HorizontalDivider(color = DarkCardBorder)
+                    }
+                ) {
+                    Tab(
+                        selected = selectedTab == 0,
+                        onClick = { selectedTab = 0 },
+                        selectedContentColor = AccentBlue,
+                        unselectedContentColor = TextMuted,
+                        text = { Text("Controls", fontSize = 12.sp, fontWeight = FontWeight.SemiBold) },
+                        icon = { Icon(Icons.Default.Tune, contentDescription = null, modifier = Modifier.size(18.dp)) }
                     )
-                },
-                divider = {
-                    HorizontalDivider(color = DarkCardBorder)
+                    Tab(
+                        selected = selectedTab == 1,
+                        onClick = { selectedTab = 1 },
+                        selectedContentColor = AccentBlue,
+                        unselectedContentColor = TextMuted,
+                        text = { Text("Settings", fontSize = 12.sp, fontWeight = FontWeight.SemiBold) },
+                        icon = { Icon(Icons.Default.Settings, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                    )
+                    Tab(
+                        selected = selectedTab == 2,
+                        onClick = { selectedTab = 2 },
+                        selectedContentColor = AccentBlue,
+                        unselectedContentColor = TextMuted,
+                        text = { Text("History (${history.size})", fontSize = 12.sp, fontWeight = FontWeight.SemiBold) },
+                        icon = { Icon(Icons.Default.QuestionAnswer, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                    )
+                    Tab(
+                        selected = selectedTab == 3,
+                        onClick = { selectedTab = 3 },
+                        selectedContentColor = AccentBlue,
+                        unselectedContentColor = TextMuted,
+                        text = {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Text("Diagnostics", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                                if (healthState.overallStatus != com.example.model.DiagnosticStatus.HEALTHY) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(7.dp)
+                                            .clip(CircleShape)
+                                            .background(
+                                                if (healthState.overallStatus == com.example.model.DiagnosticStatus.ERROR)
+                                                    AccentRed
+                                                else
+                                                    StatusOrange
+                                            )
+                                    )
+                                }
+                            }
+                        },
+                        icon = { Icon(Icons.Default.HealthAndSafety, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                    )
                 }
-            ) {
-                Tab(
-                    selected = selectedTab == 0,
-                    onClick = { selectedTab = 0 },
-                    selectedContentColor = CrimsonPrimary,
-                    unselectedContentColor = TextMuted,
-                    text = { Text("Controls", fontSize = 12.sp, fontWeight = FontWeight.SemiBold) },
-                    icon = { Icon(Icons.Default.Tune, contentDescription = null, modifier = Modifier.size(18.dp)) }
-                )
-                Tab(
-                    selected = selectedTab == 1,
-                    onClick = { selectedTab = 1 },
-                    selectedContentColor = CrimsonPrimary,
-                    unselectedContentColor = TextMuted,
-                    text = { Text("Settings", fontSize = 12.sp, fontWeight = FontWeight.SemiBold) },
-                    icon = { Icon(Icons.Default.Settings, contentDescription = null, modifier = Modifier.size(18.dp)) }
-                )
-                Tab(
-                    selected = selectedTab == 2,
-                    onClick = { selectedTab = 2 },
-                    selectedContentColor = CrimsonPrimary,
-                    unselectedContentColor = TextMuted,
-                    text = { Text("History (${history.size})", fontSize = 12.sp, fontWeight = FontWeight.SemiBold) },
-                    icon = { Icon(Icons.Default.QuestionAnswer, contentDescription = null, modifier = Modifier.size(18.dp)) }
-                )
-                Tab(
-                    selected = selectedTab == 3,
-                    onClick = { selectedTab = 3 },
-                    selectedContentColor = CrimsonPrimary,
-                    unselectedContentColor = TextMuted,
-                    text = {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Text("Diagnostics", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                            if (healthState.overallStatus != com.example.model.DiagnosticStatus.HEALTHY) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(7.dp)
-                                        .clip(CircleShape)
-                                        .background(
-                                            if (healthState.overallStatus == com.example.model.DiagnosticStatus.ERROR)
-                                                CrimsonPrimary
-                                            else
-                                                Color(0xFFF59E0B)
-                                        )
-                                )
+
+                when (selectedTab) {
+                    0 -> ControlsAndTestTab(
+                        hasOverlayPermission = hasOverlayPermission,
+                        isAccessibilityEnabled = isAccessibilityEnabled || isAccessibilityRunning,
+                        isOverlayRunning = isOverlayRunning,
+                        currentQuestion = currentQuestion?.text,
+                        activeReplies = activeReplies,
+                        activeProvider = activeProvider,
+                        isGenerating = isGenerating,
+                        errorMessage = errorMessage,
+                        testInputText = testInputText,
+                        onTestInputChange = { testInputText = it },
+                        onStartOverlay = {
+                            if (!hasOverlayPermission) {
+                                requestOverlayPermission(context)
+                            } else {
+                                FloatingOverlayService.start(context)
+                            }
+                        },
+                        onStopOverlay = {
+                            FloatingOverlayService.stop(context)
+                        },
+                        onRequestOverlayPermission = { requestOverlayPermission(context) },
+                        onRequestAccessibilityPermission = { requestAccessibilityPermission(context) },
+                        onTestDetection = { q ->
+                            AppStateManager.onQuestionDetected(q, "App Sandbox", force = true)
+                        },
+                        onRetryGeneration = {
+                            AppStateManager.generateRepliesForQuestion()
+                        },
+                        onCopyReply = { reply ->
+                            AppStateManager.copyAndDismissReply(context, reply)
+                        },
+                        onDismissReply = { id ->
+                            AppStateManager.dismissReply(id)
+                        },
+                        onNavigateToSettings = {
+                            selectedTab = 1
+                        }
+                    )
+
+                    1 -> SettingsTab(
+                        settings = settings,
+                        onUpdateSettings = { AppStateManager.updateSettings(it) },
+                        onUpdateSelectionMode = { AppStateManager.updateSelectionMode(it) },
+                        onUpdatePreferredProvider = { AppStateManager.updatePreferredProvider(it) },
+                        onUpdateLength = { AppStateManager.updateReplyLength(it) },
+                        onUpdateCount = { AppStateManager.updateReplyCount(it) },
+                        onUpdateTone = { AppStateManager.updateTone(it) },
+                        onUpdateProviderKey = { provider, key -> AppStateManager.updateProviderKey(provider, key) },
+                        onMoveProviderUp = { index ->
+                            val currentChain = settings.providerChain.toMutableList()
+                            if (index > 0 && index < currentChain.size) {
+                                val temp = currentChain[index]
+                                currentChain[index] = currentChain[index - 1]
+                                currentChain[index - 1] = temp
+                                AppStateManager.updateProviderChain(currentChain)
+                            }
+                        },
+                        onMoveProviderDown = { index ->
+                            val currentChain = settings.providerChain.toMutableList()
+                            if (index >= 0 && index < currentChain.size - 1) {
+                                val temp = currentChain[index]
+                                currentChain[index] = currentChain[index + 1]
+                                currentChain[index + 1] = temp
+                                AppStateManager.updateProviderChain(currentChain)
                             }
                         }
-                    },
-                    icon = { Icon(Icons.Default.HealthAndSafety, contentDescription = null, modifier = Modifier.size(18.dp)) }
-                )
-            }
+                    )
 
-            when (selectedTab) {
-                0 -> ControlsAndTestTab(
-                    hasOverlayPermission = hasOverlayPermission,
-                    isAccessibilityEnabled = isAccessibilityEnabled || isAccessibilityRunning,
-                    isOverlayRunning = isOverlayRunning,
-                    currentQuestion = currentQuestion?.text,
-                    activeReplies = activeReplies,
-                    activeProvider = activeProvider,
-                    isGenerating = isGenerating,
-                    errorMessage = errorMessage,
-                    testInputText = testInputText,
-                    onTestInputChange = { testInputText = it },
-                    onStartOverlay = {
-                        if (!hasOverlayPermission) {
-                            requestOverlayPermission(context)
-                        } else {
-                            FloatingOverlayService.start(context)
+                    2 -> HistoryTab(
+                        history = history,
+                        settings = settings,
+                        onUpdateSettings = { AppStateManager.updateSettings(it) },
+                        onDeleteHistoryItem = { AppStateManager.deleteHistoryItem(it) },
+                        onClearHistory = { AppStateManager.clearHistory() },
+                        onCopyReply = { text ->
+                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? android.content.ClipboardManager
+                            val clip = android.content.ClipData.newPlainText("Reply", text)
+                            clipboard?.setPrimaryClip(clip)
+                            Toast.makeText(context, "Copied to clipboard!", Toast.LENGTH_SHORT).show()
                         }
-                    },
-                    onStopOverlay = {
-                        FloatingOverlayService.stop(context)
-                    },
-                    onRequestOverlayPermission = { requestOverlayPermission(context) },
-                    onRequestAccessibilityPermission = { requestAccessibilityPermission(context) },
-                    onTestDetection = { q ->
-                        AppStateManager.onQuestionDetected(q, "App Sandbox", force = true)
-                    },
-                    onRetryGeneration = {
-                        AppStateManager.generateRepliesForQuestion()
-                    },
-                    onCopyReply = { reply ->
-                        AppStateManager.copyAndDismissReply(context, reply)
-                    },
-                    onDismissReply = { id ->
-                        AppStateManager.dismissReply(id)
-                    },
-                    onNavigateToSettings = {
-                        selectedTab = 1
-                    }
-                )
+                    )
 
-                1 -> SettingsTab(
-                    settings = settings,
-                    onUpdateSettings = { AppStateManager.updateSettings(it) },
-                    onUpdateSelectionMode = { AppStateManager.updateSelectionMode(it) },
-                    onUpdatePreferredProvider = { AppStateManager.updatePreferredProvider(it) },
-                    onUpdateLength = { AppStateManager.updateReplyLength(it) },
-                    onUpdateCount = { AppStateManager.updateReplyCount(it) },
-                    onUpdateTone = { AppStateManager.updateTone(it) },
-                    onUpdateProviderKey = { provider, key -> AppStateManager.updateProviderKey(provider, key) },
-                    onMoveProviderUp = { index ->
-                        val currentChain = settings.providerChain.toMutableList()
-                        if (index > 0 && index < currentChain.size) {
-                            val temp = currentChain[index]
-                            currentChain[index] = currentChain[index - 1]
-                            currentChain[index - 1] = temp
-                            AppStateManager.updateProviderChain(currentChain)
-                        }
-                    },
-                    onMoveProviderDown = { index ->
-                        val currentChain = settings.providerChain.toMutableList()
-                        if (index >= 0 && index < currentChain.size - 1) {
-                            val temp = currentChain[index]
-                            currentChain[index] = currentChain[index + 1]
-                            currentChain[index + 1] = temp
-                            AppStateManager.updateProviderChain(currentChain)
-                        }
-                    }
-                )
-
-                2 -> HistoryTab(
-                    history = history,
-                    settings = settings,
-                    onUpdateSettings = { AppStateManager.updateSettings(it) },
-                    onDeleteHistoryItem = { AppStateManager.deleteHistoryItem(it) },
-                    onClearHistory = { AppStateManager.clearHistory() },
-                    onCopyReply = { text ->
-                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? android.content.ClipboardManager
-                        val clip = android.content.ClipData.newPlainText("Reply", text)
-                        clipboard?.setPrimaryClip(clip)
-                        Toast.makeText(context, "Copied to clipboard!", Toast.LENGTH_SHORT).show()
-                    }
-                )
-
-                3 -> DiagnosticsTab(
-                    healthState = healthState,
-                    onRequestOverlayPermission = { requestOverlayPermission(context) },
-                    onRequestAccessibilityPermission = { requestAccessibilityPermission(context) },
-                    onNavigateToSettings = { selectedTab = 1 },
-                    onTestRequest = {
-                        val samplePrompt = testInputText.ifBlank { "What time should we meet tomorrow?" }
-                        AppStateManager.onQuestionDetected(samplePrompt, "App Sandbox", force = true)
-                    },
-                    onClearErrors = { AppStateManager.clearAllErrors() }
-                )
+                    3 -> DiagnosticsTab(
+                        healthState = healthState,
+                        onRequestOverlayPermission = { requestOverlayPermission(context) },
+                        onRequestAccessibilityPermission = { requestAccessibilityPermission(context) },
+                        onNavigateToSettings = { selectedTab = 1 },
+                        onTestRequest = {
+                            val samplePrompt = testInputText.ifBlank { "What time should we meet tomorrow?" }
+                            AppStateManager.onQuestionDetected(samplePrompt, "App Sandbox", force = true)
+                        },
+                        onClearErrors = { AppStateManager.clearAllErrors() }
+                    )
+                }
             }
         }
     }
-}
 }
 
 @Composable
@@ -494,6 +505,7 @@ fun ControlsAndTestTab(
                     .fillMaxWidth()
                     .testTag("overlay_control_card"),
                 isSelected = isOverlayRunning,
+                activeColor = AccentGreen,
                 shape = RoundedCornerShape(18.dp)
             ) {
                 Column(
@@ -525,20 +537,20 @@ fun ControlsAndTestTab(
                             modifier = Modifier
                                 .size(40.dp)
                                 .clip(RoundedCornerShape(10.dp))
-                                .background(if (isOverlayRunning) CrimsonPrimary.copy(alpha = 0.2f) else DarkBg)
-                                .border(1.dp, if (isOverlayRunning) CrimsonPrimary.copy(alpha = 0.6f) else DarkCardBorder, RoundedCornerShape(10.dp)),
+                                .background(if (isOverlayRunning) AccentGreen.copy(alpha = 0.2f) else DarkBg)
+                                .border(1.dp, if (isOverlayRunning) AccentGreen.copy(alpha = 0.6f) else DarkCardBorder, RoundedCornerShape(10.dp)),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Layers,
                                 contentDescription = null,
-                                tint = if (isOverlayRunning) CrimsonPrimary else TextMuted,
+                                tint = if (isOverlayRunning) AccentGreen else TextMuted,
                                 modifier = Modifier.size(22.dp)
                             )
                         }
                     }
 
-                    // Start / Stop Toggle Button
+                    // Start (Blue) / Stop (Red) Toggle Button
                     Button(
                         onClick = {
                             if (isOverlayRunning) onStopOverlay() else onStartOverlay()
@@ -547,19 +559,21 @@ fun ControlsAndTestTab(
                             .fillMaxWidth()
                             .height(48.dp)
                             .testTag("toggle_overlay_button")
-                            .then(if (isOverlayRunning) Modifier.crimsonGlow(radius = 10.dp, color = CrimsonPrimary.copy(alpha = 0.4f)) else Modifier),
+                            .then(
+                                if (isOverlayRunning) Modifier.softGlow(radius = 10.dp, color = AccentRed.copy(alpha = 0.4f))
+                                else Modifier.softGlow(radius = 10.dp, color = AccentBlue.copy(alpha = 0.35f))
+                            ),
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = if (isOverlayRunning) CrimsonPrimary else Color(0xFF271518),
+                            containerColor = if (isOverlayRunning) AccentRed else AccentBlue,
                             contentColor = Color.White
-                        ),
-                        border = if (!isOverlayRunning) BorderStroke(1.dp, CrimsonPrimary.copy(alpha = 0.6f)) else null
+                        )
                     ) {
                         Icon(
                             imageVector = if (isOverlayRunning) Icons.Default.Stop else Icons.Default.PlayArrow,
                             contentDescription = null,
                             modifier = Modifier.size(20.dp),
-                            tint = if (isOverlayRunning) Color.White else CrimsonPrimary
+                            tint = Color.White
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
@@ -585,10 +599,11 @@ fun ControlsAndTestTab(
                 ) {
                     ControlPanelSectionHeader(
                         title = "SYSTEM PERMISSIONS",
-                        icon = Icons.Default.Lock
+                        icon = Icons.Default.Lock,
+                        accentColor = AccentBlue
                     )
 
-                    // 1. Overlay Permission Row
+                    // 1. Overlay Permission Row (Green for granted)
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -601,7 +616,7 @@ fun ControlsAndTestTab(
                             Icon(
                                 imageVector = if (hasOverlayPermission) Icons.Default.CheckCircle else Icons.Default.Warning,
                                 contentDescription = null,
-                                tint = if (hasOverlayPermission) Color(0xFF10B981) else Color(0xFFF59E0B),
+                                tint = if (hasOverlayPermission) AccentGreen else StatusOrange,
                                 modifier = Modifier.size(20.dp)
                             )
                             Column {
@@ -614,7 +629,7 @@ fun ControlsAndTestTab(
                                 Text(
                                     text = if (hasOverlayPermission) "Granted" else "Required for floating bar",
                                     fontSize = 11.sp,
-                                    color = if (hasOverlayPermission) Color(0xFF10B981) else Color(0xFFF59E0B)
+                                    color = if (hasOverlayPermission) AccentGreen else StatusOrange
                                 )
                             }
                         }
@@ -623,8 +638,8 @@ fun ControlsAndTestTab(
                             OutlinedButton(
                                 onClick = onRequestOverlayPermission,
                                 shape = RoundedCornerShape(8.dp),
-                                border = BorderStroke(1.dp, CrimsonPrimary),
-                                colors = ButtonDefaults.outlinedButtonColors(contentColor = CrimsonPrimary),
+                                border = BorderStroke(1.dp, AccentBlue),
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = AccentBlue),
                                 modifier = Modifier.testTag("grant_overlay_perm_button")
                             ) {
                                 Text("Grant", fontSize = 11.sp, fontWeight = FontWeight.Bold)
@@ -634,7 +649,7 @@ fun ControlsAndTestTab(
 
                     HorizontalDivider(color = DarkCardBorder)
 
-                    // 2. Accessibility Service Row
+                    // 2. Accessibility Service Row (Green for active)
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -647,7 +662,7 @@ fun ControlsAndTestTab(
                             Icon(
                                 imageVector = if (isAccessibilityEnabled) Icons.Default.CheckCircle else Icons.Default.Warning,
                                 contentDescription = null,
-                                tint = if (isAccessibilityEnabled) Color(0xFF10B981) else Color(0xFFF59E0B),
+                                tint = if (isAccessibilityEnabled) AccentGreen else StatusOrange,
                                 modifier = Modifier.size(20.dp)
                             )
                             Column(modifier = Modifier.widthIn(max = 200.dp)) {
@@ -660,7 +675,7 @@ fun ControlsAndTestTab(
                                 Text(
                                     text = if (isAccessibilityEnabled) "Active (Scans '?' asynchronously)" else "Required to detect questions on screen",
                                     fontSize = 11.sp,
-                                    color = if (isAccessibilityEnabled) Color(0xFF10B981) else Color(0xFFF59E0B)
+                                    color = if (isAccessibilityEnabled) AccentGreen else StatusOrange
                                 )
                             }
                         }
@@ -669,8 +684,8 @@ fun ControlsAndTestTab(
                             OutlinedButton(
                                 onClick = onRequestAccessibilityPermission,
                                 shape = RoundedCornerShape(8.dp),
-                                border = BorderStroke(1.dp, CrimsonPrimary),
-                                colors = ButtonDefaults.outlinedButtonColors(contentColor = CrimsonPrimary),
+                                border = BorderStroke(1.dp, AccentBlue),
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = AccentBlue),
                                 modifier = Modifier.testTag("grant_accessibility_perm_button")
                             ) {
                                 Text("Enable", fontSize = 11.sp, fontWeight = FontWeight.Bold)
@@ -693,11 +708,12 @@ fun ControlsAndTestTab(
                 ) {
                     ControlPanelSectionHeader(
                         title = "INTERACTIVE QUESTION SANDBOX",
-                        icon = Icons.Default.AutoAwesome
+                        icon = Icons.Default.AutoAwesome,
+                        accentColor = AccentBlue
                     )
 
                     Text(
-                        text = "Simulate on-screen text detection or test custom questions with Gemini:",
+                        text = "Simulate on-screen text detection or test custom questions:",
                         fontSize = 12.sp,
                         color = TextMuted
                     )
@@ -745,201 +761,230 @@ fun ControlsAndTestTab(
                             .testTag("question_input_field"),
                         shape = RoundedCornerShape(12.dp),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = CrimsonPrimary,
+                            focusedBorderColor = AccentBlue,
                             unfocusedBorderColor = DarkCardBorder,
                             focusedTextColor = MaterialTheme.colorScheme.onSurface,
                             unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
-                            cursorColor = CrimsonPrimary
+                            focusedContainerColor = DarkSurfaceCard,
+                            unfocusedContainerColor = DarkSurfaceCard
                         ),
                         trailingIcon = {
                             if (testInputText.isNotBlank()) {
                                 IconButton(onClick = { onTestInputChange("") }) {
-                                    Icon(Icons.Default.DeleteOutline, contentDescription = "Clear", tint = TextMuted)
+                                    Icon(Icons.Default.Clear, contentDescription = "Clear", tint = TextMuted, modifier = Modifier.size(18.dp))
                                 }
                             }
                         }
                     )
 
+                    // Test Action Button
                     Button(
                         onClick = { onTestDetection(testInputText) },
-                        enabled = testInputText.isNotBlank() && !isGenerating,
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(44.dp)
-                            .testTag("trigger_test_ai_button")
-                            .then(if (testInputText.isNotBlank() && !isGenerating) Modifier.crimsonGlow(radius = 8.dp, color = CrimsonPrimary.copy(alpha = 0.35f)) else Modifier),
+                            .testTag("test_detection_button"),
                         shape = RoundedCornerShape(10.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = CrimsonPrimary,
-                            disabledContainerColor = DarkBg
+                            containerColor = AccentBlue,
+                            contentColor = Color.White
                         )
                     ) {
-                        if (isGenerating) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(18.dp),
-                                color = Color.White,
-                                strokeWidth = 2.dp
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Calling AI fallback chain...", color = Color.White)
-                        } else {
-                            Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color.White)
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("Detect & Generate AI Replies", fontWeight = FontWeight.Bold, color = Color.White)
-                        }
+                        Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Detect & Generate AI Replies", fontWeight = FontWeight.Bold, fontSize = 13.sp)
                     }
 
-                    // Active Generated Replies / Loading / Error Section
-                    if (isGenerating) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(DarkBg)
-                                .border(1.dp, CrimsonPrimary.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
-                                .padding(16.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
+                    // Live Question & Generated Replies Preview
+                    if (currentQuestion != null || isGenerating || errorMessage != null) {
+                        HorizontalDivider(color = DarkCardBorder)
+
+                        Text(
+                            text = "LIVE OVERLAY PREVIEW",
+                            fontSize = 10.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = AccentBlue,
+                            letterSpacing = 0.5.sp
+                        )
+
+                        // Current Question Display
+                        if (currentQuestion != null) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(DarkBg)
+                                    .border(1.dp, AccentBlue.copy(alpha = 0.35f), RoundedCornerShape(10.dp))
+                                    .padding(12.dp)
+                            ) {
+                                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = "DETECTED QUESTION",
+                                            fontSize = 9.5.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = AccentBlue
+                                        )
+                                        if (activeProvider != null) {
+                                            Surface(
+                                                shape = RoundedCornerShape(4.dp),
+                                                color = AccentPurple.copy(alpha = 0.15f),
+                                                border = BorderStroke(1.dp, AccentPurple.copy(alpha = 0.4f))
+                                            ) {
+                                                Text(
+                                                    text = activeProvider.displayName,
+                                                    fontSize = 9.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = AccentPurpleLight,
+                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                )
+                                            }
+                                        }
+                                    }
+                                    Text(
+                                        text = currentQuestion,
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+                            }
+                        }
+
+                        // Loading Spinner
+                        if (isGenerating) {
                             Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 12.dp),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
                                 CircularProgressIndicator(
-                                    modifier = Modifier.size(20.dp),
-                                    color = CrimsonPrimary,
+                                    modifier = Modifier.size(22.dp),
+                                    color = AccentBlue,
                                     strokeWidth = 2.dp
                                 )
+                                Spacer(modifier = Modifier.width(10.dp))
                                 Text(
-                                    text = "Generating replies across configured providers...",
+                                    text = "Generating replies with AI...",
                                     fontSize = 12.sp,
                                     color = TextMuted
                                 )
                             }
                         }
-                    } else if (errorMessage != null) {
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { onRetryGeneration() },
-                            shape = RoundedCornerShape(12.dp),
-                            colors = CardDefaults.cardColors(
-                                containerColor = Color(0xFF2D1214)
-                            ),
-                            border = BorderStroke(1.dp, CrimsonPrimary.copy(alpha = 0.5f))
-                        ) {
-                            Column(
-                                modifier = Modifier.padding(14.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally
+
+                        // Error message
+                        if (errorMessage != null && !isGenerating) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(AccentRed.copy(alpha = 0.12f))
+                                    .border(1.dp, AccentRed.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
+                                    .padding(10.dp)
                             ) {
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    modifier = Modifier.fillMaxWidth()
                                 ) {
-                                    Icon(
-                                        Icons.Default.Warning,
-                                        contentDescription = null,
-                                        tint = CrimsonPrimary,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                    Text(
-                                        text = "Generation Unavailable",
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 13.sp,
-                                        color = CrimsonLight
-                                    )
-                                }
-                                Text(
-                                    text = errorMessage,
-                                    fontSize = 12.sp,
-                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.9f)
-                                )
-
-                                Row(
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Button(
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Warning,
+                                            contentDescription = null,
+                                            tint = AccentRed,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Text(
+                                            text = errorMessage,
+                                            fontSize = 11.5.sp,
+                                            color = AccentRed
+                                        )
+                                    }
+                                    IconButton(
                                         onClick = onRetryGeneration,
+                                        modifier = Modifier.size(24.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Refresh,
+                                            contentDescription = "Retry",
+                                            tint = AccentRed,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        // Generated Replies List
+                        activeReplies.forEachIndexed { index, replyItem ->
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(DarkBg)
+                                    .border(1.dp, DarkCardBorder, RoundedCornerShape(10.dp))
+                                    .padding(12.dp)
+                            ) {
+                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = "Option ${index + 1}",
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = AccentBlue
+                                        )
+                                        Row(
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            IconButton(
+                                                onClick = { onDismissReply(replyItem.id) },
+                                                modifier = Modifier.size(22.dp)
+                                            ) {
+                                                Icon(
+                                                    Icons.Default.Close,
+                                                    contentDescription = "Dismiss",
+                                                    tint = TextMuted,
+                                                    modifier = Modifier.size(14.dp)
+                                                )
+                                            }
+                                        }
+                                    }
+                                    Text(
+                                        text = replyItem.text,
+                                        fontSize = 13.sp,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Button(
+                                        onClick = { onCopyReply(replyItem) },
+                                        modifier = Modifier.fillMaxWidth(),
                                         shape = RoundedCornerShape(8.dp),
                                         colors = ButtonDefaults.buttonColors(
-                                            containerColor = CrimsonPrimary
-                                        )
+                                            containerColor = AccentBlue.copy(alpha = 0.15f),
+                                            contentColor = AccentBlueLight
+                                        ),
+                                        border = BorderStroke(1.dp, AccentBlue.copy(alpha = 0.35f))
                                     ) {
-                                        Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(14.dp), tint = Color.White)
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text("Retry Chain", fontSize = 12.sp, color = Color.White)
-                                    }
-
-                                    OutlinedButton(
-                                        onClick = onNavigateToSettings,
-                                        shape = RoundedCornerShape(8.dp),
-                                        border = BorderStroke(1.dp, DarkCardBorder),
-                                        colors = ButtonDefaults.outlinedButtonColors(
-                                            contentColor = MaterialTheme.colorScheme.onSurface
-                                        )
-                                    ) {
-                                        Icon(Icons.Default.Settings, contentDescription = null, modifier = Modifier.size(14.dp))
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text("Open Settings", fontSize = 12.sp)
+                                        Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(14.dp))
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text("Copy & Use", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                     }
                                 }
                             }
-                        }
-                    } else if (activeReplies.isNotEmpty()) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "SUGGESTED REPLIES:",
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = CrimsonPrimary,
-                                letterSpacing = 0.5.sp
-                            )
-                            if (activeProvider != null) {
-                                Surface(
-                                    shape = RoundedCornerShape(4.dp),
-                                    color = CrimsonPrimary.copy(alpha = 0.15f),
-                                    border = BorderStroke(0.6.dp, CrimsonPrimary.copy(alpha = 0.4f))
-                                ) {
-                                    Text(
-                                        text = "via ${activeProvider.displayName}",
-                                        fontSize = 9.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = CrimsonLight,
-                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                    )
-                                }
-                            }
-                        }
-
-                        activeReplies.forEach { reply ->
-                            ReplyCardItem(
-                                reply = reply,
-                                onCopy = { onCopyReply(reply) },
-                                onDismiss = { onDismissReply(reply.id) }
-                            )
-                        }
-                    } else if (currentQuestion != null) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(Color(0x1510B981))
-                                .border(1.dp, Color(0x4410B981), RoundedCornerShape(8.dp))
-                                .padding(12.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "All reply cards copied to clipboard!",
-                                color = Color(0xFF10B981),
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.SemiBold
-                            )
                         }
                     }
                 }
@@ -952,22 +997,22 @@ fun ControlsAndTestTab(
 fun SettingsTab(
     settings: com.example.model.ReplySettings,
     onUpdateSettings: (com.example.model.ReplySettings) -> Unit,
-    onUpdateSelectionMode: (com.example.model.ProviderSelectionMode) -> Unit = {},
-    onUpdatePreferredProvider: (AiProvider) -> Unit = {},
+    onUpdateSelectionMode: (com.example.model.ProviderSelectionMode) -> Unit,
+    onUpdatePreferredProvider: (AiProvider) -> Unit,
     onUpdateLength: (ReplyLength) -> Unit,
     onUpdateCount: (Int) -> Unit,
     onUpdateTone: (ReplyTone) -> Unit,
-    onUpdateProviderKey: (AiProvider, String) -> Unit = { _, _ -> },
-    onMoveProviderUp: (Int) -> Unit = {},
-    onMoveProviderDown: (Int) -> Unit = {}
+    onUpdateProviderKey: (AiProvider, String) -> Unit,
+    onMoveProviderUp: (Int) -> Unit,
+    onMoveProviderDown: (Int) -> Unit
 ) {
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .padding(16.dp),
+            .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        // Provider Selection Mode Card
+        // AI Model Selection & Provider Architecture (Purple Category)
         item {
             ControlPanelCard(
                 modifier = Modifier.fillMaxWidth(),
@@ -978,21 +1023,23 @@ fun SettingsTab(
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     ControlPanelSectionHeader(
-                        title = "PROVIDER SELECTION MODE",
-                        icon = Icons.Default.Tune
+                        title = "AI PROVIDER ARCHITECTURE",
+                        icon = Icons.Default.Psychology,
+                        accentColor = AccentPurple
                     )
 
                     Text(
-                        text = "Choose how ReplyFloat decides which AI model to call for instant replies:",
+                        text = "Choose how ReplyFloat orchestrates Gemini, OpenAI, Claude, and Grok:",
                         fontSize = 12.sp,
                         color = TextMuted
                     )
 
-                    // Mode Selection Buttons (Auto Fallback vs Preferred Provider)
+                    // 1. Selection Mode (Auto Fallback vs Preferred)
                     com.example.model.ProviderSelectionMode.entries.forEach { mode ->
                         val isSelected = settings.selectionMode == mode
                         ControlPanelCard(
                             isSelected = isSelected,
+                            activeColor = AccentPurple,
                             shape = RoundedCornerShape(12.dp),
                             onClick = { onUpdateSelectionMode(mode) },
                             modifier = Modifier.fillMaxWidth()
@@ -1008,7 +1055,7 @@ fun SettingsTab(
                                     selected = isSelected,
                                     onClick = { onUpdateSelectionMode(mode) },
                                     colors = RadioButtonDefaults.colors(
-                                        selectedColor = CrimsonPrimary,
+                                        selectedColor = AccentPurple,
                                         unselectedColor = TextMuted
                                     )
                                 )
@@ -1017,7 +1064,7 @@ fun SettingsTab(
                                         text = mode.label,
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 13.sp,
-                                        color = if (isSelected) CrimsonLight else MaterialTheme.colorScheme.onSurface
+                                        color = if (isSelected) AccentPurpleLight else MaterialTheme.colorScheme.onSurface
                                     )
                                     Text(
                                         text = mode.description,
@@ -1038,7 +1085,7 @@ fun SettingsTab(
                             text = "SELECT PREFERRED PROVIDER:",
                             fontSize = 10.5.sp,
                             fontWeight = FontWeight.Bold,
-                            color = CrimsonPrimary,
+                            color = AccentPurple,
                             letterSpacing = 0.5.sp
                         )
 
@@ -1050,6 +1097,7 @@ fun SettingsTab(
                                 val isSelected = settings.preferredProvider == provider
                                 ControlPanelCard(
                                     isSelected = isSelected,
+                                    activeColor = AccentPurple,
                                     shape = RoundedCornerShape(10.dp),
                                     modifier = Modifier
                                         .weight(1f)
@@ -1064,25 +1112,18 @@ fun SettingsTab(
                                             text = provider.displayName,
                                             fontSize = 11.5.sp,
                                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                            color = if (isSelected) CrimsonLight else MaterialTheme.colorScheme.onSurface
+                                            color = if (isSelected) AccentPurpleLight else MaterialTheme.colorScheme.onSurface
                                         )
                                     }
                                 }
                             }
                         }
-
-                        Text(
-                            text = "Calls ${settings.preferredProvider.displayName} first. If it encounters a network error, auth failure, or quota limit (HTTP 429), it will gracefully fall back to the next configured provider in order.",
-                            fontSize = 11.sp,
-                            color = TextMuted,
-                            fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
-                        )
                     }
                 }
             }
         }
 
-        // Multi-Provider Fallback Chain Reordering & Status Card
+        // Multi-Provider Fallback Chain Reordering & Status Card (Purple Category)
         item {
             ControlPanelCard(
                 modifier = Modifier.fillMaxWidth(),
@@ -1092,19 +1133,14 @@ fun SettingsTab(
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        ControlPanelSectionHeader(
-                            title = "PROVIDER FALLBACK ORDER",
-                            icon = Icons.Default.Layers
-                        )
-                    }
+                    ControlPanelSectionHeader(
+                        title = "PROVIDER FALLBACK ORDER",
+                        icon = Icons.Default.Layers,
+                        accentColor = AccentPurple
+                    )
 
                     Text(
-                        text = "Reorder the fallback sequence below. If an attempt fails, ReplyFloat immediately proceeds to the next ready provider in this sequence with full diagnostic logging.",
+                        text = "Reorder the fallback sequence below. If an attempt fails, ReplyFloat immediately proceeds to the next ready provider:",
                         fontSize = 12.sp,
                         color = TextMuted
                     )
@@ -1125,6 +1161,7 @@ fun SettingsTab(
 
                         ControlPanelCard(
                             isSelected = isFirstInAuto || isPreferred,
+                            activeColor = AccentPurple,
                             shape = RoundedCornerShape(12.dp),
                             modifier = Modifier.fillMaxWidth()
                         ) {
@@ -1140,13 +1177,13 @@ fun SettingsTab(
                                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                                     modifier = Modifier.weight(1f)
                                 ) {
-                                    // Order number badge
+                                    // Order number badge (Purple)
                                     Box(
                                         modifier = Modifier
                                             .size(24.dp)
                                             .clip(CircleShape)
                                             .background(
-                                                if (index == 0) CrimsonPrimary
+                                                if (index == 0) AccentPurple
                                                 else DarkSurfaceVariant
                                             ),
                                         contentAlignment = Alignment.Center
@@ -1173,28 +1210,28 @@ fun SettingsTab(
                                             if (isFirstInAuto) {
                                                 Surface(
                                                     shape = RoundedCornerShape(4.dp),
-                                                    color = CrimsonPrimary.copy(alpha = 0.2f),
-                                                    border = BorderStroke(1.dp, CrimsonPrimary.copy(alpha = 0.5f))
+                                                    color = AccentPurple.copy(alpha = 0.2f),
+                                                    border = BorderStroke(1.dp, AccentPurple.copy(alpha = 0.5f))
                                                 ) {
                                                     Text(
                                                         text = "PRIMARY",
                                                         fontSize = 8.5.sp,
                                                         fontWeight = FontWeight.Bold,
-                                                        color = CrimsonLight,
+                                                        color = AccentPurpleLight,
                                                         modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
                                                     )
                                                 }
                                             } else if (isPreferred) {
                                                 Surface(
                                                     shape = RoundedCornerShape(4.dp),
-                                                    color = CrimsonPrimary.copy(alpha = 0.2f),
-                                                    border = BorderStroke(1.dp, CrimsonPrimary.copy(alpha = 0.5f))
+                                                    color = AccentPurple.copy(alpha = 0.2f),
+                                                    border = BorderStroke(1.dp, AccentPurple.copy(alpha = 0.5f))
                                                 ) {
                                                     Text(
                                                         text = "PREFERRED",
                                                         fontSize = 8.5.sp,
                                                         fontWeight = FontWeight.Bold,
-                                                        color = CrimsonLight,
+                                                        color = AccentPurpleLight,
                                                         modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
                                                     )
                                                 }
@@ -1203,12 +1240,12 @@ fun SettingsTab(
                                         Text(
                                             text = if (hasKey) "Ready: ${provider.modelName}" else "No key entered yet",
                                             fontSize = 10.5.sp,
-                                            color = if (hasKey) StatusGreen else TextMuted
+                                            color = if (hasKey) AccentGreen else TextMuted
                                         )
                                     }
                                 }
 
-                                // Up / Down reorder arrows
+                                // Up / Down reorder arrows (Purple)
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(2.dp)
@@ -1221,7 +1258,7 @@ fun SettingsTab(
                                         Icon(
                                             imageVector = Icons.Default.ArrowUpward,
                                             contentDescription = "Move ${provider.displayName} Up",
-                                            tint = if (index > 0) CrimsonPrimary else TextMuted.copy(alpha = 0.3f),
+                                            tint = if (index > 0) AccentPurple else TextMuted.copy(alpha = 0.3f),
                                             modifier = Modifier.size(16.dp)
                                         )
                                     }
@@ -1233,7 +1270,7 @@ fun SettingsTab(
                                         Icon(
                                             imageVector = Icons.Default.ArrowDownward,
                                             contentDescription = "Move ${provider.displayName} Down",
-                                            tint = if (index < settings.providerChain.size - 1) CrimsonPrimary else TextMuted.copy(alpha = 0.3f),
+                                            tint = if (index < settings.providerChain.size - 1) AccentPurple else TextMuted.copy(alpha = 0.3f),
                                             modifier = Modifier.size(16.dp)
                                         )
                                     }
@@ -1245,7 +1282,7 @@ fun SettingsTab(
             }
         }
 
-        // Multi-Provider API Key Inputs
+        // Multi-Provider API Key Inputs (Purple Category)
         item {
             ControlPanelCard(
                 modifier = Modifier.fillMaxWidth(),
@@ -1257,11 +1294,12 @@ fun SettingsTab(
                 ) {
                     ControlPanelSectionHeader(
                         title = "PROVIDER API KEYS",
-                        icon = Icons.Default.Key
+                        icon = Icons.Default.Key,
+                        accentColor = AccentPurple
                     )
 
                     Text(
-                        text = "Enter keys for as many providers as you have. You don't need all four — ReplyFloat will seamlessly route through whatever keys are provided.",
+                        text = "Enter keys for as many providers as you have. ReplyFloat seamlessly routes through whichever keys are configured.",
                         fontSize = 12.sp,
                         color = TextMuted
                     )
@@ -1308,7 +1346,7 @@ fun SettingsTab(
             }
         }
 
-        // Reply Length Configuration
+        // Reply Length Configuration (Blue Category)
         item {
             ControlPanelCard(
                 modifier = Modifier.fillMaxWidth(),
@@ -1320,7 +1358,8 @@ fun SettingsTab(
                 ) {
                     ControlPanelSectionHeader(
                         title = "REPLY LENGTH",
-                        icon = Icons.Default.Tune
+                        icon = Icons.Default.Tune,
+                        accentColor = AccentBlue
                     )
 
                     Text(
@@ -1337,6 +1376,7 @@ fun SettingsTab(
                             val isSelected = settings.length == lengthOption
                             ControlPanelCard(
                                 isSelected = isSelected,
+                                activeColor = AccentBlue,
                                 shape = RoundedCornerShape(12.dp),
                                 onClick = { onUpdateLength(lengthOption) },
                                 modifier = Modifier.fillMaxWidth()
@@ -1357,7 +1397,7 @@ fun SettingsTab(
                                             text = lengthOption.label,
                                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
                                             fontSize = 14.sp,
-                                            color = if (isSelected) CrimsonLight else MaterialTheme.colorScheme.onSurface
+                                            color = if (isSelected) AccentBlueLight else MaterialTheme.colorScheme.onSurface
                                         )
                                         Spacer(modifier = Modifier.height(3.dp))
                                         Text(
@@ -1372,7 +1412,7 @@ fun SettingsTab(
                                             modifier = Modifier
                                                 .size(24.dp)
                                                 .clip(CircleShape)
-                                                .background(CrimsonPrimary),
+                                                .background(AccentBlue),
                                             contentAlignment = Alignment.Center
                                         ) {
                                             Icon(
@@ -1402,7 +1442,7 @@ fun SettingsTab(
             }
         }
 
-        // Reply Count Configuration
+        // Reply Count Configuration (Blue Category)
         item {
             ControlPanelCard(
                 modifier = Modifier.fillMaxWidth(),
@@ -1414,7 +1454,8 @@ fun SettingsTab(
                 ) {
                     ControlPanelSectionHeader(
                         title = "SUGGESTION COUNT (1 - 3)",
-                        icon = Icons.Default.Filter3
+                        icon = Icons.Default.Filter3,
+                        accentColor = AccentBlue
                     )
 
                     Row(
@@ -1425,6 +1466,7 @@ fun SettingsTab(
                             val isSelected = settings.count == count
                             ControlPanelCard(
                                 isSelected = isSelected,
+                                activeColor = AccentBlue,
                                 shape = RoundedCornerShape(10.dp),
                                 onClick = { onUpdateCount(count) },
                                 modifier = Modifier.weight(1f)
@@ -1440,7 +1482,7 @@ fun SettingsTab(
                                         Icon(
                                             imageVector = Icons.Default.Check,
                                             contentDescription = null,
-                                            tint = CrimsonPrimary,
+                                            tint = AccentBlue,
                                             modifier = Modifier
                                                 .size(16.dp)
                                                 .padding(end = 4.dp)
@@ -1450,7 +1492,7 @@ fun SettingsTab(
                                         text = "$count ${if (count == 1) "Reply" else "Replies"}",
                                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                                         fontSize = 13.sp,
-                                        color = if (isSelected) CrimsonLight else MaterialTheme.colorScheme.onSurface
+                                        color = if (isSelected) AccentBlueLight else MaterialTheme.colorScheme.onSurface
                                     )
                                 }
                             }
@@ -1460,7 +1502,7 @@ fun SettingsTab(
             }
         }
 
-        // Tone & Style Selector
+        // Tone & Style Selector (Blue Category)
         item {
             ControlPanelCard(
                 modifier = Modifier.fillMaxWidth(),
@@ -1472,7 +1514,8 @@ fun SettingsTab(
                 ) {
                     ControlPanelSectionHeader(
                         title = "CONVERSATION TONE",
-                        icon = Icons.Default.ChatBubbleOutline
+                        icon = Icons.Default.ChatBubbleOutline,
+                        accentColor = AccentBlue
                     )
 
                     Text(
@@ -1489,6 +1532,7 @@ fun SettingsTab(
                             val isSelected = settings.tone == tone
                             ControlPanelCard(
                                 isSelected = isSelected,
+                                activeColor = AccentBlue,
                                 shape = RoundedCornerShape(12.dp),
                                 onClick = { onUpdateTone(tone) },
                                 modifier = Modifier.fillMaxWidth()
@@ -1509,7 +1553,7 @@ fun SettingsTab(
                                             text = tone.label,
                                             fontSize = 14.sp,
                                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
-                                            color = if (isSelected) CrimsonLight else MaterialTheme.colorScheme.onSurface
+                                            color = if (isSelected) AccentBlueLight else MaterialTheme.colorScheme.onSurface
                                         )
                                         Spacer(modifier = Modifier.height(3.dp))
                                         Text(
@@ -1525,7 +1569,7 @@ fun SettingsTab(
                                             modifier = Modifier
                                                 .size(24.dp)
                                                 .clip(CircleShape)
-                                                .background(CrimsonPrimary),
+                                                .background(AccentBlue),
                                             contentAlignment = Alignment.Center
                                         ) {
                                             Icon(
@@ -1555,7 +1599,7 @@ fun SettingsTab(
             }
         }
 
-        // Multi-Language Mode (Any language / Hinglish)
+        // Multi-Language Mode (Blue Category)
         item {
             ControlPanelCard(
                 modifier = Modifier.fillMaxWidth(),
@@ -1577,13 +1621,13 @@ fun SettingsTab(
                             modifier = Modifier
                                 .size(32.dp)
                                 .clip(RoundedCornerShape(8.dp))
-                                .background(CrimsonPrimary.copy(alpha = 0.15f)),
+                                .background(AccentBlue.copy(alpha = 0.15f)),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Translate,
                                 contentDescription = null,
-                                tint = CrimsonPrimary,
+                                tint = AccentBlue,
                                 modifier = Modifier.size(18.dp)
                             )
                         }
@@ -1606,6 +1650,7 @@ fun SettingsTab(
                     }
                     ControlPanelSwitch(
                         checked = settings.multiLanguageEnabled,
+                        activeColor = AccentBlue,
                         onCheckedChange = { checked ->
                             onUpdateSettings(settings.copy(multiLanguageEnabled = checked))
                         }
@@ -1614,7 +1659,7 @@ fun SettingsTab(
             }
         }
 
-        // Question Scanning (Analyze on/off switch)
+        // Question Scanning (Green Category for active scanning)
         item {
             ControlPanelCard(
                 modifier = Modifier.fillMaxWidth(),
@@ -1637,14 +1682,14 @@ fun SettingsTab(
                                 .size(32.dp)
                                 .clip(RoundedCornerShape(8.dp))
                                 .background(
-                                    if (settings.scanningEnabled) StatusGreen.copy(alpha = 0.2f) else DarkSurfaceVariant
+                                    if (settings.scanningEnabled) AccentGreen.copy(alpha = 0.2f) else DarkSurfaceVariant
                                 ),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Radar,
                                 contentDescription = null,
-                                tint = if (settings.scanningEnabled) StatusGreen else TextMuted,
+                                tint = if (settings.scanningEnabled) AccentGreen else TextMuted,
                                 modifier = Modifier.size(18.dp)
                             )
                         }
@@ -1661,12 +1706,13 @@ fun SettingsTab(
                                 else
                                     "Paused: zero background scanning or API calls",
                                 fontSize = 11.sp,
-                                color = TextMuted
+                                color = if (settings.scanningEnabled) AccentGreen else TextMuted
                             )
                         }
                     }
                     ControlPanelSwitch(
                         checked = settings.scanningEnabled,
+                        activeColor = AccentGreen,
                         onCheckedChange = { checked ->
                             onUpdateSettings(settings.copy(scanningEnabled = checked))
                         }
@@ -1675,7 +1721,7 @@ fun SettingsTab(
             }
         }
 
-        // Auto-generation toggle
+        // Auto-generation toggle (Blue Category)
         item {
             ControlPanelCard(
                 modifier = Modifier.fillMaxWidth(),
@@ -1696,13 +1742,14 @@ fun SettingsTab(
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
-                            text = "Automatically calls Gemini as soon as a question mark is detected on screen",
+                            text = "Automatically calls AI as soon as a question mark is detected on screen",
                             fontSize = 11.sp,
                             color = TextMuted
                         )
                     }
                     ControlPanelSwitch(
                         checked = settings.autoGenerate,
+                        activeColor = AccentBlue,
                         onCheckedChange = { checked ->
                             onUpdateSettings(settings.copy(autoGenerate = checked))
                         }
@@ -1711,7 +1758,7 @@ fun SettingsTab(
             }
         }
 
-        // Auto-delete History (1-10 mins adjustable)
+        // Auto-delete History (Blue Category with Stepper)
         item {
             ControlPanelCard(
                 modifier = Modifier.fillMaxWidth(),
@@ -1735,13 +1782,13 @@ fun SettingsTab(
                                 modifier = Modifier
                                     .size(32.dp)
                                     .clip(RoundedCornerShape(8.dp))
-                                    .background(CrimsonPrimary.copy(alpha = 0.15f)),
+                                    .background(AccentBlue.copy(alpha = 0.15f)),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Timer,
                                     contentDescription = null,
-                                    tint = CrimsonPrimary,
+                                    tint = AccentBlue,
                                     modifier = Modifier.size(18.dp)
                                 )
                             }
@@ -1761,6 +1808,7 @@ fun SettingsTab(
                         }
                         ControlPanelSwitch(
                             checked = settings.autoDeleteHistory,
+                            activeColor = AccentBlue,
                             onCheckedChange = { checked ->
                                 onUpdateSettings(settings.copy(autoDeleteHistory = checked))
                             }
@@ -1787,11 +1835,11 @@ fun SettingsTab(
                                     text = "EXPIRY DURATION (1 - 10 MINS)",
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = CrimsonPrimary,
+                                    color = AccentBlue,
                                     letterSpacing = 0.5.sp
                                 )
 
-                                // Stepper: - and + buttons with current minute badge
+                                // Stepper: - and + buttons with current minute badge (Blue)
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -1807,8 +1855,8 @@ fun SettingsTab(
                                     ) {
                                         Icon(
                                             Icons.Default.Remove,
-                                            contentDescription = "Decrease minute",
-                                            tint = if (settings.autoDeleteMinutes > 1) CrimsonPrimary else TextMuted.copy(alpha = 0.4f),
+                                            contentDescription = "Decrease",
+                                            tint = if (settings.autoDeleteMinutes > 1) AccentBlue else TextMuted.copy(alpha = 0.3f),
                                             modifier = Modifier.size(16.dp)
                                         )
                                     }
@@ -1816,15 +1864,15 @@ fun SettingsTab(
                                     Box(
                                         modifier = Modifier
                                             .clip(RoundedCornerShape(6.dp))
-                                            .background(CrimsonPrimary.copy(alpha = 0.15f))
-                                            .border(1.dp, CrimsonPrimary.copy(alpha = 0.4f), RoundedCornerShape(6.dp))
+                                            .background(AccentBlue.copy(alpha = 0.15f))
+                                            .border(1.dp, AccentBlue.copy(alpha = 0.4f), RoundedCornerShape(6.dp))
                                             .padding(horizontal = 8.dp, vertical = 3.dp)
                                     ) {
                                         Text(
-                                            text = "${settings.autoDeleteMinutes} min${if (settings.autoDeleteMinutes > 1) "s" else ""}",
+                                            text = "${settings.autoDeleteMinutes} min",
                                             fontSize = 12.sp,
                                             fontWeight = FontWeight.Bold,
-                                            color = CrimsonLight
+                                            color = AccentBlueLight
                                         )
                                     }
 
@@ -1839,51 +1887,36 @@ fun SettingsTab(
                                     ) {
                                         Icon(
                                             Icons.Default.Add,
-                                            contentDescription = "Increase minute",
-                                            tint = if (settings.autoDeleteMinutes < 10) CrimsonPrimary else TextMuted.copy(alpha = 0.4f),
+                                            contentDescription = "Increase",
+                                            tint = if (settings.autoDeleteMinutes < 10) AccentBlue else TextMuted.copy(alpha = 0.3f),
                                             modifier = Modifier.size(16.dp)
                                         )
                                     }
                                 }
                             }
 
-                            // Slider: 1 min to 10 min
-                            Slider(
-                                value = settings.autoDeleteMinutes.toFloat(),
-                                onValueChange = { newValue ->
-                                    onUpdateSettings(settings.copy(autoDeleteMinutes = newValue.toInt().coerceIn(1, 10)))
-                                },
-                                valueRange = 1f..10f,
-                                steps = 8, // 2, 3, 4, 5, 6, 7, 8, 9
-                                colors = SliderDefaults.colors(
-                                    thumbColor = CrimsonPrimary,
-                                    activeTrackColor = CrimsonPrimary,
-                                    inactiveTrackColor = DarkSurfaceVariant
-                                )
-                            )
-
-                            // Quick preset chips (all 1 to 10 minutes)
+                            // Minute chips (1 to 10)
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .horizontalScroll(rememberScrollState()),
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
                                 (1..10).forEach { mins ->
                                     val isSelected = settings.autoDeleteMinutes == mins
                                     Box(
                                         modifier = Modifier
-                                            .clip(RoundedCornerShape(8.dp))
+                                            .clip(RoundedCornerShape(6.dp))
                                             .background(
-                                                if (isSelected) CrimsonPrimary else DarkSurfaceVariant
+                                                if (isSelected) AccentBlue else DarkSurfaceVariant
                                             )
                                             .then(
-                                                if (isSelected) Modifier.crimsonGlow() else Modifier.border(1.dp, DarkCardBorder, RoundedCornerShape(8.dp))
+                                                if (isSelected) Modifier.softGlow(color = AccentBlue.copy(alpha = 0.4f)) else Modifier.border(1.dp, DarkCardBorder, RoundedCornerShape(6.dp))
                                             )
                                             .clickable {
                                                 onUpdateSettings(settings.copy(autoDeleteMinutes = mins))
                                             }
-                                            .padding(horizontal = 10.dp, vertical = 6.dp),
+                                            .padding(horizontal = 10.dp, vertical = 5.dp),
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Text(
@@ -1895,12 +1928,6 @@ fun SettingsTab(
                                     }
                                 }
                             }
-
-                            Text(
-                                text = "Detected questions and AI replies older than ${settings.autoDeleteMinutes} minute${if (settings.autoDeleteMinutes > 1) "s" else ""} will be deleted automatically.",
-                                fontSize = 11.sp,
-                                color = TextMuted
-                            )
                         }
                     }
                 }
@@ -1913,8 +1940,8 @@ fun SettingsTab(
 fun ProviderApiKeyInputField(
     provider: AiProvider,
     currentKey: String,
-    isEnvKeyPresent: Boolean = false,
     hint: String,
+    isEnvKeyPresent: Boolean = false,
     onKeyChanged: (String) -> Unit
 ) {
     var textValue by remember(currentKey) { mutableStateOf(currentKey) }
@@ -1930,59 +1957,37 @@ fun ProviderApiKeyInputField(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
+                Surface(
+                    shape = RoundedCornerShape(6.dp),
+                    color = AccentPurple.copy(alpha = 0.15f),
+                    border = BorderStroke(1.dp, AccentPurple.copy(alpha = 0.35f))
+                ) {
+                    Text(
+                        text = provider.displayName,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = AccentPurpleLight,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                    )
+                }
                 Text(
-                    text = provider.displayName,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 13.sp,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = "(${provider.modelName})",
+                    text = provider.modelName,
                     fontSize = 10.5.sp,
                     color = TextMuted
                 )
             }
 
-            // Status chip
             if (isEnvKeyPresent && textValue.isBlank()) {
                 Surface(
                     shape = RoundedCornerShape(4.dp),
-                    color = StatusGreen.copy(alpha = 0.15f),
-                    border = BorderStroke(1.dp, StatusGreen.copy(alpha = 0.4f))
+                    color = AccentGreen.copy(alpha = 0.15f),
+                    border = BorderStroke(1.dp, AccentGreen.copy(alpha = 0.4f))
                 ) {
                     Text(
-                        text = "AI Studio Key Active",
+                        text = "ENV KEY ACTIVE",
                         fontSize = 9.sp,
                         fontWeight = FontWeight.Bold,
-                        color = StatusGreen,
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                    )
-                }
-            } else if (textValue.isNotBlank()) {
-                Surface(
-                    shape = RoundedCornerShape(4.dp),
-                    color = StatusCyan.copy(alpha = 0.15f),
-                    border = BorderStroke(1.dp, StatusCyan.copy(alpha = 0.4f))
-                ) {
-                    Text(
-                        text = "Custom Key Set",
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = StatusCyan,
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                    )
-                }
-            } else {
-                Surface(
-                    shape = RoundedCornerShape(4.dp),
-                    color = DarkSurfaceVariant,
-                    border = BorderStroke(1.dp, DarkCardBorder)
-                ) {
-                    Text(
-                        text = "No Key",
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Normal,
-                        color = TextMuted,
+                        color = AccentGreen,
                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                     )
                 }
@@ -1995,7 +2000,7 @@ fun ProviderApiKeyInputField(
                 textValue = it
                 onKeyChanged(it)
             },
-            placeholder = { Text(hint, fontSize = 11.sp, color = TextMuted) },
+            placeholder = { Text(hint, color = TextSubtle, fontSize = 11.sp, maxLines = 1) },
             visualTransformation = if (isPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
             trailingIcon = {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -2021,7 +2026,7 @@ fun ProviderApiKeyInputField(
             shape = RoundedCornerShape(10.dp),
             singleLine = true,
             colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = CrimsonPrimary,
+                focusedBorderColor = AccentPurple,
                 unfocusedBorderColor = DarkCardBorder,
                 focusedContainerColor = DarkSurfaceCard,
                 unfocusedContainerColor = DarkSurfaceCard,
@@ -2029,6 +2034,86 @@ fun ProviderApiKeyInputField(
                 unfocusedTextColor = MaterialTheme.colorScheme.onSurface
             )
         )
+    }
+}
+
+/**
+ * High-performance isolated countdown timer chip that ticks internally
+ * without invalidating parent HistoryTab, LazyColumn, or other items.
+ */
+@Composable
+fun HistoryCountdownBadge(
+    itemTimestamp: Long,
+    autoDeleteMinutes: Int,
+    autoDeleteEnabled: Boolean,
+    modifier: Modifier = Modifier
+) {
+    if (!autoDeleteEnabled) {
+        var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
+        val elapsedSec = (now - itemTimestamp) / 1000
+        val timeStr = when {
+            elapsedSec < 60 -> "Just now"
+            elapsedSec < 3600 -> "${elapsedSec / 60}m ago"
+            else -> "${elapsedSec / 3600}h ago"
+        }
+        Text(
+            text = timeStr,
+            fontSize = 10.sp,
+            color = TextMuted,
+            modifier = modifier
+        )
+        return
+    }
+
+    // Isolated 1-second ticker specifically inside this badge
+    var currentMs by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(itemTimestamp, autoDeleteMinutes) {
+        while (true) {
+            kotlinx.coroutines.delay(1000L)
+            currentMs = System.currentTimeMillis()
+        }
+    }
+
+    val maxAgeMs = autoDeleteMinutes * 60 * 1000L
+    val elapsedMs = currentMs - itemTimestamp
+    val remainingMs = (maxAgeMs - elapsedMs).coerceAtLeast(0)
+    val totalSec = remainingMs / 1000
+    val remMin = totalSec / 60
+    val remSec = totalSec % 60
+    val countdownStr = if (remMin > 0) "${remMin}m ${remSec}s" else "${remSec}s"
+    val isExpiringSoon = remainingMs < 30_000
+
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(6.dp))
+            .background(
+                if (isExpiringSoon) AccentRed.copy(alpha = 0.18f)
+                else AccentGreen.copy(alpha = 0.15f)
+            )
+            .border(
+                1.dp,
+                if (isExpiringSoon) AccentRed.copy(alpha = 0.6f) else AccentGreen.copy(alpha = 0.4f),
+                RoundedCornerShape(6.dp)
+            )
+            .padding(horizontal = 6.dp, vertical = 2.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(3.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.Schedule,
+                contentDescription = null,
+                tint = if (isExpiringSoon) AccentRed else AccentGreen,
+                modifier = Modifier.size(10.dp)
+            )
+            Text(
+                text = "Expires in $countdownStr",
+                fontSize = 9.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = if (isExpiringSoon) AccentRed else AccentGreen
+            )
+        }
     }
 }
 
@@ -2041,22 +2126,13 @@ fun HistoryTab(
     onClearHistory: () -> Unit,
     onCopyReply: (String) -> Unit
 ) {
-    // Dynamic 1-second ticker for real-time countdown calculation
-    var currentTimeMs by remember { mutableStateOf(System.currentTimeMillis()) }
-    LaunchedEffect(Unit) {
-        while (true) {
-            kotlinx.coroutines.delay(1000L)
-            currentTimeMs = System.currentTimeMillis()
-        }
-    }
-
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        // History Header Card with Auto-delete Status, Stepper & Clear Button
+        // History Header Card with Auto-delete Status, Stepper & Clear Button (Blue Category)
         ControlPanelCard(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(14.dp)
@@ -2079,7 +2155,7 @@ fun HistoryTab(
                         Icon(
                             imageVector = Icons.Default.Timer,
                             contentDescription = null,
-                            tint = if (settings.autoDeleteHistory) CrimsonPrimary else TextMuted,
+                            tint = if (settings.autoDeleteHistory) AccentBlue else TextMuted,
                             modifier = Modifier.size(18.dp)
                         )
                         Column {
@@ -2107,9 +2183,9 @@ fun HistoryTab(
                                 shape = RoundedCornerShape(8.dp),
                                 contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp, vertical = 2.dp),
                                 colors = ButtonDefaults.outlinedButtonColors(
-                                    contentColor = CrimsonPrimary
+                                    contentColor = AccentRed
                                 ),
-                                border = BorderStroke(1.dp, CrimsonPrimary.copy(alpha = 0.5f))
+                                border = BorderStroke(1.dp, AccentRed.copy(alpha = 0.5f))
                             ) {
                                 Icon(
                                     Icons.Default.DeleteOutline,
@@ -2123,6 +2199,7 @@ fun HistoryTab(
 
                         ControlPanelSwitch(
                             checked = settings.autoDeleteHistory,
+                            activeColor = AccentBlue,
                             onCheckedChange = { checked ->
                                 onUpdateSettings(settings.copy(autoDeleteHistory = checked))
                             }
@@ -2130,7 +2207,7 @@ fun HistoryTab(
                     }
                 }
 
-                // If Auto-Delete is active, show quick adjustable buttons (1-10 mins) + stepper
+                // If Auto-Delete is active, show quick adjustable buttons (1-10 mins) + stepper (Blue)
                 AnimatedVisibility(
                     visible = settings.autoDeleteHistory,
                     enter = fadeIn() + expandVertically(),
@@ -2151,7 +2228,7 @@ fun HistoryTab(
                                 text = "ADJUST TIME (1 - 10 MINS):",
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = CrimsonPrimary,
+                                color = AccentBlue,
                                 letterSpacing = 0.4.sp
                             )
 
@@ -2172,7 +2249,7 @@ fun HistoryTab(
                                     Icon(
                                         Icons.Default.Remove,
                                         contentDescription = "Decrease",
-                                        tint = if (settings.autoDeleteMinutes > 1) CrimsonPrimary else TextMuted.copy(alpha = 0.3f),
+                                        tint = if (settings.autoDeleteMinutes > 1) AccentBlue else TextMuted.copy(alpha = 0.3f),
                                         modifier = Modifier.size(14.dp)
                                     )
                                 }
@@ -2180,15 +2257,15 @@ fun HistoryTab(
                                 Box(
                                     modifier = Modifier
                                         .clip(RoundedCornerShape(6.dp))
-                                        .background(CrimsonPrimary.copy(alpha = 0.15f))
-                                        .border(1.dp, CrimsonPrimary.copy(alpha = 0.4f), RoundedCornerShape(6.dp))
+                                        .background(AccentBlue.copy(alpha = 0.15f))
+                                        .border(1.dp, AccentBlue.copy(alpha = 0.4f), RoundedCornerShape(6.dp))
                                         .padding(horizontal = 6.dp, vertical = 2.dp)
                                 ) {
                                     Text(
                                         text = "${settings.autoDeleteMinutes}m",
                                         fontSize = 11.sp,
                                         fontWeight = FontWeight.Bold,
-                                        color = CrimsonLight
+                                        color = AccentBlueLight
                                     )
                                 }
 
@@ -2204,7 +2281,7 @@ fun HistoryTab(
                                     Icon(
                                         Icons.Default.Add,
                                         contentDescription = "Increase",
-                                        tint = if (settings.autoDeleteMinutes < 10) CrimsonPrimary else TextMuted.copy(alpha = 0.3f),
+                                        tint = if (settings.autoDeleteMinutes < 10) AccentBlue else TextMuted.copy(alpha = 0.3f),
                                         modifier = Modifier.size(14.dp)
                                     )
                                 }
@@ -2224,10 +2301,10 @@ fun HistoryTab(
                                     modifier = Modifier
                                         .clip(RoundedCornerShape(6.dp))
                                         .background(
-                                            if (isSelected) CrimsonPrimary else DarkSurfaceVariant
+                                            if (isSelected) AccentBlue else DarkSurfaceVariant
                                         )
                                         .then(
-                                            if (isSelected) Modifier.crimsonGlow() else Modifier.border(1.dp, DarkCardBorder, RoundedCornerShape(6.dp))
+                                            if (isSelected) Modifier.softGlow(color = AccentBlue.copy(alpha = 0.4f)) else Modifier.border(1.dp, DarkCardBorder, RoundedCornerShape(6.dp))
                                         )
                                         .clickable {
                                             onUpdateSettings(settings.copy(autoDeleteMinutes = mins))
@@ -2342,61 +2419,12 @@ fun HistoryTab(
                                             }
                                         }
 
-                                        // Auto-delete timer badge or elapsed time
-                                        if (settings.autoDeleteHistory) {
-                                            val maxAgeMs = settings.autoDeleteMinutes * 60 * 1000L
-                                            val elapsedMs = currentTimeMs - item.timestamp
-                                            val remainingMs = (maxAgeMs - elapsedMs).coerceAtLeast(0)
-                                            val totalSec = remainingMs / 1000
-                                            val remMin = totalSec / 60
-                                            val remSec = totalSec % 60
-                                            val countdownStr = if (remMin > 0) "${remMin}m ${remSec}s" else "${remSec}s"
-
-                                            Box(
-                                                modifier = Modifier
-                                                    .clip(RoundedCornerShape(6.dp))
-                                                    .background(
-                                                        if (remainingMs < 30_000) CrimsonPrimary.copy(alpha = 0.2f)
-                                                        else CrimsonPrimary.copy(alpha = 0.15f)
-                                                    )
-                                                    .border(
-                                                        1.dp,
-                                                        if (remainingMs < 30_000) CrimsonPrimary else CrimsonPrimary.copy(alpha = 0.4f),
-                                                        RoundedCornerShape(6.dp)
-                                                    )
-                                                    .padding(horizontal = 6.dp, vertical = 2.dp)
-                                            ) {
-                                                Row(
-                                                    verticalAlignment = Alignment.CenterVertically,
-                                                    horizontalArrangement = Arrangement.spacedBy(3.dp)
-                                                ) {
-                                                    Icon(
-                                                        imageVector = Icons.Default.Schedule,
-                                                        contentDescription = null,
-                                                        tint = CrimsonLight,
-                                                        modifier = Modifier.size(10.dp)
-                                                    )
-                                                    Text(
-                                                        text = "Expires in $countdownStr",
-                                                        fontSize = 9.sp,
-                                                        fontWeight = FontWeight.SemiBold,
-                                                        color = CrimsonLight
-                                                    )
-                                                }
-                                            }
-                                        } else {
-                                            val elapsedSec = (currentTimeMs - item.timestamp) / 1000
-                                            val timeStr = when {
-                                                elapsedSec < 60 -> "Just now"
-                                                elapsedSec < 3600 -> "${elapsedSec / 60}m ago"
-                                                else -> "${elapsedSec / 3600}h ago"
-                                            }
-                                            Text(
-                                                text = timeStr,
-                                                fontSize = 10.sp,
-                                                color = TextMuted
-                                            )
-                                        }
+                                        // Isolated Auto-delete countdown badge
+                                        HistoryCountdownBadge(
+                                            itemTimestamp = item.timestamp,
+                                            autoDeleteMinutes = settings.autoDeleteMinutes,
+                                            autoDeleteEnabled = settings.autoDeleteHistory
+                                        )
                                     }
                                 }
 
@@ -2407,7 +2435,7 @@ fun HistoryTab(
                                     Icon(
                                         Icons.Default.Close,
                                         contentDescription = "Delete item",
-                                        tint = TextMuted,
+                                        tint = AccentRed,
                                         modifier = Modifier.size(16.dp)
                                     )
                                 }
@@ -2419,7 +2447,7 @@ fun HistoryTab(
                                         .fillMaxWidth()
                                         .clip(RoundedCornerShape(8.dp))
                                         .background(DarkSurfaceVariant)
-                                        .border(1.dp, CrimsonPrimary.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
+                                        .border(1.dp, AccentPurple.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
                                         .padding(horizontal = 8.dp, vertical = 5.dp)
                                 ) {
                                     Row(
@@ -2429,14 +2457,14 @@ fun HistoryTab(
                                         Icon(
                                             imageVector = Icons.Default.Translate,
                                             contentDescription = null,
-                                            tint = CrimsonLight,
+                                            tint = AccentPurpleLight,
                                             modifier = Modifier.size(12.dp)
                                         )
                                         Text(
                                             text = "Meaning: ${item.englishMeaning}",
                                             fontSize = 11.sp,
                                             fontWeight = FontWeight.Medium,
-                                            color = CrimsonLight
+                                            color = AccentPurpleLight
                                         )
                                     }
                                 }
@@ -2468,7 +2496,7 @@ fun HistoryTab(
                                         Icon(
                                             Icons.Default.ContentCopy,
                                             contentDescription = "Copy",
-                                            tint = CrimsonPrimary,
+                                            tint = AccentBlue,
                                             modifier = Modifier.size(14.dp)
                                         )
                                     }
