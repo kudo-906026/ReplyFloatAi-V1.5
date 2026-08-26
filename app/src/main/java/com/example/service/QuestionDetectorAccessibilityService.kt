@@ -1,377 +1,299 @@
 package com.example.service
 
 import android.accessibilityservice.AccessibilityService
-import android.accessibilityservice.AccessibilityServiceInfo
 import android.graphics.Bitmap
 import android.os.Build
-import android.util.Log
 import android.view.Display
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
+import com.example.ai.OcrRecognitionEngine
+import com.example.ai.QuestionDetectionEngine
+import com.example.model.DetectionMethod
+import com.example.model.DetectionResultType
 import com.example.state.AppStateManager
-import com.example.util.QuestionValidator
-import com.google.mlkit.vision.common.InputImage
-import com.google.mlkit.vision.text.Text
-import com.google.mlkit.vision.text.TextRecognition
-import com.google.mlkit.vision.text.TextRecognizer
-import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import java.util.concurrent.atomic.AtomicBoolean
 
 class QuestionDetectorAccessibilityService : AccessibilityService() {
 
-    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-    private var scanJob: Job? = null
-    private var periodicOcrJob: Job? = null
-    private var lastEmittedQuestionNormalized: String? = null
-    private val localEmittedQuestions = LinkedHashSet<String>()
-    private val isOcrRunning = AtomicBoolean(false)
+    private var lastProcessedText: String = ""
+    private var lastProcessedTime: Long = 0L
+    private var lastOcrScanTime: Long = 0L
+    private var isOcrProcessing: Boolean = false
 
-    private val textRecognizer: TextRecognizer by lazy {
-        TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
-    }
+    // Background coroutine scope ensuring zero UI/main thread blocking
+    private val serviceScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 
     override fun onServiceConnected() {
         super.onServiceConnected()
-        Log.d(TAG, "QuestionDetectorAccessibilityService connected")
-        AppStateManager.init(this)
         AppStateManager.setAccessibilityRunning(true)
-
-        val info = serviceInfo ?: AccessibilityServiceInfo()
-        info.eventTypes = AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED or
-                AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED or
-                AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED
-        info.feedbackType = AccessibilityServiceInfo.FEEDBACK_GENERIC
-        info.flags = AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS or
-                AccessibilityServiceInfo.FLAG_INCLUDE_NOT_IMPORTANT_VIEWS
-        info.notificationTimeout = 600
-        serviceInfo = info
-
-        startPeriodicOcrWorker()
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event == null) return
 
-        // 1. If scanning is paused by user, immediately ignore all accessibility events
-        if (!AppStateManager.settings.value.scanningEnabled) {
+        val pkgName = event.packageName?.toString() ?: return
+
+        // Check if package is whitelisted
+        val settings = AppStateManager.settings.value
+        val whitelistedApp = settings.appsWhitelist.find { it.packageName == pkgName && it.isEnabled }
+        if (whitelistedApp == null) return
+
+        val now = System.currentTimeMillis()
+        if (now - lastProcessedTime < settings.smartDebounceMs) {
+            // Debounce active
             return
         }
 
-        // Skip events from our own app and overlay windows
-        val packageName = event.packageName?.toString() ?: ""
-        if (isOurAppPackage(packageName)) {
-            return
-        }
+        val appName = whitelistedApp.appName
 
-        // Filter out rapid micro-events: skip non-textual cursor/selection fluctuations
-        val eventType = event.eventType
-        if (eventType == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED) {
-            val changeTypes = event.contentChangeTypes
-            if (changeTypes != 0 && (changeTypes and (AccessibilityEvent.CONTENT_CHANGE_TYPE_TEXT or AccessibilityEvent.CONTENT_CHANGE_TYPE_SUBTREE)) == 0) {
+        // 1. PRIMARY SCAN: Fast Accessibility Node / Event Text Scan (Instant, zero latency)
+        val eventTexts = event.text.mapNotNull { it?.toString() }
+        for (raw in eventTexts) {
+            if (processCandidateText(raw, appName, pkgName, "AccessibilityEvent.text")) {
+                lastProcessedTime = now
                 return
             }
         }
 
-        // Debounce scanning to ~700ms to ensure the screen stabilizes
-        scanJob?.cancel()
-        scanJob = serviceScope.launch {
-            delay(700)
-            scanActiveWindowForQuestions(packageName)
-        }
-    }
-
-    private fun startPeriodicOcrWorker() {
-        periodicOcrJob?.cancel()
-        periodicOcrJob = serviceScope.launch {
-            while (true) {
-                delay(2500)
-                try {
-                    val settings = AppStateManager.settings.value
-                    if (settings.scanningEnabled && !AppStateManager.isGenerating.value) {
-                        // Opportunistic fallback check for game screens or custom canvas apps
-                        triggerOcrScreenScan("Game/Custom-UI Canvas")
-                    }
-                } catch (e: Exception) {
-                    Log.d(TAG, "Periodic OCR cycle caught exception: ${e.message}")
-                }
-            }
-        }
-    }
-
-    private fun scanActiveWindowForQuestions(sourcePackage: String) {
-        // Double check scanning is enabled
-        if (!AppStateManager.settings.value.scanningEnabled) return
-        if (isOurAppPackage(sourcePackage)) return
-
-        val rootNode = try {
-            rootInActiveWindow
-        } catch (e: Exception) {
-            Log.e(TAG, "Error getting root in active window", e)
-            null
-        }
-
-        // Verify root node doesn't belong to our app/overlay
-        val rootPkg = rootNode?.packageName?.toString() ?: ""
-        if (isOurAppPackage(rootPkg)) {
-            return
-        }
-
-        var foundQuestionInNodes = false
-
-        if (rootNode != null) {
+        // 2. Scan window node hierarchy
+        var foundAnyReadableNodes = false
+        if (settings.continuousScreenAnalysis) {
             try {
-                val questions = ArrayList<String>(4)
-                findQuestionsInNode(rootNode, questions, 0)
+                rootInActiveWindow?.let { rootNode ->
+                    val collectedCandidates = mutableListOf<String>()
+                    collectTextNodesSafely(rootNode, collectedCandidates, currentDepth = 0, maxDepth = 8, maxNodes = 40)
 
-                if (questions.isNotEmpty()) {
-                    val targetQuestion = questions.lastOrNull()
-                    if (!targetQuestion.isNullOrBlank()) {
-                        val normalized = normalizeForDedup(targetQuestion)
-                        if (normalized.isNotBlank()) {
-                            if (normalized != lastEmittedQuestionNormalized && !localEmittedQuestions.contains(normalized)) {
-                                markAndEmitQuestion(targetQuestion, normalized, sourcePackage, isOcr = false)
-                                foundQuestionInNodes = true
-                            } else {
-                                foundQuestionInNodes = true
+                    if (collectedCandidates.isNotEmpty()) {
+                        foundAnyReadableNodes = true
+                    }
+
+                    // Test individual text nodes first
+                    for (candidate in collectedCandidates) {
+                        if (processCandidateText(candidate, appName, pkgName, "ScreenNode")) {
+                            lastProcessedTime = now
+                            return
+                        }
+                    }
+
+                    // Test concatenated sibling text if multiple consecutive text segments exist
+                    if (collectedCandidates.size > 1) {
+                        val combined = collectedCandidates.take(5).joinToString(" ").trim()
+                        if (combined.length > 6 && combined != lastProcessedText) {
+                            if (processCandidateText(combined, appName, pkgName, "ConcatenatedNodes")) {
+                                lastProcessedTime = now
+                                return
                             }
                         }
                     }
                 }
-            } catch (e: Exception) {
-                Log.e(TAG, "Error scanning accessibility nodes", e)
+            } catch (_: Exception) {
+                // Safeguard against framework access exceptions
             }
         }
 
-        // If native node scanning found nothing (e.g. Unity, Cocos2d, Flutter custom canvas, games),
-        // invoke OCR screen text recognition to capture text directly from the screen
-        if (!foundQuestionInNodes) {
-            triggerOcrScreenScan(sourcePackage)
+        // 3. OCR FALLBACK ONLY: Trigger on-device ML Kit OCR ONLY when accessibility found NO readable text
+        if (!foundAnyReadableNodes && settings.enableOcrFallback) {
+            triggerOcrFallbackIfEligible(appName, pkgName, now, settings.ocrDebounceMs)
         }
     }
 
-    private fun triggerOcrScreenScan(sourcePackage: String) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return
-        if (!AppStateManager.settings.value.scanningEnabled) return
-        if (isOcrRunning.getAndSet(true)) return
+    private fun triggerOcrFallbackIfEligible(appName: String, pkgName: String, now: Long, ocrDebounceMs: Int) {
+        if (isOcrProcessing || (now - lastOcrScanTime < ocrDebounceMs)) {
+            return
+        }
 
-        try {
-            takeScreenshot(
-                Display.DEFAULT_DISPLAY,
-                mainExecutor,
-                object : TakeScreenshotCallback {
-                    override fun onSuccess(screenshotResult: ScreenshotResult) {
-                        serviceScope.launch {
-                            try {
-                                val hardwareBuffer = screenshotResult.hardwareBuffer
-                                val colorSpace = screenshotResult.colorSpace
-                                val bitmap = Bitmap.wrapHardwareBuffer(hardwareBuffer, colorSpace)
-                                    ?.copy(Bitmap.Config.ARGB_8888, false)
+        lastOcrScanTime = now
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            isOcrProcessing = true
+
+            try {
+                takeScreenshot(
+                    Display.DEFAULT_DISPLAY,
+                    applicationContext.mainExecutor,
+                    object : TakeScreenshotCallback {
+                        override fun onSuccess(screenshotResult: ScreenshotResult) {
+                            val hardwareBuffer = screenshotResult.hardwareBuffer
+                            val colorSpace = screenshotResult.colorSpace
+                            val bitmap = try {
+                                Bitmap.wrapHardwareBuffer(hardwareBuffer, colorSpace)
+                            } catch (_: Exception) {
+                                null
+                            } finally {
                                 hardwareBuffer.close()
-
-                                if (bitmap != null) {
-                                    runOcrOnBitmap(bitmap, sourcePackage)
-                                } else {
-                                    isOcrRunning.set(false)
-                                }
-                            } catch (e: Throwable) {
-                                Log.e(TAG, "Error decoding screenshot bitmap", e)
-                                isOcrRunning.set(false)
                             }
+
+                            if (bitmap != null) {
+                                val softwareCopy = try {
+                                    bitmap.copy(Bitmap.Config.ARGB_8888, false)
+                                } catch (_: Exception) {
+                                    null
+                                }
+
+                                if (softwareCopy != null) {
+                                    // Process entirely on background coroutine
+                                    serviceScope.launch(Dispatchers.Default) {
+                                        try {
+                                            runOcrProcessingOnBackground(softwareCopy, appName, pkgName)
+                                        } finally {
+                                            isOcrProcessing = false
+                                        }
+                                    }
+                                    return
+                                }
+                            }
+                            isOcrProcessing = false
+                        }
+
+                        override fun onFailure(errorCode: Int) {
+                            isOcrProcessing = false
+                            AppStateManager.addDiagnosticLog(
+                                source = "$appName (Screen Capture)",
+                                rawText = "[No Accessibility Text]",
+                                result = DetectionResultType.REJECTED,
+                                category = "SCREENSHOT_UNAVAILABLE",
+                                reason = "Screen capture failed with error code $errorCode. Window is protected or uncapturable.",
+                                detectionMethod = DetectionMethod.MLKIT_OCR
+                            )
                         }
                     }
-
-                    override fun onFailure(errorCode: Int) {
-                        Log.d(TAG, "Accessibility takeScreenshot failed with code: $errorCode")
-                        isOcrRunning.set(false)
-                    }
-                }
+                )
+            } catch (e: Exception) {
+                isOcrProcessing = false
+            }
+        } else {
+            // Android API < 30
+            AppStateManager.addDiagnosticLog(
+                source = "$appName (Accessibility Scan)",
+                rawText = "[No Text Nodes Found]",
+                result = DetectionResultType.REJECTED,
+                category = "ACCESSIBILITY_EMPTY",
+                reason = "Accessibility scan found 0 text nodes. (On-Device OCR fallback requires Android 11+ / API 30+).",
+                detectionMethod = DetectionMethod.ACCESSIBILITY
             )
-        } catch (e: Throwable) {
-            Log.e(TAG, "takeScreenshot invocation error", e)
-            isOcrRunning.set(false)
         }
     }
 
-    private fun runOcrOnBitmap(bitmap: Bitmap, sourcePackage: String) {
-        try {
-            val inputImage = InputImage.fromBitmap(bitmap, 0)
-            textRecognizer.process(inputImage)
-                .addOnSuccessListener { visionText ->
-                    try {
-                        bitmap.recycle()
-                        handleOcrResults(visionText, sourcePackage)
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Error handling OCR text results", e)
-                    } finally {
-                        isOcrRunning.set(false)
-                    }
-                }
-                .addOnFailureListener { e ->
-                    bitmap.recycle()
-                    isOcrRunning.set(false)
-                    Log.w(TAG, "OCR recognition process failed", e)
-                }
-        } catch (e: Throwable) {
-            bitmap.recycle()
-            isOcrRunning.set(false)
-            Log.e(TAG, "Error preparing image for OCR", e)
-        }
-    }
+    private suspend fun runOcrProcessingOnBackground(bitmap: Bitmap, appName: String, pkgName: String) {
+        val ocrResult = OcrRecognitionEngine.recognizeTextFromBitmap(bitmap)
+        val settings = AppStateManager.settings.value
+        val analysis = OcrRecognitionEngine.analyzeOcrOutput(ocrResult, settings.detectQuestionsOnly)
 
-    private fun handleOcrResults(visionText: Text, sourcePackage: String) {
-        if (!AppStateManager.settings.value.scanningEnabled) return
-
-        val detectedCandidates = mutableListOf<String>()
-
-        for (block in visionText.textBlocks) {
-            val blockText = block.text
-            if (isInternalOverlayText(blockText)) continue
-
-            // 1. First inspect individual lines (game chats, in-app messages)
-            for (line in block.lines) {
-                val lineText = line.text
-                if (isInternalOverlayText(lineText)) continue
-                val question = QuestionValidator.cleanAndExtractQuestion(lineText)
-                if (question != null && !detectedCandidates.contains(question)) {
-                    detectedCandidates.add(question)
-                }
+        if (analysis.isQuestion && ocrResult.rawText.isNotBlank()) {
+            if (ocrResult.rawText != lastProcessedText) {
+                lastProcessedText = ocrResult.rawText
+                AppStateManager.onQuestionDetected(
+                    context = this@QuestionDetectorAccessibilityService,
+                    text = ocrResult.rawText,
+                    sourceApp = appName,
+                    packageName = pkgName,
+                    forcedBypass = true,
+                    detectionMethod = DetectionMethod.MLKIT_OCR,
+                    ocrLatencyMs = ocrResult.latencyMs
+                )
             }
-
-            // 2. Also inspect multi-line block content
-            val blockQuestion = QuestionValidator.cleanAndExtractQuestion(blockText)
-            if (blockQuestion != null && !detectedCandidates.contains(blockQuestion)) {
-                detectedCandidates.add(blockQuestion)
-            }
-        }
-
-        if (detectedCandidates.isNotEmpty()) {
-            val targetQuestion = detectedCandidates.last()
-            val normalized = normalizeForDedup(targetQuestion)
-            if (normalized.isNotBlank()) {
-                if (normalized != lastEmittedQuestionNormalized && !localEmittedQuestions.contains(normalized)) {
-                    markAndEmitQuestion(targetQuestion, normalized, sourcePackage, isOcr = true)
-                }
-            }
+        } else {
+            // Log rejection diagnostic clearly identifying ML Kit OCR Fallback
+            AppStateManager.addDiagnosticLog(
+                source = "$appName (ML Kit OCR Fallback)",
+                rawText = if (ocrResult.rawText.isNotBlank()) ocrResult.rawText else "[No OCR Text in Image]",
+                result = DetectionResultType.REJECTED,
+                category = analysis.category,
+                reason = if (ocrResult.rawText.isBlank()) {
+                    "Accessibility returned 0 nodes. ML Kit OCR scanned screen in ${ocrResult.latencyMs}ms but found no readable text."
+                } else {
+                    "Accessibility returned 0 nodes. ML Kit OCR extracted text in ${ocrResult.latencyMs}ms: ${analysis.reason}"
+                },
+                detectionMethod = DetectionMethod.MLKIT_OCR,
+                latencyMs = ocrResult.latencyMs
+            )
         }
     }
 
-    private fun markAndEmitQuestion(
-        questionText: String,
-        normalized: String,
-        sourcePackage: String,
-        isOcr: Boolean
-    ) {
-        localEmittedQuestions.add(normalized)
-        if (localEmittedQuestions.size > 60) {
-            val it = localEmittedQuestions.iterator()
-            if (it.hasNext()) {
-                it.next()
-                it.remove()
-            }
-        }
-        lastEmittedQuestionNormalized = normalized
-
-        val tagPrefix = if (isOcr) "[OCR_SCREEN_SCAN]" else "[NATIVE_A11Y_NODE]"
-        Log.d(TAG, "$tagPrefix Detected question: \"$questionText\" (Source: $sourcePackage)")
-        AppStateManager.onQuestionDetected(questionText, sourcePackage, force = false)
-    }
-
-    private fun normalizeForDedup(raw: String): String {
-        return raw.lowercase()
-            .replace(Regex("[^a-zA-Z0-9\\s]"), "")
-            .replace(Regex("\\s+"), " ")
-            .trim()
-    }
-
-    private fun findQuestionsInNode(
+    private fun collectTextNodesSafely(
         node: AccessibilityNodeInfo?,
-        outQuestions: MutableList<String>,
-        depth: Int
+        outList: MutableList<String>,
+        currentDepth: Int,
+        maxDepth: Int,
+        maxNodes: Int
     ) {
-        if (node == null || depth > 10 || outQuestions.size >= 5) return
+        if (node == null || currentDepth > maxDepth || outList.size >= maxNodes) return
 
-        // Exclude our own app's nodes / overlay elements
-        val nodePkg = node.packageName?.toString() ?: ""
-        if (isOurAppPackage(nodePkg)) {
-            return
-        }
-
-        // Skip invisible nodes to reduce traversal overhead
-        if (!node.isVisibleToUser) {
-            return
-        }
-
-        // Check text and contentDescription
         val text = node.text?.toString()?.trim()
-        val desc = node.contentDescription?.toString()?.trim()
+        if (!text.isNullOrBlank() && text.length >= 3) {
+            outList.add(text)
+        }
 
-        checkAndAddQuestion(text, outQuestions)
-        checkAndAddQuestion(desc, outQuestions)
+        val contentDesc = node.contentDescription?.toString()?.trim()
+        if (!contentDesc.isNullOrBlank() && contentDesc.length >= 3 && contentDesc != text) {
+            outList.add(contentDesc)
+        }
 
         val childCount = node.childCount
         for (i in 0 until childCount) {
+            if (outList.size >= maxNodes) break
             val child = try {
                 node.getChild(i)
             } catch (_: Exception) {
                 null
             }
             if (child != null) {
-                findQuestionsInNode(child, outQuestions, depth + 1)
+                collectTextNodesSafely(child, outList, currentDepth + 1, maxDepth, maxNodes)
             }
         }
     }
 
-    private fun checkAndAddQuestion(text: String?, outQuestions: MutableList<String>) {
-        if (text.isNullOrBlank() || text.length < 3) return
-        if (isInternalOverlayText(text)) return
+    private fun processCandidateText(raw: String, appName: String, pkgName: String, sourceTag: String): Boolean {
+        val trimmed = raw.trim()
+        if (trimmed.length < 3) return false
 
-        val extractedQuestion = QuestionValidator.cleanAndExtractQuestion(text)
-        if (extractedQuestion != null && !outQuestions.contains(extractedQuestion)) {
-            outQuestions.add(extractedQuestion)
+        // Prevent duplicate processing of the exact same message within short period
+        if (trimmed == lastProcessedText) {
+            return false
         }
-    }
 
-    private fun isOurAppPackage(pkg: String): Boolean {
-        if (pkg.isBlank()) return false
-        return pkg == this.packageName ||
-                pkg == "com.example" ||
-                pkg.contains("replyfloatai", ignoreCase = true)
-    }
+        val settings = AppStateManager.settings.value
+        val analysis = QuestionDetectionEngine.analyze(trimmed, settings.detectQuestionsOnly)
 
-    private fun isInternalOverlayText(text: String): Boolean {
-        val lower = text.lowercase()
-        return lower.contains("replyfloatai") ||
-                lower.contains("detected question") ||
-                lower.contains("suggested replies") ||
-                lower.contains("couldn't generate reply") ||
-                lower.contains("generating replies") ||
-                lower.contains("tap to retry") ||
-                lower.contains("gemini is crafting") ||
-                lower.contains("ai studio key active")
+        if (analysis.isQuestion) {
+            lastProcessedText = trimmed
+            AppStateManager.onQuestionDetected(
+                context = this,
+                text = trimmed,
+                sourceApp = appName,
+                packageName = pkgName,
+                forcedBypass = true,
+                detectionMethod = DetectionMethod.ACCESSIBILITY
+            )
+            return true
+        } else {
+            // Log rejection diagnostic so it is transparent that scanning ran
+            AppStateManager.addDiagnosticLog(
+                source = "$appName ($sourceTag)",
+                rawText = trimmed,
+                result = DetectionResultType.REJECTED,
+                category = analysis.category,
+                reason = analysis.reason,
+                detectionMethod = DetectionMethod.ACCESSIBILITY
+            )
+        }
+
+        return false
     }
 
     override fun onInterrupt() {
-        Log.d(TAG, "QuestionDetectorAccessibilityService interrupted")
+        AppStateManager.setAccessibilityRunning(false)
     }
 
     override fun onDestroy() {
-        super.onDestroy()
-        Log.d(TAG, "QuestionDetectorAccessibilityService destroyed")
         AppStateManager.setAccessibilityRunning(false)
         serviceScope.cancel()
-        try {
-            textRecognizer.close()
-        } catch (_: Exception) {}
-    }
-
-    companion object {
-        private const val TAG = "QuestionDetectorService"
+        super.onDestroy()
     }
 }
+
+

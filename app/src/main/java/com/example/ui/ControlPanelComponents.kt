@@ -1,8 +1,11 @@
 package com.example.ui
 
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -15,19 +18,20 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Circle
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -43,47 +47,56 @@ import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.theme.AccentBlue
-import com.example.ui.theme.AccentBlueLight
 import com.example.ui.theme.AccentGreen
+import com.example.ui.theme.AccentGreenLight
 import com.example.ui.theme.AccentPurple
-import com.example.ui.theme.AccentRed
+import com.example.ui.theme.AccentPurpleLight
+import com.example.ui.theme.AccentYellow
+import com.example.ui.theme.CrimsonDark
+import com.example.ui.theme.CrimsonLight
 import com.example.ui.theme.CrimsonPrimary
 import com.example.ui.theme.DarkBg
 import com.example.ui.theme.DarkCard
 import com.example.ui.theme.DarkCardBorder
 import com.example.ui.theme.DarkCardElevated
+import com.example.ui.theme.DarkSurfaceCard
 import com.example.ui.theme.DarkSurfaceVariant
+import com.example.ui.theme.TechBlue
+import com.example.ui.theme.TechGreen
 import com.example.ui.theme.TextMuted
+import com.example.ui.theme.TextPrimary
+import com.example.ui.theme.TextSecondary
+import com.example.ui.theme.TextWhite
 
-/**
- * Modifier that draws a soft outer glow shadow matching the element's category color
- */
 fun Modifier.softGlow(
-    radius: Dp = 8.dp,
-    color: Color = AccentBlue.copy(alpha = 0.35f),
-    shapeRadius: Dp = 14.dp
+    color: Color = CrimsonPrimary.copy(alpha = 0.35f),
+    radius: Dp = 12.dp,
+    shapeRadius: Dp = 16.dp
 ): Modifier = this.drawBehind {
-    drawIntoCanvas { canvas ->
+    val transparentColor = color.copy(alpha = 0.0f).toArgb()
+    val shadowColor = color.toArgb()
+    this.drawIntoCanvas {
         val paint = Paint()
         val frameworkPaint = paint.asFrameworkPaint()
-        frameworkPaint.color = android.graphics.Color.TRANSPARENT
+        frameworkPaint.color = transparentColor
         frameworkPaint.setShadowLayer(
             radius.toPx(),
             0f,
             0f,
-            color.toArgb()
+            shadowColor
         )
-        canvas.drawRoundRect(
+        it.drawRoundRect(
             0f,
             0f,
-            size.width,
-            size.height,
+            this.size.width,
+            this.size.height,
             shapeRadius.toPx(),
             shapeRadius.toPx(),
             paint
@@ -91,147 +104,49 @@ fun Modifier.softGlow(
     }
 }
 
-/**
- * Backward-compatible alias for softGlow
- */
-fun Modifier.crimsonGlow(
-    radius: Dp = 8.dp,
-    color: Color = AccentRed.copy(alpha = 0.35f),
-    shapeRadius: Dp = 14.dp
-): Modifier = softGlow(radius = radius, color = color, shapeRadius = shapeRadius)
-
-/**
- * Pill-shaped switch with smooth color transitions and customizable category-based active color
- */
-@Composable
-fun ControlPanelSwitch(
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit,
-    modifier: Modifier = Modifier,
-    activeColor: Color = AccentBlue,
-    enabled: Boolean = true
-) {
-    val trackWidth = 46.dp
-    val trackHeight = 26.dp
-    val thumbSize = 20.dp
-    val padding = 3.dp
-
-    val targetOffset = if (checked) trackWidth - thumbSize - padding else padding
-    val animatedOffset by animateDpAsState(
-        targetValue = targetOffset,
-        animationSpec = tween(durationMillis = 200),
-        label = "switch_thumb"
-    )
-
-    val trackColor by animateColorAsState(
-        targetValue = if (checked) activeColor else Color(0xFF19202E),
-        animationSpec = tween(durationMillis = 200),
-        label = "switch_track"
-    )
-
-    val borderColor by animateColorAsState(
-        targetValue = if (checked) activeColor.copy(alpha = 0.85f) else DarkCardBorder,
-        animationSpec = tween(durationMillis = 200),
-        label = "switch_border"
-    )
-
-    val thumbColor by animateColorAsState(
-        targetValue = if (checked) Color.White else Color(0xFF94A3B8),
-        animationSpec = tween(durationMillis = 200),
-        label = "switch_thumb_color"
-    )
-
-    val glowModifier = if (checked) {
-        Modifier.softGlow(radius = 6.dp, color = activeColor.copy(alpha = 0.4f), shapeRadius = 14.dp)
-    } else {
-        Modifier
-    }
-
-    Box(
-        modifier = modifier
-            .then(glowModifier)
-            .size(trackWidth, trackHeight)
-            .clip(CircleShape)
-            .background(trackColor)
-            .border(1.dp, borderColor, CircleShape)
-            .clickable(
-                enabled = enabled,
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null
-            ) { onCheckedChange(!checked) },
-        contentAlignment = Alignment.CenterStart
-    ) {
-        Box(
-            modifier = Modifier
-                .offset(x = animatedOffset)
-                .size(thumbSize)
-                .shadow(elevation = if (checked) 3.dp else 1.dp, shape = CircleShape)
-                .clip(CircleShape)
-                .background(thumbColor)
-        )
-    }
-}
-
-/**
- * Standard Control Panel Card with subtle border and colored glow matching its category
- */
 @Composable
 fun ControlPanelCard(
     modifier: Modifier = Modifier,
     isSelected: Boolean = false,
-    activeColor: Color = AccentBlue,
+    activeColor: Color = CrimsonPrimary,
+    shapeRadius: Dp = 16.dp,
     onClick: (() -> Unit)? = null,
-    shapeRadius: Dp = 14.dp,
-    shape: androidx.compose.ui.graphics.Shape = RoundedCornerShape(shapeRadius),
-    border: BorderStroke? = null,
     content: @Composable () -> Unit
 ) {
-    val targetBorderColor by animateColorAsState(
-        targetValue = if (isSelected) activeColor else DarkCardBorder,
-        animationSpec = tween(durationMillis = 200),
-        label = "card_border"
-    )
-
-    val bgColor by animateColorAsState(
-        targetValue = if (isSelected) DarkCardElevated else DarkCard,
-        animationSpec = tween(durationMillis = 200),
-        label = "card_bg"
-    )
-
-    val glowModifier = if (isSelected) {
-        Modifier.softGlow(radius = 10.dp, color = activeColor.copy(alpha = 0.28f), shapeRadius = shapeRadius)
-    } else {
-        Modifier
-    }
+    val borderColor = if (isSelected) activeColor else DarkCardBorder
+    val borderWidth = if (isSelected) 1.5.dp else 1.dp
+    val containerColor = if (isSelected) DarkCardElevated else DarkCard
 
     Card(
         modifier = modifier
-            .then(glowModifier)
-            .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier),
-        shape = shape,
-        colors = CardDefaults.cardColors(containerColor = bgColor),
-        border = border ?: BorderStroke(if (isSelected) 1.5.dp else 1.dp, targetBorderColor)
+            .then(
+                if (onClick != null) {
+                    Modifier
+                        .clip(RoundedCornerShape(shapeRadius))
+                        .clickable { onClick() }
+                } else Modifier
+            )
+            .border(borderWidth, borderColor, RoundedCornerShape(shapeRadius)),
+        shape = RoundedCornerShape(shapeRadius),
+        colors = CardDefaults.cardColors(containerColor = containerColor),
+        elevation = CardDefaults.cardElevation(defaultElevation = if (isSelected) 4.dp else 1.dp)
     ) {
         content()
     }
 }
 
-/**
- * Section Header for Control Panel modules with custom category accent color
- */
 @Composable
 fun ControlPanelSectionHeader(
     title: String,
     icon: ImageVector? = null,
-    accentColor: Color = AccentBlue,
+    accentColor: Color = CrimsonPrimary,
     badgeText: String? = null,
-    badgeColor: Color = accentColor,
-    modifier: Modifier = Modifier
+    badgeColor: Color = TechGreen
 ) {
     Row(
-        modifier = modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -240,65 +155,133 @@ fun ControlPanelSectionHeader(
             if (icon != null) {
                 Box(
                     modifier = Modifier
-                        .size(26.dp)
+                        .size(24.dp)
                         .clip(RoundedCornerShape(6.dp))
-                        .background(accentColor.copy(alpha = 0.15f))
-                        .border(1.dp, accentColor.copy(alpha = 0.35f), RoundedCornerShape(6.dp)),
+                        .background(accentColor.copy(alpha = 0.15f)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = icon,
                         contentDescription = null,
                         tint = accentColor,
-                        modifier = Modifier.size(15.dp)
+                        modifier = Modifier.size(14.dp)
                     )
                 }
+            } else {
+                Box(
+                    modifier = Modifier
+                        .size(4.dp, 14.dp)
+                        .clip(RoundedCornerShape(2.dp))
+                        .background(accentColor)
+                )
             }
+
             Text(
-                text = title,
-                fontSize = 11.5.sp,
+                text = title.uppercase(),
+                fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
-                color = accentColor,
-                letterSpacing = 0.8.sp
+                letterSpacing = 0.8.sp,
+                color = TextWhite
             )
         }
 
         if (badgeText != null) {
-            Surface(
-                shape = RoundedCornerShape(6.dp),
-                color = badgeColor.copy(alpha = 0.12f),
-                border = BorderStroke(1.dp, badgeColor.copy(alpha = 0.3f))
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(badgeColor.copy(alpha = 0.15f))
+                    .border(0.8.dp, badgeColor.copy(alpha = 0.4f), RoundedCornerShape(6.dp))
+                    .padding(horizontal = 6.dp, vertical = 2.dp)
             ) {
                 Text(
                     text = badgeText,
                     fontSize = 10.sp,
                     fontFamily = FontFamily.Monospace,
                     fontWeight = FontWeight.Bold,
-                    color = badgeColor,
-                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                    color = badgeColor
                 )
             }
         }
     }
 }
 
-/**
- * Monospace technical display value
- */
 @Composable
 fun MonospaceValue(
     text: String,
-    modifier: Modifier = Modifier,
-    color: Color = MaterialTheme.colorScheme.onSurface,
-    fontSize: androidx.compose.ui.unit.TextUnit = 12.sp,
-    fontWeight: FontWeight = FontWeight.Medium
+    color: Color = TechBlue
 ) {
-    Text(
-        text = text,
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(6.dp))
+            .background(DarkSurfaceVariant)
+            .border(1.dp, DarkCardBorder, RoundedCornerShape(6.dp))
+            .padding(horizontal = 8.dp, vertical = 3.dp)
+    ) {
+        Text(
+            text = text,
+            fontFamily = FontFamily.Monospace,
+            fontSize = 11.5.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = color
+        )
+    }
+}
+
+@Composable
+fun ControlPanelSwitch(
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+    activeColor: Color = CrimsonPrimary
+) {
+    Switch(
+        checked = checked,
+        onCheckedChange = onCheckedChange,
         modifier = modifier,
-        fontFamily = FontFamily.Monospace,
-        fontSize = fontSize,
-        fontWeight = fontWeight,
-        color = color
+        colors = SwitchDefaults.colors(
+            checkedThumbColor = Color.White,
+            checkedTrackColor = activeColor,
+            uncheckedThumbColor = TextMuted,
+            uncheckedTrackColor = DarkSurfaceVariant,
+            uncheckedBorderColor = DarkCardBorder
+        )
     )
+}
+
+enum class StatusBadgeStyle {
+    GREEN_LIVE,
+    PURPLE_AI,
+    BLUE_INFO,
+    RED_WARNING,
+    MUTED_OFF
+}
+
+@Composable
+fun StatusBadge(
+    text: String,
+    style: StatusBadgeStyle = StatusBadgeStyle.GREEN_LIVE
+) {
+    val (bgColor, borderColor, textColor) = when (style) {
+        StatusBadgeStyle.GREEN_LIVE -> Triple(AccentGreen.copy(alpha = 0.15f), AccentGreen.copy(alpha = 0.4f), AccentGreenLight)
+        StatusBadgeStyle.PURPLE_AI -> Triple(AccentPurple.copy(alpha = 0.15f), AccentPurple.copy(alpha = 0.4f), AccentPurpleLight)
+        StatusBadgeStyle.BLUE_INFO -> Triple(TechBlue.copy(alpha = 0.15f), TechBlue.copy(alpha = 0.4f), TechBlue)
+        StatusBadgeStyle.RED_WARNING -> Triple(CrimsonPrimary.copy(alpha = 0.15f), CrimsonPrimary.copy(alpha = 0.4f), CrimsonLight)
+        StatusBadgeStyle.MUTED_OFF -> Triple(DarkSurfaceVariant, DarkCardBorder, TextMuted)
+    }
+
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(6.dp))
+            .background(bgColor)
+            .border(1.dp, borderColor, RoundedCornerShape(6.dp))
+            .padding(horizontal = 7.dp, vertical = 3.dp)
+    ) {
+        Text(
+            text = text,
+            fontSize = 10.5.sp,
+            fontWeight = FontWeight.Bold,
+            fontFamily = FontFamily.Monospace,
+            color = textColor
+        )
+    }
 }

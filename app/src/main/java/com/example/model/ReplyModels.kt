@@ -2,229 +2,235 @@ package com.example.model
 
 import java.util.UUID
 
-enum class AiProvider(
+enum class AiProviderType {
+    GEMINI_BUILTIN,
+    GEMINI_API,
+    OPENAI,
+    ANTHROPIC,
+    DEEPSEEK,
+    OLLAMA_LOCAL,
+    CUSTOM_REST
+}
+
+enum class AiModelTier(val label: String, val badge: String) {
+    BALANCED("Balanced", "Fast & Smart"),
+    LIGHTWEIGHT("Lightweight", "Ultra-Fast"),
+    PRO("Pro / Reasoning", "Deep Reasoning")
+}
+
+data class AiProvider(
     val id: String,
+    val type: AiProviderType,
+    val name: String,
     val displayName: String,
-    val defaultModel: String,
-    val hint: String
-) {
-    GEMINI(
-        id = "gemini",
-        displayName = "Gemini",
-        defaultModel = "gemini-3.1-flash-lite-preview",
-        hint = "Google AI Studio Key"
-    ),
-    OPENAI(
-        id = "openai",
-        displayName = "OpenAI",
-        defaultModel = "gpt-4o-mini",
-        hint = "OpenAI API Key (sk-...)"
-    ),
-    CLAUDE(
-        id = "claude",
-        displayName = "Claude",
-        defaultModel = "claude-3-5-haiku-20241022",
-        hint = "Anthropic Claude Key (sk-ant-...)"
-    ),
-    GROK(
-        id = "grok",
-        displayName = "Grok",
-        defaultModel = "grok-2-latest",
-        hint = "xAI API Key (xai-...)"
-    );
-
-    val modelName: String get() = defaultModel
-
-    companion object {
-        fun fromId(id: String): AiProvider {
-            return entries.firstOrNull { it.id.equals(id, ignoreCase = true) } ?: GEMINI
-        }
-    }
-}
-
-enum class ProviderSelectionMode(val id: String, val label: String, val description: String) {
-    AUTO_FALLBACK(
-        id = "auto",
-        label = "Auto Fallback Chain",
-        description = "Sequentially attempts providers in fallback chain order on error or rate-limit"
-    ),
-    PREFERRED_PROVIDER(
-        id = "preferred",
-        label = "Preferred Provider",
-        description = "Uses your chosen provider first; falls back to others only if it fails"
-    );
-
-    companion object {
-        fun fromId(id: String): ProviderSelectionMode {
-            return entries.firstOrNull { it.id.equals(id, ignoreCase = true) } ?: AUTO_FALLBACK
-        }
-    }
-}
-
-enum class ReplyLength(val label: String, val promptInstruction: String) {
-    ONE_WORD(
-        label = "1 word",
-        promptInstruction = "Provide exactly ONE single word as the reply (e.g. 'Sure', 'Tomorrow', 'Definitely', 'Unavailable'). Do not include multiple words, quotes, or conversational filler."
-    ),
-    SHORT(
-        label = "short",
-        promptInstruction = "Provide a very short reply of 2 to 5 words maximum (e.g., 'Sounds great to me!', 'I will check shortly.')."
-    ),
-    ONE_LINE(
-        label = "1 line",
-        promptInstruction = "Provide exactly one clear, complete single-sentence reply that fits on one line."
-    ),
-    TWO_LINES(
-        label = "2 lines",
-        promptInstruction = "Provide a concise two-sentence or two-line reply providing brief context and answer."
-    ),
-    FIVE_TO_SEVEN_LINES(
-        label = "5-7 lines",
-        promptInstruction = "Provide a comprehensive, well-structured response of 5 to 7 sentences/lines explaining points clearly."
-    );
-
-    companion object {
-        fun fromLabel(label: String): ReplyLength {
-            return entries.firstOrNull { it.label.equals(label, ignoreCase = true) } ?: ONE_LINE
-        }
-    }
-}
+    val modelName: String,
+    val apiKey: String = "",
+    val customEndpoint: String? = null,
+    val isEnabled: Boolean = true,
+    val isBuiltIn: Boolean = false,
+    val tier: AiModelTier = AiModelTier.BALANCED,
+    val latencyMs: Long? = null,
+    val isCustom: Boolean = false,
+    val statusText: String = "Ready"
+)
 
 enum class ReplyTone(
     val label: String,
     val description: String,
-    val promptInstruction: String
+    val systemPromptHint: String,
+    val exampleReply: String
 ) {
     CASUAL(
         label = "Casual & Friendly",
-        description = "Friendly, warm, and natural conversational tone.",
-        promptInstruction = "Friendly, warm, and natural conversational tone."
+        description = "Relaxed, informal, and friendly tone for social apps",
+        systemPromptHint = "Keep the reply casual, brief, warm, friendly, natural conversational texting style.",
+        exampleReply = "Hey! Sounds good to me, see you then!"
     ),
     PROFESSIONAL(
-        label = "Professional",
-        description = "Polite, articulate, respectful, and business-appropriate.",
-        promptInstruction = "Polite, articulate, respectful, and business-appropriate."
+        label = "Professional & Crisp",
+        description = "Polite, concise, business-appropriate replies",
+        systemPromptHint = "Keep the reply professional, polite, concise, and articulate. Business messaging tone.",
+        exampleReply = "Received with thanks. I'll review and follow up shortly."
     ),
     CONCISE(
-        label = "Direct",
-        description = "Direct, straightforward, and to the point without extra fluff.",
-        promptInstruction = "Direct, straightforward, and to the point without extra fluff."
-    ),
-    ENTHUSIASTIC(
-        label = "Enthusiastic",
-        description = "Upbeat, positive, energetic, and engaging.",
-        promptInstruction = "Upbeat, positive, energetic, and engaging."
+        label = "Ultra-Concise",
+        description = "1 to 5 words max for rapid lightning responses",
+        systemPromptHint = "Extremely short reply. 1 to 5 words maximum.",
+        exampleReply = "Sounds great, will do."
     ),
     WITTY(
-        label = "Witty",
-        description = "Light-hearted, clever, and pleasantly playful.",
-        promptInstruction = "Light-hearted, clever, and pleasantly playful."
+        label = "Witty & Fun",
+        description = "Playful, lighthearted, and clever responses",
+        systemPromptHint = "Slightly witty, playful, and fun tone, yet helpful and not overly sarcastic.",
+        exampleReply = "Count me in! What's the plan?"
     ),
-    TRASH_TALK(
-        label = "Trash Talk",
-        description = "Savage, teasing, and playfully roasting — banter-heavy comebacks.",
-        promptInstruction = "Savage, teasing, and playfully roasting persona delivering banter-heavy comebacks. Write witty and cutting replies in a joking, competitive-banter style (like friendly trash talk between friends; humorous and sharp, not genuinely cruel or targeting real vulnerabilities), while fully answering the detected question in this persona's voice."
+    EMPATHETIC(
+        label = "Empathetic & Supportive",
+        description = "Caring, understanding, and encouraging tone",
+        systemPromptHint = "Compassionate, warm, empathetic, and supportive tone.",
+        exampleReply = "I understand completely. Take your time, no rush at all!"
     ),
-    LORD(
-        label = "Lord",
-        description = "A theatrical, larger-than-life persona that speaks as an all-powerful sovereign being — grandiose, commanding, and mythic in tone, referring to the user's contact as 'servant' or 'mortal' and framing every answer as a divine pronouncement.",
-        promptInstruction = "A theatrical, larger-than-life fictional roleplay persona of an all-powerful sovereign being. Speak in a grandiose, commanding, and mythic tone, addressing the user's contact as 'servant' or 'mortal' and framing every answer as a divine pronouncement or royal decree, while still answering the actual detected question in this persona's voice."
-    );
-
-    companion object {
-        fun fromName(name: String): ReplyTone {
-            return entries.firstOrNull { it.name.equals(name, ignoreCase = true) } ?: CASUAL
-        }
-    }
+    TECHNICAL(
+        label = "Technical & Precise",
+        description = "Direct, factual, and mathematically accurate",
+        systemPromptHint = "Technical, factual, direct, precise response.",
+        exampleReply = "Confirmed. The latency is within the acceptable threshold."
+    )
 }
 
-data class ReplyItem(
+enum class ResponseLengthPreset(
+    val title: String,
+    val subtitle: String,
+    val approxChars: String,
+    val maxWords: Int
+) {
+    VERY_SHORT("Very Short", "1 - 5 words", "~10-30 chars", 5),
+    SHORT("Short", "1 concise sentence", "~30-80 chars", 14),
+    NORMAL("Normal", "1 - 2 sentences", "~80-160 chars", 28),
+    LONG("Detailed", "Complete explanation", "~160-320 chars", 55)
+}
+
+enum class UnderstandingSummaryLength(
+    val label: String,
+    val description: String,
+    val exampleText: String
+) {
+    EXTREMELY_CONCISE("Micro (1-3 Words)", "Ultra-compact intent tag", "Reschedule sync"),
+    BALANCED("Balanced (1 Sentence)", "Clean synthesis of underlying intent", "Inquiring about meeting availability at 4 PM"),
+    DETAILED("Detailed Analysis", "Full breakdown of intent, context, and nuance", "Asking for clarification on project timeline due to upcoming deadline")
+}
+
+enum class OverlayBarStyle(
+    val title: String,
+    val description: String
+) {
+    MINIMAL_PILL("Floating Pill", "Compact pill with expandable suggestions sheet"),
+    DOCK_BOTTOM("Bottom Dock", "Sticky dock above keyboard and active input node"),
+    FLOATING_BUBBLE("Floating Bubble", "Draggable circular avatar expanding into a popup tray"),
+    HEADER_BAR("Top Status Bar", "Subtle top banner pinned below system notification bar")
+}
+
+enum class OverlayInteractionMode(
+    val title: String,
+    val description: String
+) {
+    FLOATING_DRAGGABLE("Freely Draggable", "Move anywhere on screen; snaps softly to edges"),
+    ANCHORED_TO_INPUT("Anchor to Input Field", "Automatically hovers 12dp above focused typing area"),
+    LOCKED_SIDEBAR("Edge Side Drawer", "Collapses into a discreet edge tab when idle")
+}
+
+data class WhitelistedApp(
+    val packageName: String,
+    val appName: String,
+    val category: String = "Messaging",
+    val isEnabled: Boolean = true,
+    val isCustom: Boolean = false
+)
+
+data class SavedOverlayPosition(
     val id: String = UUID.randomUUID().toString(),
-    val text: String,
-    val generatedByProvider: AiProvider? = null,
-    val timestamp: Long = System.currentTimeMillis()
+    val packageName: String,
+    val appName: String,
+    val x: Int,
+    val y: Int
 )
 
 data class ReplySettings(
-    val count: Int = 3,
-    val length: ReplyLength = ReplyLength.ONE_LINE,
+    val preferredProvider: AiProvider = AiProvider(
+        id = "gemini-builtin",
+        type = AiProviderType.GEMINI_BUILTIN,
+        name = "gemini-builtin",
+        displayName = "Gemini Flash (Built-in)",
+        modelName = "gemini-2.5-flash",
+        isBuiltIn = true,
+        tier = AiModelTier.LIGHTWEIGHT
+    ),
     val tone: ReplyTone = ReplyTone.CASUAL,
+    val count: Int = 3,
     val autoGenerate: Boolean = true,
-    val autoDeleteHistory: Boolean = true,
-    val autoDeleteMinutes: Int = 5,
-    val multiLanguageEnabled: Boolean = false,
-    val scanningEnabled: Boolean = true,
-    // Provider Selection Mode
-    val selectionMode: ProviderSelectionMode = ProviderSelectionMode.AUTO_FALLBACK,
-    val preferredProvider: AiProvider = AiProvider.GEMINI,
-    // Multi-provider keys
-    val customApiKey: String = "", // Legacy alias for gemini
-    val geminiApiKey: String = "",
-    val openaiApiKey: String = "",
-    val claudeApiKey: String = "",
-    val grokApiKey: String = "",
-    // Fallback chain ordering
-    val providerChain: List<AiProvider> = listOf(
-        AiProvider.GEMINI,
-        AiProvider.OPENAI,
-        AiProvider.CLAUDE,
-        AiProvider.GROK
-    )
-) {
-    val openAiApiKey: String get() = openaiApiKey
+    val detectQuestionsOnly: Boolean = true,
+    val prefetchOnAppFocus: Boolean = true,
+    val autoCopySingleReply: Boolean = false,
+    val understandingMode: Boolean = true,
+    val understandingSummaryLength: UnderstandingSummaryLength = UnderstandingSummaryLength.BALANCED,
+    val expandableReplies: Boolean = true,
+    val responseLengthPreset: ResponseLengthPreset = ResponseLengthPreset.SHORT,
+    val customCharLimit: Int = 120,
+    val cacheRetentionMinutes: Int = 15,
+    val historyRetentionDays: Int = 7,
+    val continuousScreenAnalysis: Boolean = true,
+    val realTimeNodeTracking: Boolean = true,
+    val smartDebounceMs: Int = 300,
+    val overlayBarStyle: OverlayBarStyle = OverlayBarStyle.MINIMAL_PILL,
+    val overlayInteractionMode: OverlayInteractionMode = OverlayInteractionMode.FLOATING_DRAGGABLE,
+    val autoHideEnabled: Boolean = true,
+    val autoHideDelaySec: Int = 12,
+    val screenIdleTimeoutSec: Int = 30,
+    val overlayOpacity: Float = 0.95f,
+    val overlayCornerRadius: Int = 18,
+    val overlayTextSizeSp: Int = 13,
+    val savedPositions: List<SavedOverlayPosition> = emptyList(),
+    val appsWhitelist: List<WhitelistedApp> = defaultWhitelistedApps(),
+    val customProviders: List<AiProvider> = emptyList(),
+    val enableOcrFallback: Boolean = true,
+    val ocrDebounceMs: Int = 1200
+)
 
-    fun getApiKeyFor(provider: AiProvider): String {
-        return when (provider) {
-            AiProvider.GEMINI -> geminiApiKey.ifBlank { customApiKey }
-            AiProvider.OPENAI -> openaiApiKey
-            AiProvider.CLAUDE -> claudeApiKey
-            AiProvider.GROK -> grokApiKey
-        }.trim()
-    }
+fun defaultWhitelistedApps(): List<WhitelistedApp> = listOf(
+    WhitelistedApp("com.whatsapp", "WhatsApp", "Messaging", true),
+    WhitelistedApp("org.telegram.messenger", "Telegram", "Messaging", true),
+    WhitelistedApp("com.facebook.orca", "Messenger", "Social", true),
+    WhitelistedApp("com.instagram.android", "Instagram Direct", "Social", true),
+    WhitelistedApp("com.discord", "Discord", "Community", true),
+    WhitelistedApp("com.slack", "Slack", "Workplace", true),
+    WhitelistedApp("com.google.android.apps.messaging", "Google Messages (SMS)", "SMS", true),
+    WhitelistedApp("com.google.android.gm", "Gmail", "Email", true),
+    WhitelistedApp("com.microsoft.teams", "Microsoft Teams", "Workplace", true),
+    WhitelistedApp("com.twitter.android", "X (Twitter DMs)", "Social", true),
+    WhitelistedApp("com.linkedin.android", "LinkedIn Messaging", "Professional", true),
+    WhitelistedApp("com.reddit.frontpage", "Reddit Chat", "Social", true)
+)
+
+enum class DetectionMethod(val label: String, val shortBadge: String) {
+    ACCESSIBILITY("Accessibility Node Scan", "FAST (Primary)"),
+    MLKIT_OCR("ML Kit On-Device OCR", "OCR Fallback")
 }
 
 data class DetectedQuestion(
     val id: String = UUID.randomUUID().toString(),
     val text: String,
-    val englishMeaning: String? = null,
     val sourceApp: String? = null,
+    val packageName: String? = null,
+    val timestamp: Long = System.currentTimeMillis(),
+    val englishMeaning: String? = null,
     val generatedByProvider: AiProvider? = null,
-    val timestamp: Long = System.currentTimeMillis()
+    val detectionMethod: DetectionMethod = DetectionMethod.ACCESSIBILITY,
+    val ocrLatencyMs: Long? = null
 )
 
-data class QuestionDetectionHistory(
+data class ReplyItem(
     val id: String = UUID.randomUUID().toString(),
-    val question: String,
-    val englishMeaning: String? = null,
-    val replies: List<String> = emptyList(),
-    val sourceApp: String? = null,
+    val questionId: String,
+    val text: String,
+    val tone: ReplyTone,
     val generatedByProvider: AiProvider? = null,
-    val timestamp: Long = System.currentTimeMillis()
+    val isCustomized: Boolean = false
 )
 
-data class AiReplyResult(
-    val original: String,
-    val englishMeaning: String? = null,
-    val replies: List<String> = emptyList(),
-    val provider: AiProvider = AiProvider.GEMINI
-)
-
-typealias GeminiReplyResult = AiReplyResult
-
-enum class ApiCallStatus {
-    IN_FLIGHT,
-    SUCCESS,
-    FAILED
+enum class DetectionResultType(val label: String) {
+    MATCHED("MATCHED"),
+    REJECTED("REJECTED")
 }
 
-data class ApiCallLog(
+data class DiagnosticLogEntry(
     val id: String = UUID.randomUUID().toString(),
-    val provider: AiProvider,
-    val model: String,
-    val question: String,
     val timestamp: Long = System.currentTimeMillis(),
-    val status: ApiCallStatus = ApiCallStatus.IN_FLIGHT,
-    val durationMs: Long = 0L,
-    val repliesCount: Int = 0,
-    val error: String? = null
+    val source: String,
+    val rawText: String,
+    val result: DetectionResultType,
+    val category: String,
+    val reason: String,
+    val detectionMethod: DetectionMethod = DetectionMethod.ACCESSIBILITY,
+    val latencyMs: Long? = null
 )
+

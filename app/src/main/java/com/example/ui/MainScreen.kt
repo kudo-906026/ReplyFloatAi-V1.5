@@ -1,29 +1,17 @@
 package com.example.ui
 
-import android.accessibilityservice.AccessibilityServiceInfo
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
-import android.view.accessibility.AccessibilityManager
 import android.widget.Toast
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -32,121 +20,54 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AccessTime
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ArrowDownward
-import androidx.compose.material.icons.filled.ArrowUpward
-import androidx.compose.material.icons.filled.Assessment
-import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.filled.Build
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.ChatBubbleOutline
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Clear
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.DeleteOutline
-import androidx.compose.material.icons.filled.Filter3
-import androidx.compose.material.icons.filled.FormatAlignLeft
-import androidx.compose.material.icons.filled.HealthAndSafety
-import androidx.compose.material.icons.filled.Key
+import androidx.compose.material.icons.filled.Apps
+import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.Layers
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.OpenInNew
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.QuestionAnswer
-import androidx.compose.material.icons.filled.Radar
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Remove
-import androidx.compose.material.icons.filled.Schedule
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Stop
-import androidx.compose.material.icons.filled.Timer
-import androidx.compose.material.icons.filled.Translate
-import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
-import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.RadioButton
-import androidx.compose.material3.RadioButtonDefaults
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
+import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
 import androidx.compose.material3.TabRowDefaults
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.model.AiProvider
-import com.example.model.ReplyLength
-import com.example.model.ReplyTone
 import com.example.service.FloatingOverlayService
-import com.example.service.QuestionDetectorAccessibilityService
 import com.example.state.AppStateManager
 import com.example.ui.theme.AccentBlue
-import com.example.ui.theme.AccentBlueGlow
-import com.example.ui.theme.AccentBlueLight
 import com.example.ui.theme.AccentGreen
-import com.example.ui.theme.AccentGreenLight
 import com.example.ui.theme.AccentPurple
-import com.example.ui.theme.AccentPurpleLight
-import com.example.ui.theme.AccentRed
+import com.example.ui.theme.AccentYellow
 import com.example.ui.theme.CrimsonLight
 import com.example.ui.theme.CrimsonPrimary
 import com.example.ui.theme.DarkBg
@@ -155,2391 +76,303 @@ import com.example.ui.theme.DarkCardBorder
 import com.example.ui.theme.DarkCardElevated
 import com.example.ui.theme.DarkSurfaceCard
 import com.example.ui.theme.DarkSurfaceVariant
-import com.example.ui.theme.StatusCyan
-import com.example.ui.theme.StatusGreen
-import com.example.ui.theme.StatusOrange
+import com.example.ui.theme.TechBlue
+import com.example.ui.theme.TechGreen
 import com.example.ui.theme.TextMuted
-import com.example.ui.theme.TextSubtle
+import com.example.ui.theme.TextPrimary
+import com.example.ui.theme.TextSecondary
+import com.example.ui.theme.TextWhite
 
-@OptIn(ExperimentalMaterial3Api::class)
+enum class ControlPanelTab(val title: String, val icon: ImageVector, val tag: String) {
+    DASHBOARD("Dashboard", Icons.Default.Dashboard, "tab_dashboard"),
+    SIMULATOR("Simulator", Icons.Default.Speed, "tab_simulator"),
+    APPS("Apps", Icons.Default.Apps, "tab_apps"),
+    PROVIDERS("Providers", Icons.Default.Psychology, "tab_providers"),
+    OVERLAY("Overlay", Icons.Default.Layers, "tab_overlay"),
+    REPLIES("Replies", Icons.Default.QuestionAnswer, "tab_replies")
+}
+
 @Composable
 fun MainScreen() {
     val context = LocalContext.current
-    val lifecycleOwner = LocalLifecycleOwner.current
-
-    var hasOverlayPermission by remember { mutableStateOf(checkOverlayPermission(context)) }
-    var isAccessibilityEnabled by remember { mutableStateOf(checkAccessibilityService(context)) }
-
-    val isOverlayRunning by AppStateManager.isOverlayRunning.collectAsState()
-    val isAccessibilityRunning by AppStateManager.isAccessibilityRunning.collectAsState()
-    val settings by AppStateManager.settings.collectAsState()
-    val currentQuestion by AppStateManager.currentQuestion.collectAsState()
-    val activeReplies by AppStateManager.activeReplies.collectAsState()
-    val activeProvider by AppStateManager.activeProvider.collectAsState()
-    val isGenerating by AppStateManager.isGenerating.collectAsState()
-    val errorMessage by AppStateManager.errorMessage.collectAsState()
-    val history by AppStateManager.history.collectAsState()
-    val healthState by AppStateManager.diagnosticsState.collectAsState()
-
     var selectedTab by remember { mutableIntStateOf(0) }
-    var testInputText by remember { mutableStateOf("Are you free to meet tomorrow at 3 PM?") }
 
-    // Re-check permissions when activity resumes
-    DisposableEffect(lifecycleOwner) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) {
-                hasOverlayPermission = checkOverlayPermission(context)
-                isAccessibilityEnabled = checkAccessibilityService(context)
-            }
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose {
-            lifecycleOwner.lifecycle.removeObserver(observer)
-        }
+    val settings by AppStateManager.settings.collectAsStateWithLifecycle()
+    val isOverlayRunning by AppStateManager.isOverlayRunning.collectAsStateWithLifecycle()
+    val isAccessibilityRunning by AppStateManager.isAccessibilityRunning.collectAsStateWithLifecycle()
+    val currentQuestion by AppStateManager.currentQuestion.collectAsStateWithLifecycle()
+    val activeReplies by AppStateManager.activeReplies.collectAsStateWithLifecycle()
+    val activeProvider by AppStateManager.activeProvider.collectAsStateWithLifecycle()
+    val isGenerating by AppStateManager.isGenerating.collectAsStateWithLifecycle()
+    val errorMessage by AppStateManager.errorMessage.collectAsStateWithLifecycle()
+    val diagnosticLogs by AppStateManager.diagnosticLogs.collectAsStateWithLifecycle()
+
+    var hasOverlayPermission by remember {
+        mutableStateOf(
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                Settings.canDrawOverlays(context)
+            } else true
+        )
     }
 
     Scaffold(
+        modifier = Modifier.fillMaxSize(),
         containerColor = DarkBg,
         topBar = {
-            TopAppBar(
-                title = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(DarkSurfaceCard)
+            ) {
+                // Top Header Bar
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(36.dp)
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(AccentBlue.copy(alpha = 0.18f))
-                                .border(1.dp, AccentBlue.copy(alpha = 0.5f), RoundedCornerShape(10.dp)),
+                                .size(32.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(CrimsonPrimary.copy(alpha = 0.2f))
+                                .border(1.dp, CrimsonPrimary.copy(alpha = 0.5f), RoundedCornerShape(8.dp)),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
-                                imageVector = Icons.Default.ChatBubbleOutline,
-                                contentDescription = "ReplyFloat AI",
-                                tint = AccentBlue,
-                                modifier = Modifier.size(20.dp)
+                                imageVector = Icons.Default.Speed,
+                                contentDescription = null,
+                                tint = CrimsonPrimary,
+                                modifier = Modifier.size(18.dp)
                             )
                         }
+
                         Column {
                             Text(
-                                text = "ReplyFloatAi",
+                                text = "ReplyFloat",
                                 fontWeight = FontWeight.Bold,
-                                fontSize = 18.sp,
-                                color = MaterialTheme.colorScheme.onSurface
+                                fontSize = 16.sp,
+                                color = TextWhite,
+                                letterSpacing = 0.5.sp
                             )
                             Text(
-                                text = "AI FLOATING ASSISTANT",
-                                fontSize = 9.5.sp,
+                                text = "INTELLIGENT OVERLAY DAEMON",
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 9.sp,
                                 fontWeight = FontWeight.Bold,
-                                letterSpacing = 0.8.sp,
-                                color = AccentBlue
+                                color = TextSecondary,
+                                letterSpacing = 1.sp
                             )
                         }
                     }
-                },
-                actions = {
-                    // System Health Diagnostics Badge (Tapping navigates directly to Diagnostics Tab)
-                    AppDiagnosticsBadge(
-                        healthState = healthState,
-                        onClick = { selectedTab = 3 }
-                    )
 
-                    Spacer(modifier = Modifier.width(6.dp))
-
-                    // Quick Overlay Status Pill (Green for Active)
-                    Box(
+                    // Status Pill
+                    Row(
                         modifier = Modifier
-                            .padding(end = 12.dp)
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(
-                                if (isOverlayRunning) AccentGreen.copy(alpha = 0.18f) else DarkSurfaceVariant
-                            )
-                            .border(
-                                1.dp,
-                                if (isOverlayRunning) AccentGreen else DarkCardBorder,
-                                RoundedCornerShape(16.dp)
-                            )
-                            .padding(horizontal = 10.dp, vertical = 4.dp)
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(DarkSurfaceVariant)
+                            .border(1.dp, if (isOverlayRunning) AccentGreen.copy(alpha = 0.5f) else DarkCardBorder, RoundedCornerShape(20.dp))
+                            .padding(horizontal = 10.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(5.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(7.dp)
-                                    .clip(CircleShape)
-                                    .background(
-                                        if (isOverlayRunning) AccentGreen else TextMuted
-                                    )
-                            )
-                            Text(
-                                text = if (isOverlayRunning) "Overlay Active" else "Overlay Inactive",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = if (isOverlayRunning) AccentGreen else TextMuted
-                            )
-                        }
+                        Box(
+                            modifier = Modifier
+                                .size(8.dp)
+                                .clip(CircleShape)
+                                .background(if (isOverlayRunning) AccentGreen else CrimsonPrimary)
+                        )
+                        Text(
+                            text = if (isOverlayRunning) "OVERLAY ACTIVE" else "IDLE",
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (isOverlayRunning) TechGreen else TextMuted
+                        )
                     }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = DarkBg
-                )
-            )
-        }
-    ) { innerPadding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(DarkBg)
-                .padding(innerPadding)
-        ) {
-            Column(
-                modifier = Modifier.fillMaxSize()
-            ) {
-                // Top Navigation Tabs (4 Tabs: Controls, Settings, History, Diagnostics)
-                TabRow(
+                }
+
+                // Scrollable Top Tabs Row
+                ScrollableTabRow(
                     selectedTabIndex = selectedTab,
-                    containerColor = DarkBg,
-                    contentColor = AccentBlue,
+                    containerColor = DarkSurfaceCard,
+                    contentColor = CrimsonPrimary,
+                    edgePadding = 12.dp,
                     indicator = { tabPositions ->
                         TabRowDefaults.SecondaryIndicator(
-                            Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
-                            color = AccentBlue,
+                            modifier = Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
+                            color = CrimsonPrimary,
                             height = 2.5.dp
                         )
                     },
-                    divider = {
-                        HorizontalDivider(color = DarkCardBorder)
-                    }
+                    divider = {}
                 ) {
-                    Tab(
-                        selected = selectedTab == 0,
-                        onClick = { selectedTab = 0 },
-                        selectedContentColor = AccentBlue,
-                        unselectedContentColor = TextMuted,
-                        text = { Text("Controls", fontSize = 12.sp, fontWeight = FontWeight.SemiBold) },
-                        icon = { Icon(Icons.Default.Tune, contentDescription = null, modifier = Modifier.size(18.dp)) }
-                    )
-                    Tab(
-                        selected = selectedTab == 1,
-                        onClick = { selectedTab = 1 },
-                        selectedContentColor = AccentBlue,
-                        unselectedContentColor = TextMuted,
-                        text = { Text("Settings", fontSize = 12.sp, fontWeight = FontWeight.SemiBold) },
-                        icon = { Icon(Icons.Default.Settings, contentDescription = null, modifier = Modifier.size(18.dp)) }
-                    )
-                    Tab(
-                        selected = selectedTab == 2,
-                        onClick = { selectedTab = 2 },
-                        selectedContentColor = AccentBlue,
-                        unselectedContentColor = TextMuted,
-                        text = { Text("History (${history.size})", fontSize = 12.sp, fontWeight = FontWeight.SemiBold) },
-                        icon = { Icon(Icons.Default.QuestionAnswer, contentDescription = null, modifier = Modifier.size(18.dp)) }
-                    )
-                    Tab(
-                        selected = selectedTab == 3,
-                        onClick = { selectedTab = 3 },
-                        selectedContentColor = AccentBlue,
-                        unselectedContentColor = TextMuted,
-                        text = {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                Text("Diagnostics", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                                if (healthState.overallStatus != com.example.model.DiagnosticStatus.HEALTHY) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(7.dp)
-                                            .clip(CircleShape)
-                                            .background(
-                                                if (healthState.overallStatus == com.example.model.DiagnosticStatus.ERROR)
-                                                    AccentRed
-                                                else
-                                                    StatusOrange
-                                            )
-                                    )
-                                }
-                            }
-                        },
-                        icon = { Icon(Icons.Default.HealthAndSafety, contentDescription = null, modifier = Modifier.size(18.dp)) }
-                    )
-                }
-
-                when (selectedTab) {
-                    0 -> ControlsAndTestTab(
-                        hasOverlayPermission = hasOverlayPermission,
-                        isAccessibilityEnabled = isAccessibilityEnabled || isAccessibilityRunning,
-                        isOverlayRunning = isOverlayRunning,
-                        currentQuestion = currentQuestion?.text,
-                        activeReplies = activeReplies,
-                        activeProvider = activeProvider,
-                        isGenerating = isGenerating,
-                        errorMessage = errorMessage,
-                        testInputText = testInputText,
-                        onTestInputChange = { testInputText = it },
-                        onStartOverlay = {
-                            if (!hasOverlayPermission) {
-                                requestOverlayPermission(context)
-                            } else {
-                                FloatingOverlayService.start(context)
-                            }
-                        },
-                        onStopOverlay = {
-                            FloatingOverlayService.stop(context)
-                        },
-                        onRequestOverlayPermission = { requestOverlayPermission(context) },
-                        onRequestAccessibilityPermission = { requestAccessibilityPermission(context) },
-                        onTestDetection = { q ->
-                            AppStateManager.onQuestionDetected(q, "App Sandbox", force = true)
-                        },
-                        onRetryGeneration = {
-                            AppStateManager.generateRepliesForQuestion()
-                        },
-                        onCopyReply = { reply ->
-                            AppStateManager.copyAndDismissReply(context, reply)
-                        },
-                        onDismissReply = { id ->
-                            AppStateManager.dismissReply(id)
-                        },
-                        onNavigateToSettings = {
-                            selectedTab = 1
-                        }
-                    )
-
-                    1 -> SettingsTab(
-                        settings = settings,
-                        onUpdateSettings = { AppStateManager.updateSettings(it) },
-                        onUpdateSelectionMode = { AppStateManager.updateSelectionMode(it) },
-                        onUpdatePreferredProvider = { AppStateManager.updatePreferredProvider(it) },
-                        onUpdateLength = { AppStateManager.updateReplyLength(it) },
-                        onUpdateCount = { AppStateManager.updateReplyCount(it) },
-                        onUpdateTone = { AppStateManager.updateTone(it) },
-                        onUpdateProviderKey = { provider, key -> AppStateManager.updateProviderKey(provider, key) },
-                        onMoveProviderUp = { index ->
-                            val currentChain = settings.providerChain.toMutableList()
-                            if (index > 0 && index < currentChain.size) {
-                                val temp = currentChain[index]
-                                currentChain[index] = currentChain[index - 1]
-                                currentChain[index - 1] = temp
-                                AppStateManager.updateProviderChain(currentChain)
-                            }
-                        },
-                        onMoveProviderDown = { index ->
-                            val currentChain = settings.providerChain.toMutableList()
-                            if (index >= 0 && index < currentChain.size - 1) {
-                                val temp = currentChain[index]
-                                currentChain[index] = currentChain[index + 1]
-                                currentChain[index + 1] = temp
-                                AppStateManager.updateProviderChain(currentChain)
-                            }
-                        }
-                    )
-
-                    2 -> HistoryTab(
-                        history = history,
-                        settings = settings,
-                        onUpdateSettings = { AppStateManager.updateSettings(it) },
-                        onDeleteHistoryItem = { AppStateManager.deleteHistoryItem(it) },
-                        onClearHistory = { AppStateManager.clearHistory() },
-                        onCopyReply = { text ->
-                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? android.content.ClipboardManager
-                            val clip = android.content.ClipData.newPlainText("Reply", text)
-                            clipboard?.setPrimaryClip(clip)
-                            Toast.makeText(context, "Copied to clipboard!", Toast.LENGTH_SHORT).show()
-                        }
-                    )
-
-                    3 -> DiagnosticsTab(
-                        healthState = healthState,
-                        onRequestOverlayPermission = { requestOverlayPermission(context) },
-                        onRequestAccessibilityPermission = { requestAccessibilityPermission(context) },
-                        onNavigateToSettings = { selectedTab = 1 },
-                        onTestRequest = {
-                            val samplePrompt = testInputText.ifBlank { "What time should we meet tomorrow?" }
-                            AppStateManager.onQuestionDetected(samplePrompt, "App Sandbox", force = true)
-                        },
-                        onClearErrors = { AppStateManager.clearAllErrors() }
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun ControlsAndTestTab(
-    hasOverlayPermission: Boolean,
-    isAccessibilityEnabled: Boolean,
-    isOverlayRunning: Boolean,
-    currentQuestion: String?,
-    activeReplies: List<com.example.model.ReplyItem>,
-    activeProvider: AiProvider? = null,
-    isGenerating: Boolean,
-    errorMessage: String? = null,
-    testInputText: String,
-    onTestInputChange: (String) -> Unit,
-    onStartOverlay: () -> Unit,
-    onStopOverlay: () -> Unit,
-    onRequestOverlayPermission: () -> Unit,
-    onRequestAccessibilityPermission: () -> Unit,
-    onTestDetection: (String) -> Unit,
-    onRetryGeneration: () -> Unit,
-    onCopyReply: (com.example.model.ReplyItem) -> Unit,
-    onDismissReply: (String) -> Unit,
-    onNavigateToSettings: () -> Unit = {}
-) {
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
-    ) {
-        // Hero Floating Overlay Launch Card
-        item {
-            ControlPanelCard(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("overlay_control_card"),
-                isSelected = isOverlayRunning,
-                activeColor = AccentGreen,
-                shape = RoundedCornerShape(18.dp)
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(18.dp),
-                    verticalArrangement = Arrangement.spacedBy(14.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column {
-                            Text(
-                                text = "Floating AI Bar",
-                                fontSize = 17.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Text(
-                                text = "Floats over WhatsApp, Messenger, Gmail, and any app",
-                                fontSize = 12.sp,
-                                color = TextMuted
-                            )
-                        }
-
-                        Box(
-                            modifier = Modifier
-                                .size(40.dp)
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(if (isOverlayRunning) AccentGreen.copy(alpha = 0.2f) else DarkBg)
-                                .border(1.dp, if (isOverlayRunning) AccentGreen.copy(alpha = 0.6f) else DarkCardBorder, RoundedCornerShape(10.dp)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Layers,
-                                contentDescription = null,
-                                tint = if (isOverlayRunning) AccentGreen else TextMuted,
-                                modifier = Modifier.size(22.dp)
-                            )
-                        }
-                    }
-
-                    // Start (Blue) / Stop (Red) Toggle Button
-                    Button(
-                        onClick = {
-                            if (isOverlayRunning) onStopOverlay() else onStartOverlay()
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(48.dp)
-                            .testTag("toggle_overlay_button")
-                            .then(
-                                if (isOverlayRunning) Modifier.softGlow(radius = 10.dp, color = AccentRed.copy(alpha = 0.4f))
-                                else Modifier.softGlow(radius = 10.dp, color = AccentBlue.copy(alpha = 0.35f))
-                            ),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (isOverlayRunning) AccentRed else AccentBlue,
-                            contentColor = Color.White
-                        )
-                    ) {
-                        Icon(
-                            imageVector = if (isOverlayRunning) Icons.Default.Stop else Icons.Default.PlayArrow,
-                            contentDescription = null,
-                            modifier = Modifier.size(20.dp),
-                            tint = Color.White
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = if (isOverlayRunning) "Stop Floating Overlay" else "Start Floating Overlay Bar",
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        )
-                    }
-                }
-            }
-        }
-
-        // Permissions Status Section
-        item {
-            ControlPanelCard(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp)
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    ControlPanelSectionHeader(
-                        title = "SYSTEM PERMISSIONS",
-                        icon = Icons.Default.Lock,
-                        accentColor = AccentBlue
-                    )
-
-                    // 1. Overlay Permission Row (Green for granted)
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            Icon(
-                                imageVector = if (hasOverlayPermission) Icons.Default.CheckCircle else Icons.Default.Warning,
-                                contentDescription = null,
-                                tint = if (hasOverlayPermission) AccentGreen else StatusOrange,
-                                modifier = Modifier.size(20.dp)
-                            )
-                            Column {
-                                Text(
-                                    text = "Draw Over Other Apps",
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                                Text(
-                                    text = if (hasOverlayPermission) "Granted" else "Required for floating bar",
-                                    fontSize = 11.sp,
-                                    color = if (hasOverlayPermission) AccentGreen else StatusOrange
-                                )
-                            }
-                        }
-
-                        if (!hasOverlayPermission) {
-                            OutlinedButton(
-                                onClick = onRequestOverlayPermission,
-                                shape = RoundedCornerShape(8.dp),
-                                border = BorderStroke(1.dp, AccentBlue),
-                                colors = ButtonDefaults.outlinedButtonColors(contentColor = AccentBlue),
-                                modifier = Modifier.testTag("grant_overlay_perm_button")
-                            ) {
-                                Text("Grant", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                            }
-                        }
-                    }
-
-                    HorizontalDivider(color = DarkCardBorder)
-
-                    // 2. Accessibility Service Row (Green for active)
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            Icon(
-                                imageVector = if (isAccessibilityEnabled) Icons.Default.CheckCircle else Icons.Default.Warning,
-                                contentDescription = null,
-                                tint = if (isAccessibilityEnabled) AccentGreen else StatusOrange,
-                                modifier = Modifier.size(20.dp)
-                            )
-                            Column(modifier = Modifier.widthIn(max = 200.dp)) {
-                                Text(
-                                    text = "Accessibility Question Scanner",
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                                Text(
-                                    text = if (isAccessibilityEnabled) "Active (Scans '?' asynchronously)" else "Required to detect questions on screen",
-                                    fontSize = 11.sp,
-                                    color = if (isAccessibilityEnabled) AccentGreen else StatusOrange
-                                )
-                            }
-                        }
-
-                        if (!isAccessibilityEnabled) {
-                            OutlinedButton(
-                                onClick = onRequestAccessibilityPermission,
-                                shape = RoundedCornerShape(8.dp),
-                                border = BorderStroke(1.dp, AccentBlue),
-                                colors = ButtonDefaults.outlinedButtonColors(contentColor = AccentBlue),
-                                modifier = Modifier.testTag("grant_accessibility_perm_button")
-                            ) {
-                                Text("Enable", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // Live Floating Bar In-App Sandbox & Tester
-        item {
-            ControlPanelCard(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp)
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    ControlPanelSectionHeader(
-                        title = "INTERACTIVE QUESTION SANDBOX",
-                        icon = Icons.Default.AutoAwesome,
-                        accentColor = AccentBlue
-                    )
-
-                    Text(
-                        text = "Simulate on-screen text detection or test custom questions:",
-                        fontSize = 12.sp,
-                        color = TextMuted
-                    )
-
-                    // Preset Chips
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        val presets = listOf(
-                            "Are you free to meet tomorrow at 3 PM?",
-                            "isko karo kya vote?",
-                            "Demain à 14h, ça te convient?",
-                            "¿Puedes revisar el documento hoy?",
-                            "明日ミーティングは可能ですか？",
-                            "What is your status update for today?"
-                        )
-                        presets.forEach { preset ->
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(DarkBg)
-                                    .border(1.dp, DarkCardBorder, RoundedCornerShape(8.dp))
-                                    .clickable { onTestInputChange(preset) }
-                                    .padding(horizontal = 10.dp, vertical = 6.dp)
-                            ) {
-                                Text(
-                                    text = preset,
-                                    fontSize = 11.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 1
-                                )
-                            }
-                        }
-                    }
-
-                    OutlinedTextField(
-                        value = testInputText,
-                        onValueChange = onTestInputChange,
-                        label = { Text("Question containing '?'", color = TextMuted) },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("question_input_field"),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = AccentBlue,
-                            unfocusedBorderColor = DarkCardBorder,
-                            focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
-                            focusedContainerColor = DarkSurfaceCard,
-                            unfocusedContainerColor = DarkSurfaceCard
-                        ),
-                        trailingIcon = {
-                            if (testInputText.isNotBlank()) {
-                                IconButton(onClick = { onTestInputChange("") }) {
-                                    Icon(Icons.Default.Clear, contentDescription = "Clear", tint = TextMuted, modifier = Modifier.size(18.dp))
-                                }
-                            }
-                        }
-                    )
-
-                    // Test Action Button
-                    Button(
-                        onClick = { onTestDetection(testInputText) },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(44.dp)
-                            .testTag("test_detection_button"),
-                        shape = RoundedCornerShape(10.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = AccentBlue,
-                            contentColor = Color.White
-                        )
-                    ) {
-                        Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("Detect & Generate AI Replies", fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                    }
-
-                    // Live Question & Generated Replies Preview
-                    if (currentQuestion != null || isGenerating || errorMessage != null) {
-                        HorizontalDivider(color = DarkCardBorder)
-
-                        Text(
-                            text = "LIVE OVERLAY PREVIEW",
-                            fontSize = 10.5.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = AccentBlue,
-                            letterSpacing = 0.5.sp
-                        )
-
-                        // Current Question Display
-                        if (currentQuestion != null) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .background(DarkBg)
-                                    .border(1.dp, AccentBlue.copy(alpha = 0.35f), RoundedCornerShape(10.dp))
-                                    .padding(12.dp)
-                            ) {
-                                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Text(
-                                            text = "DETECTED QUESTION",
-                                            fontSize = 9.5.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = AccentBlue
-                                        )
-                                        if (activeProvider != null) {
-                                            Surface(
-                                                shape = RoundedCornerShape(4.dp),
-                                                color = AccentPurple.copy(alpha = 0.15f),
-                                                border = BorderStroke(1.dp, AccentPurple.copy(alpha = 0.4f))
-                                            ) {
-                                                Text(
-                                                    text = activeProvider.displayName,
-                                                    fontSize = 9.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = AccentPurpleLight,
-                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                                )
-                                            }
-                                        }
-                                    }
-                                    Text(
-                                        text = currentQuestion,
-                                        fontSize = 13.sp,
-                                        fontWeight = FontWeight.Medium,
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
-                                }
-                            }
-                        }
-
-                        // Loading Spinner
-                        if (isGenerating) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 12.dp),
-                                horizontalArrangement = Arrangement.Center,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(22.dp),
-                                    color = AccentBlue,
-                                    strokeWidth = 2.dp
-                                )
-                                Spacer(modifier = Modifier.width(10.dp))
-                                Text(
-                                    text = "Generating replies with AI...",
-                                    fontSize = 12.sp,
-                                    color = TextMuted
-                                )
-                            }
-                        }
-
-                        // Error message
-                        if (errorMessage != null && !isGenerating) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(AccentRed.copy(alpha = 0.12f))
-                                    .border(1.dp, AccentRed.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
-                                    .padding(10.dp)
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                        modifier = Modifier.weight(1f)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Warning,
-                                            contentDescription = null,
-                                            tint = AccentRed,
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                        Text(
-                                            text = errorMessage,
-                                            fontSize = 11.5.sp,
-                                            color = AccentRed
-                                        )
-                                    }
-                                    IconButton(
-                                        onClick = onRetryGeneration,
-                                        modifier = Modifier.size(24.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Refresh,
-                                            contentDescription = "Retry",
-                                            tint = AccentRed,
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                    }
-                                }
-                            }
-                        }
-
-                        // Generated Replies List
-                        activeReplies.forEachIndexed { index, replyItem ->
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .background(DarkBg)
-                                    .border(1.dp, DarkCardBorder, RoundedCornerShape(10.dp))
-                                    .padding(12.dp)
-                            ) {
-                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Text(
-                                            text = "Option ${index + 1}",
-                                            fontSize = 10.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = AccentBlue
-                                        )
-                                        Row(
-                                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            IconButton(
-                                                onClick = { onDismissReply(replyItem.id) },
-                                                modifier = Modifier.size(22.dp)
-                                            ) {
-                                                Icon(
-                                                    Icons.Default.Close,
-                                                    contentDescription = "Dismiss",
-                                                    tint = TextMuted,
-                                                    modifier = Modifier.size(14.dp)
-                                                )
-                                            }
-                                        }
-                                    }
-                                    Text(
-                                        text = replyItem.text,
-                                        fontSize = 13.sp,
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
-                                    Button(
-                                        onClick = { onCopyReply(replyItem) },
-                                        modifier = Modifier.fillMaxWidth(),
-                                        shape = RoundedCornerShape(8.dp),
-                                        colors = ButtonDefaults.buttonColors(
-                                            containerColor = AccentBlue.copy(alpha = 0.15f),
-                                            contentColor = AccentBlueLight
-                                        ),
-                                        border = BorderStroke(1.dp, AccentBlue.copy(alpha = 0.35f))
-                                    ) {
-                                        Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(14.dp))
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text("Copy & Use", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun SettingsTab(
-    settings: com.example.model.ReplySettings,
-    onUpdateSettings: (com.example.model.ReplySettings) -> Unit,
-    onUpdateSelectionMode: (com.example.model.ProviderSelectionMode) -> Unit,
-    onUpdatePreferredProvider: (AiProvider) -> Unit,
-    onUpdateLength: (ReplyLength) -> Unit,
-    onUpdateCount: (Int) -> Unit,
-    onUpdateTone: (ReplyTone) -> Unit,
-    onUpdateProviderKey: (AiProvider, String) -> Unit,
-    onMoveProviderUp: (Int) -> Unit,
-    onMoveProviderDown: (Int) -> Unit
-) {
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
-    ) {
-        // AI Model Selection & Provider Architecture (Purple Category)
-        item {
-            ControlPanelCard(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp)
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    ControlPanelSectionHeader(
-                        title = "AI PROVIDER ARCHITECTURE",
-                        icon = Icons.Default.Psychology,
-                        accentColor = AccentPurple
-                    )
-
-                    Text(
-                        text = "Choose how ReplyFloat orchestrates Gemini, OpenAI, Claude, and Grok:",
-                        fontSize = 12.sp,
-                        color = TextMuted
-                    )
-
-                    // 1. Selection Mode (Auto Fallback vs Preferred)
-                    com.example.model.ProviderSelectionMode.entries.forEach { mode ->
-                        val isSelected = settings.selectionMode == mode
-                        ControlPanelCard(
-                            isSelected = isSelected,
-                            activeColor = AccentPurple,
-                            shape = RoundedCornerShape(12.dp),
-                            onClick = { onUpdateSelectionMode(mode) },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 14.dp, vertical = 10.dp),
-                                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                RadioButton(
-                                    selected = isSelected,
-                                    onClick = { onUpdateSelectionMode(mode) },
-                                    colors = RadioButtonDefaults.colors(
-                                        selectedColor = AccentPurple,
-                                        unselectedColor = TextMuted
-                                    )
-                                )
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = mode.label,
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 13.sp,
-                                        color = if (isSelected) AccentPurpleLight else MaterialTheme.colorScheme.onSurface
-                                    )
-                                    Text(
-                                        text = mode.description,
-                                        fontSize = 11.sp,
-                                        color = if (isSelected) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f) else TextMuted,
-                                        lineHeight = 14.sp
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    // If Preferred Provider is selected, show provider selector
-                    if (settings.selectionMode == com.example.model.ProviderSelectionMode.PREFERRED_PROVIDER) {
-                        HorizontalDivider(color = DarkCardBorder)
-
-                        Text(
-                            text = "SELECT PREFERRED PROVIDER:",
-                            fontSize = 10.5.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = AccentPurple,
-                            letterSpacing = 0.5.sp
-                        )
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            AiProvider.entries.forEach { provider ->
-                                val isSelected = settings.preferredProvider == provider
-                                ControlPanelCard(
-                                    isSelected = isSelected,
-                                    activeColor = AccentPurple,
-                                    shape = RoundedCornerShape(10.dp),
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .clickable { onUpdatePreferredProvider(provider) }
-                                ) {
-                                    Column(
-                                        modifier = Modifier.padding(vertical = 10.dp, horizontal = 4.dp),
-                                        horizontalAlignment = Alignment.CenterHorizontally,
-                                        verticalArrangement = Arrangement.Center
-                                    ) {
-                                        Text(
-                                            text = provider.displayName,
-                                            fontSize = 11.5.sp,
-                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                            color = if (isSelected) AccentPurpleLight else MaterialTheme.colorScheme.onSurface
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // Multi-Provider Fallback Chain Reordering & Status Card (Purple Category)
-        item {
-            ControlPanelCard(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp)
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    ControlPanelSectionHeader(
-                        title = "PROVIDER FALLBACK ORDER",
-                        icon = Icons.Default.Layers,
-                        accentColor = AccentPurple
-                    )
-
-                    Text(
-                        text = "Reorder the fallback sequence below. If an attempt fails, ReplyFloat immediately proceeds to the next ready provider:",
-                        fontSize = 12.sp,
-                        color = TextMuted
-                    )
-
-                    HorizontalDivider(color = DarkCardBorder)
-
-                    // Reorderable list of providers
-                    settings.providerChain.forEachIndexed { index, provider ->
-                        val hasKey = when (provider) {
-                            AiProvider.GEMINI -> settings.customApiKey.isNotBlank() || com.example.BuildConfig.GEMINI_API_KEY.isNotBlank()
-                            AiProvider.OPENAI -> settings.openAiApiKey.isNotBlank()
-                            AiProvider.CLAUDE -> settings.claudeApiKey.isNotBlank()
-                            AiProvider.GROK -> settings.grokApiKey.isNotBlank()
-                        }
-
-                        val isFirstInAuto = index == 0 && settings.selectionMode == com.example.model.ProviderSelectionMode.AUTO_FALLBACK
-                        val isPreferred = settings.selectionMode == com.example.model.ProviderSelectionMode.PREFERRED_PROVIDER && settings.preferredProvider == provider
-
-                        ControlPanelCard(
-                            isSelected = isFirstInAuto || isPreferred,
-                            activeColor = AccentPurple,
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 12.dp, vertical = 8.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    // Order number badge (Purple)
-                                    Box(
-                                        modifier = Modifier
-                                            .size(24.dp)
-                                            .clip(CircleShape)
-                                            .background(
-                                                if (index == 0) AccentPurple
-                                                else DarkSurfaceVariant
-                                            ),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text(
-                                            text = "${index + 1}",
-                                            color = if (index == 0) Color.White else TextMuted,
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                    }
-
-                                    Column {
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                        ) {
-                                            Text(
-                                                text = provider.displayName,
-                                                fontWeight = FontWeight.Bold,
-                                                fontSize = 13.sp,
-                                                color = MaterialTheme.colorScheme.onSurface
-                                            )
-                                            if (isFirstInAuto) {
-                                                Surface(
-                                                    shape = RoundedCornerShape(4.dp),
-                                                    color = AccentPurple.copy(alpha = 0.2f),
-                                                    border = BorderStroke(1.dp, AccentPurple.copy(alpha = 0.5f))
-                                                ) {
-                                                    Text(
-                                                        text = "PRIMARY",
-                                                        fontSize = 8.5.sp,
-                                                        fontWeight = FontWeight.Bold,
-                                                        color = AccentPurpleLight,
-                                                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
-                                                    )
-                                                }
-                                            } else if (isPreferred) {
-                                                Surface(
-                                                    shape = RoundedCornerShape(4.dp),
-                                                    color = AccentPurple.copy(alpha = 0.2f),
-                                                    border = BorderStroke(1.dp, AccentPurple.copy(alpha = 0.5f))
-                                                ) {
-                                                    Text(
-                                                        text = "PREFERRED",
-                                                        fontSize = 8.5.sp,
-                                                        fontWeight = FontWeight.Bold,
-                                                        color = AccentPurpleLight,
-                                                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
-                                                    )
-                                                }
-                                            }
-                                        }
-                                        Text(
-                                            text = if (hasKey) "Ready: ${provider.modelName}" else "No key entered yet",
-                                            fontSize = 10.5.sp,
-                                            color = if (hasKey) AccentGreen else TextMuted
-                                        )
-                                    }
-                                }
-
-                                // Up / Down reorder arrows (Purple)
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(2.dp)
-                                ) {
-                                    IconButton(
-                                        onClick = { onMoveProviderUp(index) },
-                                        enabled = index > 0,
-                                        modifier = Modifier.size(30.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.ArrowUpward,
-                                            contentDescription = "Move ${provider.displayName} Up",
-                                            tint = if (index > 0) AccentPurple else TextMuted.copy(alpha = 0.3f),
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                    }
-                                    IconButton(
-                                        onClick = { onMoveProviderDown(index) },
-                                        enabled = index < settings.providerChain.size - 1,
-                                        modifier = Modifier.size(30.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.ArrowDownward,
-                                            contentDescription = "Move ${provider.displayName} Down",
-                                            tint = if (index < settings.providerChain.size - 1) AccentPurple else TextMuted.copy(alpha = 0.3f),
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // Multi-Provider API Key Inputs (Purple Category)
-        item {
-            ControlPanelCard(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp)
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(14.dp)
-                ) {
-                    ControlPanelSectionHeader(
-                        title = "PROVIDER API KEYS",
-                        icon = Icons.Default.Key,
-                        accentColor = AccentPurple
-                    )
-
-                    Text(
-                        text = "Enter keys for as many providers as you have. ReplyFloat seamlessly routes through whichever keys are configured.",
-                        fontSize = 12.sp,
-                        color = TextMuted
-                    )
-
-                    // 1. Gemini
-                    ProviderApiKeyInputField(
-                        provider = AiProvider.GEMINI,
-                        currentKey = settings.geminiApiKey.ifBlank { settings.customApiKey },
-                        isEnvKeyPresent = com.example.BuildConfig.GEMINI_API_KEY.isNotBlank(),
-                        hint = "AI Studio environment key active by default (or custom AIzaSy...)",
-                        onKeyChanged = { onUpdateProviderKey(AiProvider.GEMINI, it) }
-                    )
-
-                    HorizontalDivider(color = DarkCardBorder)
-
-                    // 2. OpenAI
-                    ProviderApiKeyInputField(
-                        provider = AiProvider.OPENAI,
-                        currentKey = settings.openAiApiKey,
-                        hint = "OpenAI key (sk-...)",
-                        onKeyChanged = { onUpdateProviderKey(AiProvider.OPENAI, it) }
-                    )
-
-                    HorizontalDivider(color = DarkCardBorder)
-
-                    // 3. Claude
-                    ProviderApiKeyInputField(
-                        provider = AiProvider.CLAUDE,
-                        currentKey = settings.claudeApiKey,
-                        hint = "Anthropic Claude key (sk-ant-...)",
-                        onKeyChanged = { onUpdateProviderKey(AiProvider.CLAUDE, it) }
-                    )
-
-                    HorizontalDivider(color = DarkCardBorder)
-
-                    // 4. Grok (xAI)
-                    ProviderApiKeyInputField(
-                        provider = AiProvider.GROK,
-                        currentKey = settings.grokApiKey,
-                        hint = "xAI Grok key (xai-...)",
-                        onKeyChanged = { onUpdateProviderKey(AiProvider.GROK, it) }
-                    )
-                }
-            }
-        }
-
-        // Reply Length Configuration (Blue Category)
-        item {
-            ControlPanelCard(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp)
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    ControlPanelSectionHeader(
-                        title = "REPLY LENGTH",
-                        icon = Icons.Default.Tune,
-                        accentColor = AccentBlue
-                    )
-
-                    Text(
-                        text = "Choose the exact output format for AI response generation:",
-                        fontSize = 12.sp,
-                        color = TextMuted
-                    )
-
-                    Column(
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        ReplyLength.entries.forEach { lengthOption ->
-                            val isSelected = settings.length == lengthOption
-                            ControlPanelCard(
-                                isSelected = isSelected,
-                                activeColor = AccentBlue,
-                                shape = RoundedCornerShape(12.dp),
-                                onClick = { onUpdateLength(lengthOption) },
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(14.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Column(
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .padding(end = 12.dp)
-                                    ) {
-                                        Text(
-                                            text = lengthOption.label,
-                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
-                                            fontSize = 14.sp,
-                                            color = if (isSelected) AccentBlueLight else MaterialTheme.colorScheme.onSurface
-                                        )
-                                        Spacer(modifier = Modifier.height(3.dp))
-                                        Text(
-                                            text = lengthOption.promptInstruction,
-                                            fontSize = 11.5.sp,
-                                            color = if (isSelected) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f) else TextMuted,
-                                            lineHeight = 15.sp
-                                        )
-                                    }
-                                    if (isSelected) {
-                                        Box(
-                                            modifier = Modifier
-                                                .size(24.dp)
-                                                .clip(CircleShape)
-                                                .background(AccentBlue),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Default.Check,
-                                                contentDescription = "Selected",
-                                                tint = Color.White,
-                                                modifier = Modifier.size(16.dp)
-                                            )
-                                        }
-                                    } else {
-                                        Box(
-                                            modifier = Modifier
-                                                .size(24.dp)
-                                                .clip(CircleShape)
-                                                .border(
-                                                    1.dp,
-                                                    DarkCardBorder,
-                                                    CircleShape
-                                                )
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // Reply Count Configuration (Blue Category)
-        item {
-            ControlPanelCard(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp)
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    ControlPanelSectionHeader(
-                        title = "SUGGESTION COUNT (1 - 3)",
-                        icon = Icons.Default.Filter3,
-                        accentColor = AccentBlue
-                    )
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        listOf(1, 2, 3).forEach { count ->
-                            val isSelected = settings.count == count
-                            ControlPanelCard(
-                                isSelected = isSelected,
-                                activeColor = AccentBlue,
-                                shape = RoundedCornerShape(10.dp),
-                                onClick = { onUpdateCount(count) },
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(vertical = 12.dp, horizontal = 6.dp),
-                                    horizontalArrangement = Arrangement.Center,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    if (isSelected) {
-                                        Icon(
-                                            imageVector = Icons.Default.Check,
-                                            contentDescription = null,
-                                            tint = AccentBlue,
-                                            modifier = Modifier
-                                                .size(16.dp)
-                                                .padding(end = 4.dp)
-                                        )
-                                    }
-                                    Text(
-                                        text = "$count ${if (count == 1) "Reply" else "Replies"}",
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                        fontSize = 13.sp,
-                                        color = if (isSelected) AccentBlueLight else MaterialTheme.colorScheme.onSurface
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // Tone & Style Selector (Blue Category)
-        item {
-            ControlPanelCard(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp)
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    ControlPanelSectionHeader(
-                        title = "CONVERSATION TONE",
-                        icon = Icons.Default.ChatBubbleOutline,
-                        accentColor = AccentBlue
-                    )
-
-                    Text(
-                        text = "Set the personality and voice for AI-generated response suggestions:",
-                        fontSize = 12.sp,
-                        color = TextMuted
-                    )
-
-                    Column(
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        ReplyTone.entries.forEach { tone ->
-                            val isSelected = settings.tone == tone
-                            ControlPanelCard(
-                                isSelected = isSelected,
-                                activeColor = AccentBlue,
-                                shape = RoundedCornerShape(12.dp),
-                                onClick = { onUpdateTone(tone) },
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(14.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Column(
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .padding(end = 12.dp)
-                                    ) {
-                                        Text(
-                                            text = tone.label,
-                                            fontSize = 14.sp,
-                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
-                                            color = if (isSelected) AccentBlueLight else MaterialTheme.colorScheme.onSurface
-                                        )
-                                        Spacer(modifier = Modifier.height(3.dp))
-                                        Text(
-                                            text = tone.description,
-                                            fontSize = 11.5.sp,
-                                            color = if (isSelected) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f) else TextMuted,
-                                            lineHeight = 15.sp
-                                        )
-                                    }
-
-                                    if (isSelected) {
-                                        Box(
-                                            modifier = Modifier
-                                                .size(24.dp)
-                                                .clip(CircleShape)
-                                                .background(AccentBlue),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Default.Check,
-                                                contentDescription = "Selected",
-                                                tint = Color.White,
-                                                modifier = Modifier.size(16.dp)
-                                            )
-                                        }
-                                    } else {
-                                        Box(
-                                            modifier = Modifier
-                                                .size(24.dp)
-                                                .clip(CircleShape)
-                                                .border(
-                                                    1.dp,
-                                                    DarkCardBorder,
-                                                    CircleShape
-                                                )
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // Multi-Language Mode (Blue Category)
-        item {
-            ControlPanelCard(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp)
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(32.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(AccentBlue.copy(alpha = 0.15f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Translate,
-                                contentDescription = null,
-                                tint = AccentBlue,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-                        Column {
-                            Text(
-                                text = "Multi-Language Mode (\"Lang\")",
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Text(
-                                text = if (settings.multiLanguageEnabled)
-                                    "Detects any language & code-mixed/Hinglish (e.g. 'isko karo kya vote?') and replies in the exact same language"
-                                else
-                                    "Standard English-only replies",
-                                fontSize = 11.sp,
-                                color = TextMuted
-                            )
-                        }
-                    }
-                    ControlPanelSwitch(
-                        checked = settings.multiLanguageEnabled,
-                        activeColor = AccentBlue,
-                        onCheckedChange = { checked ->
-                            onUpdateSettings(settings.copy(multiLanguageEnabled = checked))
-                        }
-                    )
-                }
-            }
-        }
-
-        // Question Scanning (Green Category for active scanning)
-        item {
-            ControlPanelCard(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp)
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(32.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(
-                                    if (settings.scanningEnabled) AccentGreen.copy(alpha = 0.2f) else DarkSurfaceVariant
-                                ),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Radar,
-                                contentDescription = null,
-                                tint = if (settings.scanningEnabled) AccentGreen else TextMuted,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-                        Column {
-                            Text(
-                                text = "Analyze / Screen Scanning",
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Text(
-                                text = if (settings.scanningEnabled)
-                                    "Active: scanning for questions in other apps"
-                                else
-                                    "Paused: zero background scanning or API calls",
-                                fontSize = 11.sp,
-                                color = if (settings.scanningEnabled) AccentGreen else TextMuted
-                            )
-                        }
-                    }
-                    ControlPanelSwitch(
-                        checked = settings.scanningEnabled,
-                        activeColor = AccentGreen,
-                        onCheckedChange = { checked ->
-                            onUpdateSettings(settings.copy(scanningEnabled = checked))
-                        }
-                    )
-                }
-            }
-        }
-
-        // Auto-generation toggle (Blue Category)
-        item {
-            ControlPanelCard(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp)
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "Auto-Generate on Screen '?'",
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            text = "Automatically calls AI as soon as a question mark is detected on screen",
-                            fontSize = 11.sp,
-                            color = TextMuted
-                        )
-                    }
-                    ControlPanelSwitch(
-                        checked = settings.autoGenerate,
-                        activeColor = AccentBlue,
-                        onCheckedChange = { checked ->
-                            onUpdateSettings(settings.copy(autoGenerate = checked))
-                        }
-                    )
-                }
-            }
-        }
-
-        // Auto-delete History (Blue Category with Stepper)
-        item {
-            ControlPanelCard(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp)
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(32.dp)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(AccentBlue.copy(alpha = 0.15f)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Timer,
-                                    contentDescription = null,
-                                    tint = AccentBlue,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
-                            Column {
-                                Text(
-                                    text = "Auto-Delete History",
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                                Text(
-                                    text = if (settings.autoDeleteHistory) "Purges items after ${settings.autoDeleteMinutes} min" else "Disabled (kept until cleared)",
-                                    fontSize = 11.sp,
-                                    color = TextMuted
-                                )
-                            }
-                        }
-                        ControlPanelSwitch(
-                            checked = settings.autoDeleteHistory,
-                            activeColor = AccentBlue,
-                            onCheckedChange = { checked ->
-                                onUpdateSettings(settings.copy(autoDeleteHistory = checked))
-                            }
-                        )
-                    }
-
-                    AnimatedVisibility(
-                        visible = settings.autoDeleteHistory,
-                        enter = fadeIn() + expandVertically(),
-                        exit = fadeOut() + shrinkVertically()
-                    ) {
-                        Column(
-                            verticalArrangement = Arrangement.spacedBy(10.dp),
-                            modifier = Modifier.padding(top = 4.dp)
-                        ) {
-                            HorizontalDivider(color = DarkCardBorder)
-
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = "EXPIRY DURATION (1 - 10 MINS)",
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = AccentBlue,
-                                    letterSpacing = 0.5.sp
-                                )
-
-                                // Stepper: - and + buttons with current minute badge (Blue)
+                    ControlPanelTab.entries.forEachIndexed { index, tab ->
+                        val isSelected = selectedTab == index
+                        Tab(
+                            selected = isSelected,
+                            onClick = { selectedTab = index },
+                            modifier = Modifier.testTag(tab.tag),
+                            text = {
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                                 ) {
-                                    IconButton(
-                                        onClick = {
-                                            if (settings.autoDeleteMinutes > 1) {
-                                                onUpdateSettings(settings.copy(autoDeleteMinutes = settings.autoDeleteMinutes - 1))
-                                            }
-                                        },
-                                        enabled = settings.autoDeleteMinutes > 1,
-                                        modifier = Modifier.size(28.dp)
-                                    ) {
-                                        Icon(
-                                            Icons.Default.Remove,
-                                            contentDescription = "Decrease",
-                                            tint = if (settings.autoDeleteMinutes > 1) AccentBlue else TextMuted.copy(alpha = 0.3f),
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                    }
-
-                                    Box(
-                                        modifier = Modifier
-                                            .clip(RoundedCornerShape(6.dp))
-                                            .background(AccentBlue.copy(alpha = 0.15f))
-                                            .border(1.dp, AccentBlue.copy(alpha = 0.4f), RoundedCornerShape(6.dp))
-                                            .padding(horizontal = 8.dp, vertical = 3.dp)
-                                    ) {
-                                        Text(
-                                            text = "${settings.autoDeleteMinutes} min",
-                                            fontSize = 12.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = AccentBlueLight
-                                        )
-                                    }
-
-                                    IconButton(
-                                        onClick = {
-                                            if (settings.autoDeleteMinutes < 10) {
-                                                onUpdateSettings(settings.copy(autoDeleteMinutes = settings.autoDeleteMinutes + 1))
-                                            }
-                                        },
-                                        enabled = settings.autoDeleteMinutes < 10,
-                                        modifier = Modifier.size(28.dp)
-                                    ) {
-                                        Icon(
-                                            Icons.Default.Add,
-                                            contentDescription = "Increase",
-                                            tint = if (settings.autoDeleteMinutes < 10) AccentBlue else TextMuted.copy(alpha = 0.3f),
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                    }
+                                    Icon(
+                                        imageVector = tab.icon,
+                                        contentDescription = null,
+                                        tint = if (isSelected) CrimsonPrimary else TextMuted,
+                                        modifier = Modifier.size(15.dp)
+                                    )
+                                    Text(
+                                        text = tab.title,
+                                        fontSize = 12.5.sp,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                        color = if (isSelected) TextWhite else TextMuted
+                                    )
                                 }
                             }
-
-                            // Minute chips (1 to 10)
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .horizontalScroll(rememberScrollState()),
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                (1..10).forEach { mins ->
-                                    val isSelected = settings.autoDeleteMinutes == mins
-                                    Box(
-                                        modifier = Modifier
-                                            .clip(RoundedCornerShape(6.dp))
-                                            .background(
-                                                if (isSelected) AccentBlue else DarkSurfaceVariant
-                                            )
-                                            .then(
-                                                if (isSelected) Modifier.softGlow(color = AccentBlue.copy(alpha = 0.4f)) else Modifier.border(1.dp, DarkCardBorder, RoundedCornerShape(6.dp))
-                                            )
-                                            .clickable {
-                                                onUpdateSettings(settings.copy(autoDeleteMinutes = mins))
-                                            }
-                                            .padding(horizontal = 10.dp, vertical = 5.dp),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text(
-                                            text = "${mins}m",
-                                            fontSize = 11.sp,
-                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                            color = if (isSelected) Color.White else TextMuted
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun ProviderApiKeyInputField(
-    provider: AiProvider,
-    currentKey: String,
-    hint: String,
-    isEnvKeyPresent: Boolean = false,
-    onKeyChanged: (String) -> Unit
-) {
-    var textValue by remember(currentKey) { mutableStateOf(currentKey) }
-    var isPasswordVisible by remember { mutableStateOf(false) }
-
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                Surface(
-                    shape = RoundedCornerShape(6.dp),
-                    color = AccentPurple.copy(alpha = 0.15f),
-                    border = BorderStroke(1.dp, AccentPurple.copy(alpha = 0.35f))
-                ) {
-                    Text(
-                        text = provider.displayName,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = AccentPurpleLight,
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                    )
-                }
-                Text(
-                    text = provider.modelName,
-                    fontSize = 10.5.sp,
-                    color = TextMuted
-                )
-            }
-
-            if (isEnvKeyPresent && textValue.isBlank()) {
-                Surface(
-                    shape = RoundedCornerShape(4.dp),
-                    color = AccentGreen.copy(alpha = 0.15f),
-                    border = BorderStroke(1.dp, AccentGreen.copy(alpha = 0.4f))
-                ) {
-                    Text(
-                        text = "ENV KEY ACTIVE",
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = AccentGreen,
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                    )
-                }
-            }
-        }
-
-        OutlinedTextField(
-            value = textValue,
-            onValueChange = {
-                textValue = it
-                onKeyChanged(it)
-            },
-            placeholder = { Text(hint, color = TextSubtle, fontSize = 11.sp, maxLines = 1) },
-            visualTransformation = if (isPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-            trailingIcon = {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (textValue.isNotBlank()) {
-                        IconButton(onClick = {
-                            textValue = ""
-                            onKeyChanged("")
-                        }) {
-                            Icon(Icons.Default.Clear, contentDescription = "Clear", modifier = Modifier.size(16.dp), tint = TextMuted)
-                        }
-                    }
-                    IconButton(onClick = { isPasswordVisible = !isPasswordVisible }) {
-                        Icon(
-                            imageVector = if (isPasswordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
-                            contentDescription = if (isPasswordVisible) "Hide key" else "Show key",
-                            modifier = Modifier.size(16.dp),
-                            tint = TextMuted
                         )
                     }
                 }
-            },
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(10.dp),
-            singleLine = true,
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = AccentPurple,
-                unfocusedBorderColor = DarkCardBorder,
-                focusedContainerColor = DarkSurfaceCard,
-                unfocusedContainerColor = DarkSurfaceCard,
-                focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                unfocusedTextColor = MaterialTheme.colorScheme.onSurface
-            )
-        )
-    }
-}
-
-/**
- * High-performance isolated countdown timer chip that ticks internally
- * without invalidating parent HistoryTab, LazyColumn, or other items.
- */
-@Composable
-fun HistoryCountdownBadge(
-    itemTimestamp: Long,
-    autoDeleteMinutes: Int,
-    autoDeleteEnabled: Boolean,
-    modifier: Modifier = Modifier
-) {
-    if (!autoDeleteEnabled) {
-        var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
-        val elapsedSec = (now - itemTimestamp) / 1000
-        val timeStr = when {
-            elapsedSec < 60 -> "Just now"
-            elapsedSec < 3600 -> "${elapsedSec / 60}m ago"
-            else -> "${elapsedSec / 3600}h ago"
+            }
         }
-        Text(
-            text = timeStr,
-            fontSize = 10.sp,
-            color = TextMuted,
-            modifier = modifier
-        )
-        return
-    }
-
-    // Isolated 1-second ticker specifically inside this badge
-    var currentMs by remember { mutableLongStateOf(System.currentTimeMillis()) }
-    LaunchedEffect(itemTimestamp, autoDeleteMinutes) {
-        while (true) {
-            kotlinx.coroutines.delay(1000L)
-            currentMs = System.currentTimeMillis()
-        }
-    }
-
-    val maxAgeMs = autoDeleteMinutes * 60 * 1000L
-    val elapsedMs = currentMs - itemTimestamp
-    val remainingMs = (maxAgeMs - elapsedMs).coerceAtLeast(0)
-    val totalSec = remainingMs / 1000
-    val remMin = totalSec / 60
-    val remSec = totalSec % 60
-    val countdownStr = if (remMin > 0) "${remMin}m ${remSec}s" else "${remSec}s"
-    val isExpiringSoon = remainingMs < 30_000
-
-    Box(
-        modifier = modifier
-            .clip(RoundedCornerShape(6.dp))
-            .background(
-                if (isExpiringSoon) AccentRed.copy(alpha = 0.18f)
-                else AccentGreen.copy(alpha = 0.15f)
-            )
-            .border(
-                1.dp,
-                if (isExpiringSoon) AccentRed.copy(alpha = 0.6f) else AccentGreen.copy(alpha = 0.4f),
-                RoundedCornerShape(6.dp)
-            )
-            .padding(horizontal = 6.dp, vertical = 2.dp)
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(3.dp)
+    ) { paddingValues ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
         ) {
-            Icon(
-                imageVector = Icons.Default.Schedule,
-                contentDescription = null,
-                tint = if (isExpiringSoon) AccentRed else AccentGreen,
-                modifier = Modifier.size(10.dp)
-            )
-            Text(
-                text = "Expires in $countdownStr",
-                fontSize = 9.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = if (isExpiringSoon) AccentRed else AccentGreen
-            )
-        }
-    }
-}
-
-@Composable
-fun HistoryTab(
-    history: List<com.example.model.QuestionDetectionHistory>,
-    settings: com.example.model.ReplySettings,
-    onUpdateSettings: (com.example.model.ReplySettings) -> Unit,
-    onDeleteHistoryItem: (String) -> Unit,
-    onClearHistory: () -> Unit,
-    onCopyReply: (String) -> Unit
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        // History Header Card with Auto-delete Status, Stepper & Clear Button (Blue Category)
-        ControlPanelCard(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(14.dp)
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(12.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Timer,
-                            contentDescription = null,
-                            tint = if (settings.autoDeleteHistory) AccentBlue else TextMuted,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Column {
-                            Text(
-                                text = "Auto-Delete History",
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Text(
-                                text = if (settings.autoDeleteHistory) "Purging after ${settings.autoDeleteMinutes} min" else "Auto-deletion disabled",
-                                fontSize = 10.sp,
-                                color = TextMuted
-                            )
-                        }
-                    }
-
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        if (history.isNotEmpty()) {
-                            OutlinedButton(
-                                onClick = onClearHistory,
-                                shape = RoundedCornerShape(8.dp),
-                                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp, vertical = 2.dp),
-                                colors = ButtonDefaults.outlinedButtonColors(
-                                    contentColor = AccentRed
-                                ),
-                                border = BorderStroke(1.dp, AccentRed.copy(alpha = 0.5f))
-                            ) {
-                                Icon(
-                                    Icons.Default.DeleteOutline,
-                                    contentDescription = "Clear All",
-                                    modifier = Modifier.size(13.dp)
+            when (ControlPanelTab.entries[selectedTab]) {
+                ControlPanelTab.DASHBOARD -> {
+                    DashboardTab(
+                        isOverlayRunning = isOverlayRunning,
+                        hasOverlayPermission = hasOverlayPermission,
+                        isAccessibilityEnabled = isAccessibilityRunning,
+                        settings = settings,
+                        activeProvider = activeProvider,
+                        onStartAssistant = {
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(context)) {
+                                Toast.makeText(context, "Please grant Overlay Permission first", Toast.LENGTH_SHORT).show()
+                                val intent = Intent(
+                                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                    Uri.parse("package:${context.packageName}")
                                 )
-                                Spacer(modifier = Modifier.width(3.dp))
-                                Text("Clear", fontSize = 10.sp)
+                                context.startActivity(intent)
+                            } else {
+                                FloatingOverlayService.start(context)
+                                AppStateManager.setOverlayRunning(true)
+                                Toast.makeText(context, "Floating Assistant Started", Toast.LENGTH_SHORT).show()
                             }
-                        }
-
-                        ControlPanelSwitch(
-                            checked = settings.autoDeleteHistory,
-                            activeColor = AccentBlue,
-                            onCheckedChange = { checked ->
-                                onUpdateSettings(settings.copy(autoDeleteHistory = checked))
-                            }
-                        )
-                    }
-                }
-
-                // If Auto-Delete is active, show quick adjustable buttons (1-10 mins) + stepper (Blue)
-                AnimatedVisibility(
-                    visible = settings.autoDeleteHistory,
-                    enter = fadeIn() + expandVertically(),
-                    exit = fadeOut() + shrinkVertically()
-                ) {
-                    Column(
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier.padding(top = 2.dp)
-                    ) {
-                        HorizontalDivider(color = DarkCardBorder)
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "ADJUST TIME (1 - 10 MINS):",
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = AccentBlue,
-                                letterSpacing = 0.4.sp
-                            )
-
-                            // Quick stepper (- / +)
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                IconButton(
-                                    onClick = {
-                                        if (settings.autoDeleteMinutes > 1) {
-                                            onUpdateSettings(settings.copy(autoDeleteMinutes = settings.autoDeleteMinutes - 1))
-                                        }
-                                    },
-                                    enabled = settings.autoDeleteMinutes > 1,
-                                    modifier = Modifier.size(24.dp)
-                                ) {
-                                    Icon(
-                                        Icons.Default.Remove,
-                                        contentDescription = "Decrease",
-                                        tint = if (settings.autoDeleteMinutes > 1) AccentBlue else TextMuted.copy(alpha = 0.3f),
-                                        modifier = Modifier.size(14.dp)
-                                    )
-                                }
-
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(6.dp))
-                                        .background(AccentBlue.copy(alpha = 0.15f))
-                                        .border(1.dp, AccentBlue.copy(alpha = 0.4f), RoundedCornerShape(6.dp))
-                                        .padding(horizontal = 6.dp, vertical = 2.dp)
-                                ) {
-                                    Text(
-                                        text = "${settings.autoDeleteMinutes}m",
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = AccentBlueLight
-                                    )
-                                }
-
-                                IconButton(
-                                    onClick = {
-                                        if (settings.autoDeleteMinutes < 10) {
-                                            onUpdateSettings(settings.copy(autoDeleteMinutes = settings.autoDeleteMinutes + 1))
-                                        }
-                                    },
-                                    enabled = settings.autoDeleteMinutes < 10,
-                                    modifier = Modifier.size(24.dp)
-                                ) {
-                                    Icon(
-                                        Icons.Default.Add,
-                                        contentDescription = "Increase",
-                                        tint = if (settings.autoDeleteMinutes < 10) AccentBlue else TextMuted.copy(alpha = 0.3f),
-                                        modifier = Modifier.size(14.dp)
-                                    )
-                                }
-                            }
-                        }
-
-                        // Minute chips (1 to 10)
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .horizontalScroll(rememberScrollState()),
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            (1..10).forEach { mins ->
-                                val isSelected = settings.autoDeleteMinutes == mins
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(6.dp))
-                                        .background(
-                                            if (isSelected) AccentBlue else DarkSurfaceVariant
-                                        )
-                                        .then(
-                                            if (isSelected) Modifier.softGlow(color = AccentBlue.copy(alpha = 0.4f)) else Modifier.border(1.dp, DarkCardBorder, RoundedCornerShape(6.dp))
-                                        )
-                                        .clickable {
-                                            onUpdateSettings(settings.copy(autoDeleteMinutes = mins))
-                                        }
-                                        .padding(horizontal = 8.dp, vertical = 4.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = "${mins}m",
-                                        fontSize = 10.sp,
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                        color = if (isSelected) Color.White else TextMuted
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        if (history.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(32.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(48.dp)
-                            .clip(CircleShape)
-                            .background(DarkSurfaceVariant)
-                            .border(1.dp, DarkCardBorder, CircleShape),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.QuestionAnswer,
-                            contentDescription = null,
-                            tint = TextMuted,
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
-                    Text(
-                        text = "No questions in history",
-                        color = MaterialTheme.colorScheme.onSurface,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 14.sp
-                    )
-                    Text(
-                        text = if (settings.autoDeleteHistory) {
-                            "Questions with '?' appear here and auto-delete after ${settings.autoDeleteMinutes} min."
-                        } else {
-                            "Questions with '?' will appear here automatically."
                         },
-                        color = TextMuted,
-                        fontSize = 12.sp,
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        onStopAssistant = {
+                            FloatingOverlayService.stop(context)
+                            AppStateManager.setOverlayRunning(false)
+                            Toast.makeText(context, "Floating Assistant Stopped", Toast.LENGTH_SHORT).show()
+                        },
+                        onRequestOverlayPermission = {
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                                val intent = Intent(
+                                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                    Uri.parse("package:${context.packageName}")
+                                )
+                                context.startActivity(intent)
+                            }
+                        },
+                        onRequestAccessibilityPermission = {
+                            val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+                            context.startActivity(intent)
+                            Toast.makeText(context, "Enable 'ReplyFloat Detector' in Accessibility list", Toast.LENGTH_LONG).show()
+                        }
+                    )
+                }
+                ControlPanelTab.SIMULATOR -> {
+                    SimulatorTab(
+                        currentQuestion = currentQuestion,
+                        activeReplies = activeReplies,
+                        isGenerating = isGenerating,
+                        errorMessage = errorMessage,
+                        settings = settings,
+                        activeProvider = activeProvider,
+                        diagnosticLogs = diagnosticLogs,
+                        onSimulateQuestion = { text, source ->
+                            AppStateManager.simulateQuestionDetected(context, text, source)
+                        },
+                        onSimulateOcrQuestion = { text, source ->
+                            AppStateManager.simulateOcrQuestionDetected(context, text, source)
+                        },
+                        onCopyReply = { reply ->
+                            AppStateManager.copyAndDismissReply(context, reply)
+                        },
+                        onClearDiagnosticLogs = {
+                            AppStateManager.clearDiagnosticLogs()
+                        }
+                    )
+                }
+                ControlPanelTab.APPS -> {
+                    AppsTab(
+                        appsList = settings.appsWhitelist,
+                        onToggleApp = { AppStateManager.toggleAppWhitelist(it) },
+                        onAddCustomApp = { name, pkg, cat -> AppStateManager.addCustomApp(name, pkg, cat) },
+                        onDeleteCustomApp = { AppStateManager.deleteCustomApp(it) }
+                    )
+                }
+                ControlPanelTab.PROVIDERS -> {
+                    ProvidersTab(
+                        settings = settings,
+                        activeProvider = activeProvider,
+                        onSelectPreferredProvider = { AppStateManager.updatePreferredProvider(it) },
+                        onUpdateApiKey = { provider, key -> AppStateManager.updateProviderApiKey(provider, key) },
+                        onAddCustomProvider = { name, model, endpoint, key ->
+                            AppStateManager.addCustomProvider(name, model, endpoint, key)
+                        },
+                        onDeleteCustomProvider = { AppStateManager.deleteCustomProvider(it) }
+                    )
+                }
+                ControlPanelTab.OVERLAY -> {
+                    OverlayTab(
+                        settings = settings,
+                        onSetContinuousAnalysis = { AppStateManager.setContinuousScreenAnalysis(it) },
+                        onSetRealTimeNodeTracking = { AppStateManager.setRealTimeNodeTracking(it) },
+                        onSetSmartDebounceMs = { AppStateManager.setSmartDebounceMs(it) },
+                        onSetOcrFallbackEnabled = { AppStateManager.setOcrFallbackEnabled(it) },
+                        onSetOcrDebounceMs = { AppStateManager.setOcrDebounceMs(it) },
+                        onSetOverlayBarStyle = { AppStateManager.setOverlayBarStyle(it) },
+                        onSetOverlayInteractionMode = { AppStateManager.setOverlayInteractionMode(it) },
+                        onSetAutoHideEnabled = { AppStateManager.setAutoHideEnabled(it) },
+                        onSetAutoHideDelaySec = { AppStateManager.setAutoHideDelaySec(it) },
+                        onSetScreenIdleTimeoutSec = { AppStateManager.setScreenIdleTimeoutSec(it) },
+                        onSetOverlayOpacity = { AppStateManager.setOverlayOpacity(it) },
+                        onSetOverlayCornerRadius = { AppStateManager.setOverlayCornerRadius(it) },
+                        onSetOverlayTextSizeSp = { AppStateManager.setOverlayTextSizeSp(it) },
+                        onDeleteSavedPosition = { AppStateManager.deleteSavedPosition(it) },
+                        onClearAllSavedPositions = { AppStateManager.clearAllSavedPositions() }
+                    )
+                }
+                ControlPanelTab.REPLIES -> {
+                    RepliesTab(
+                        settings = settings,
+                        onUpdateTone = { AppStateManager.updateTone(it) },
+                        onUpdateReplyCount = { AppStateManager.updateReplyCount(it) },
+                        onSetUnderstandingMode = { AppStateManager.setUnderstandingMode(it) },
+                        onSetUnderstandingSummaryLength = { AppStateManager.setUnderstandingSummaryLength(it) },
+                        onSetAutoGenerateReplies = { AppStateManager.setAutoGenerateReplies(it) },
+                        onSetDetectQuestionsOnly = { AppStateManager.setDetectQuestionsOnly(it) },
+                        onSetPrefetchOnAppFocus = { AppStateManager.setPrefetchOnAppFocus(it) },
+                        onSetAutoCopySingleReply = { AppStateManager.setAutoCopySingleReply(it) },
+                        onSetExpandableReplies = { AppStateManager.setExpandableReplies(it) },
+                        onSetResponseLengthPreset = { AppStateManager.setResponseLengthPreset(it) },
+                        onSetCustomCharLimit = { AppStateManager.setCustomCharLimit(it) },
+                        onSetCacheRetentionMinutes = { AppStateManager.setCacheRetentionMinutes(it) },
+                        onSetHistoryRetentionDays = { AppStateManager.setHistoryRetentionDays(it) }
                     )
                 }
             }
-        } else {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                items(history, key = { it.id }) { item ->
-                    ControlPanelCard(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(14.dp)
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(14.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.Top
-                            ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = item.question,
-                                        fontSize = 13.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
-
-                                    Spacer(modifier = Modifier.height(4.dp))
-
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                    ) {
-                                        if (!item.sourceApp.isNullOrBlank()) {
-                                            Box(
-                                                modifier = Modifier
-                                                    .clip(RoundedCornerShape(6.dp))
-                                                    .background(DarkSurfaceVariant)
-                                                    .border(1.dp, DarkCardBorder, RoundedCornerShape(6.dp))
-                                                    .padding(horizontal = 6.dp, vertical = 2.dp)
-                                            ) {
-                                                Text(
-                                                    text = item.sourceApp,
-                                                    fontSize = 9.sp,
-                                                    color = TextMuted
-                                                )
-                                            }
-                                        }
-
-                                        // Isolated Auto-delete countdown badge
-                                        HistoryCountdownBadge(
-                                            itemTimestamp = item.timestamp,
-                                            autoDeleteMinutes = settings.autoDeleteMinutes,
-                                            autoDeleteEnabled = settings.autoDeleteHistory
-                                        )
-                                    }
-                                }
-
-                                IconButton(
-                                    onClick = { onDeleteHistoryItem(item.id) },
-                                    modifier = Modifier.size(28.dp)
-                                ) {
-                                    Icon(
-                                        Icons.Default.Close,
-                                        contentDescription = "Delete item",
-                                        tint = AccentRed,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                }
-                            }
-
-                            if (!item.englishMeaning.isNullOrBlank()) {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .background(DarkSurfaceVariant)
-                                        .border(1.dp, AccentPurple.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
-                                        .padding(horizontal = 8.dp, vertical = 5.dp)
-                                ) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Translate,
-                                            contentDescription = null,
-                                            tint = AccentPurpleLight,
-                                            modifier = Modifier.size(12.dp)
-                                        )
-                                        Text(
-                                            text = "Meaning: ${item.englishMeaning}",
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Medium,
-                                            color = AccentPurpleLight
-                                        )
-                                    }
-                                }
-                            }
-
-                            HorizontalDivider(color = DarkCardBorder)
-
-                            item.replies.forEach { reply ->
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .background(DarkSurfaceVariant)
-                                        .border(1.dp, DarkCardBorder, RoundedCornerShape(8.dp))
-                                        .padding(8.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Text(
-                                        text = reply,
-                                        fontSize = 12.sp,
-                                        color = MaterialTheme.colorScheme.onSurface,
-                                        modifier = Modifier.weight(1f)
-                                    )
-                                    IconButton(
-                                        onClick = { onCopyReply(reply) },
-                                        modifier = Modifier.size(28.dp)
-                                    ) {
-                                        Icon(
-                                            Icons.Default.ContentCopy,
-                                            contentDescription = "Copy",
-                                            tint = AccentBlue,
-                                            modifier = Modifier.size(14.dp)
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
         }
     }
-}
-
-private fun checkOverlayPermission(context: Context): Boolean {
-    return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-        Settings.canDrawOverlays(context)
-    } else {
-        true
-    }
-}
-
-private fun checkAccessibilityService(context: Context): Boolean {
-    val am = context.getSystemService(Context.ACCESSIBILITY_SERVICE) as? AccessibilityManager ?: return false
-    val enabledServices = am.getEnabledAccessibilityServiceList(AccessibilityServiceInfo.FEEDBACK_GENERIC)
-    val packageName = context.packageName
-    return enabledServices.any { it.resolveInfo.serviceInfo.packageName == packageName }
-}
-
-private fun requestOverlayPermission(context: Context) {
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-        val intent = Intent(
-            Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-            Uri.parse("package:${context.packageName}")
-        ).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK
-        }
-        context.startActivity(intent)
-    }
-}
-
-private fun requestAccessibilityPermission(context: Context) {
-    val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).apply {
-        flags = Intent.FLAG_ACTIVITY_NEW_TASK
-    }
-    context.startActivity(intent)
 }

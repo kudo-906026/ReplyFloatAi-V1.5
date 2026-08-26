@@ -1,73 +1,65 @@
 package com.example.ui.theme
 
-import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.dynamicDarkColorScheme
-import androidx.compose.material3.dynamicLightColorScheme
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
+
+// Control Panel & Futuristic Dark Palette
+val DarkBg = Color(0xFF0D0F14)
+val DarkSurfaceCard = Color(0xFF141822)
+val DarkCard = Color(0xFF161B26)
+val DarkCardElevated = Color(0xFF1C2230)
+val DarkSurfaceVariant = Color(0xFF222938)
+val DarkCardBorder = Color(0xFF2B3346)
+
+// Accent Colors
+val CrimsonPrimary = Color(0xFFFF3366)
+val CrimsonLight = Color(0xFFFF6688)
+val CrimsonDark = Color(0xFFCC1144)
+
+val TechBlue = Color(0xFF38BDF8)
+val TechGreen = Color(0xFF4ADE80)
+val AccentGreen = Color(0xFF10B981)
+val AccentGreenLight = Color(0xFF34D399)
+val AccentPurple = Color(0xFFA855F7)
+val AccentPurpleLight = Color(0xFFC084FC)
+val AccentBlue = Color(0xFF00E5FF)
+val AccentYellow = Color(0xFFFBBF24)
+
+// Text Colors
+val TextWhite = Color(0xFFF8FAFC)
+val TextPrimary = Color(0xFFF1F5F9)
+val TextSecondary = Color(0xFF94A3B8)
+val TextMuted = Color(0xFF64748B)
 
 private val DarkColorScheme = darkColorScheme(
     primary = CrimsonPrimary,
     onPrimary = Color.White,
     primaryContainer = CrimsonDark,
-    onPrimaryContainer = Color(0xFFFFEAEA),
-    secondary = CoralGlow,
+    onPrimaryContainer = Color.White,
+    secondary = TechBlue,
     onSecondary = Color.Black,
-    secondaryContainer = DarkCardElevated,
-    onSecondaryContainer = Color(0xFFFFD1D1),
-    tertiary = EmeraldSuccess,
+    secondaryContainer = DarkSurfaceVariant,
+    onSecondaryContainer = TechBlue,
+    tertiary = AccentPurple,
     background = DarkBg,
-    onBackground = Color(0xFFF5EBE6),
-    surface = DarkCard,
-    onSurface = Color(0xFFF5EBE6),
-    surfaceVariant = DarkCardElevated,
-    onSurfaceVariant = TextMuted,
+    onBackground = TextWhite,
+    surface = DarkSurfaceCard,
+    onSurface = TextWhite,
+    surfaceVariant = DarkSurfaceVariant,
+    onSurfaceVariant = TextSecondary,
     outline = DarkCardBorder
 )
 
-private val LightColorScheme = lightColorScheme(
-    primary = CrimsonPrimary,
-    onPrimary = Color.White,
-    primaryContainer = Color(0xFFFFE5E5),
-    onPrimaryContainer = CrimsonDark,
-    secondary = Color(0xFF991B1B),
-    onSecondary = Color.White,
-    secondaryContainer = Color(0xFFFFD5D5),
-    onSecondaryContainer = Color(0xFF500707),
-    tertiary = EmeraldSuccess,
-    background = LightSurface,
-    onBackground = Color(0xFF1F1212),
-    surface = LightCard,
-    onSurface = Color(0xFF1F1212),
-    surfaceVariant = Color(0xFFF8EFEF),
-    onSurfaceVariant = Color(0xFF6B5555),
-    outline = Color(0xFFD8C4C4)
-)
-
 @Composable
-fun MyApplicationTheme(
+fun ReplyFloatTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    dynamicColor: Boolean = false,
-    content: @Composable () -> Unit,
+    content: @Composable () -> Unit
 ) {
-    val colorScheme = when {
-        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            val context = LocalContext.current
-            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-        }
-        darkTheme -> DarkColorScheme
-        else -> LightColorScheme
-    }
-
     MaterialTheme(
-        colorScheme = colorScheme,
-        typography = Typography,
+        colorScheme = DarkColorScheme,
         content = content
     )
 }
-
