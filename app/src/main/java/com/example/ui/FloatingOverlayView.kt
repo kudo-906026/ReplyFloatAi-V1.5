@@ -140,6 +140,10 @@ fun FloatingOverlayView(
                             .background(if (hasContent) AccentGreen else CrimsonPrimary)
                     )
 
+                    val providerLabel = currentQuestion?.generatedByProvider?.displayName?.split(" ")?.first()
+                        ?: activeProvider?.displayName?.split(" ")?.first()
+                        ?: settings.preferredProvider.displayName.split(" ").first()
+
                     Text(
                         text = "ReplyFloat",
                         fontFamily = FontFamily.Monospace,
@@ -147,6 +151,21 @@ fun FloatingOverlayView(
                         fontWeight = FontWeight.Bold,
                         color = if (hasContent) TextWhite else TextMuted
                     )
+
+                    Surface(
+                        shape = RoundedCornerShape(4.dp),
+                        color = CrimsonPrimary.copy(alpha = 0.2f),
+                        border = BorderStroke(0.5.dp, CrimsonPrimary.copy(alpha = 0.5f))
+                    ) {
+                        Text(
+                            text = "via $providerLabel",
+                            fontSize = 9.sp,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Medium,
+                            color = CrimsonLight,
+                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                        )
+                    }
                 }
 
                 Row(
@@ -220,6 +239,23 @@ fun FloatingOverlayView(
                             color = TextWhite,
                             maxLines = 2
                         )
+
+                        if (currentQuestion?.fallbackNotice != null) {
+                            Surface(
+                                shape = RoundedCornerShape(4.dp),
+                                color = TechBlue.copy(alpha = 0.15f),
+                                border = BorderStroke(0.5.dp, TechBlue.copy(alpha = 0.4f))
+                            ) {
+                                Text(
+                                    text = currentQuestion?.fallbackNotice ?: "",
+                                    fontSize = 9.5.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    color = TechBlue,
+                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+                                    maxLines = 1
+                                )
+                            }
+                        }
 
                         if (settings.understandingMode && currentQuestion?.englishMeaning != null) {
                             Row(

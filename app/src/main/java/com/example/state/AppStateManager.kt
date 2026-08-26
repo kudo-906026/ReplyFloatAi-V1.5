@@ -23,6 +23,7 @@ import com.example.model.ResponseLengthPreset
 import com.example.model.SavedOverlayPosition
 import com.example.model.UnderstandingSummaryLength
 import com.example.model.WhitelistedApp
+import com.example.model.defaultBuiltInProviders
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -110,17 +111,62 @@ object AppStateManager {
     }
 
     fun updatePreferredProvider(provider: AiProvider) {
-        _settings.value = _settings.value.copy(preferredProvider = provider)
+        val currentOrder = _settings.value.fallbackOrder.toMutableList()
+        if (currentOrder.contains(provider.id)) {
+            currentOrder.remove(provider.id)
+            currentOrder.add(0, provider.id)
+        } else {
+            currentOrder.add(0, provider.id)
+        }
+        _settings.value = _settings.value.copy(
+            preferredProvider = provider,
+            fallbackOrder = currentOrder
+        )
         _activeProvider.value = provider
     }
 
+    fun updateFallbackOrder(newOrder: List<String>) {
+        val allMap = (defaultBuiltInProviders() + _settings.value.customProviders).associateBy { it.id }
+        val topProvider = newOrder.firstOrNull()?.let { allMap[it] } ?: _settings.value.preferredProvider
+        _settings.value = _settings.value.copy(
+            fallbackOrder = newOrder,
+            preferredProvider = topProvider
+        )
+        _activeProvider.value = topProvider
+    }
+
+    fun moveProviderInFallbackOrder(fromIndex: Int, toIndex: Int) {
+        val current = _settings.value.fallbackOrder.toMutableList()
+        if (fromIndex in current.indices && toIndex in current.indices) {
+            val item = current.removeAt(fromIndex)
+            current.add(toIndex, item)
+            updateFallbackOrder(current)
+        }
+    }
+
+    fun setPrimaryFallbackProvider(providerId: String) {
+        val current = _settings.value.fallbackOrder.toMutableList()
+        current.remove(providerId)
+        current.add(0, providerId)
+        updateFallbackOrder(current)
+    }
+
     fun updateProviderApiKey(provider: AiProvider, newKey: String) {
+        val updatedKeys = _settings.value.providerApiKeys.toMutableMap()
+        updatedKeys[provider.id] = newKey
+
         if (provider.isCustom) {
             val updated = _settings.value.customProviders.map {
                 if (it.id == provider.id) it.copy(apiKey = newKey) else it
             }
-            _settings.value = _settings.value.copy(customProviders = updated)
+            _settings.value = _settings.value.copy(
+                customProviders = updated,
+                providerApiKeys = updatedKeys
+            )
+        } else {
+            _settings.value = _settings.value.copy(providerApiKeys = updatedKeys)
         }
+
         if (_settings.value.preferredProvider.id == provider.id) {
             val updatedPref = _settings.value.preferredProvider.copy(apiKey = newKey)
             _settings.value = _settings.value.copy(preferredProvider = updatedPref)
@@ -129,8 +175,9 @@ object AppStateManager {
     }
 
     fun addCustomProvider(name: String, model: String, endpoint: String, apiKey: String) {
+        val id = UUID.randomUUID().toString()
         val newProvider = AiProvider(
-            id = UUID.randomUUID().toString(),
+            id = id,
             type = AiProviderType.CUSTOM_REST,
             name = name.lowercase().replace(" ", "-"),
             displayName = name,
@@ -140,23 +187,27 @@ object AppStateManager {
             isCustom = true,
             tier = AiModelTier.BALANCED
         )
-        val updated = _settings.value.customProviders + newProvider
-        _settings.value = _settings.value.copy(customProviders = updated)
+        val updatedCustom = _settings.value.customProviders + newProvider
+        val updatedKeys = _settings.value.providerApiKeys + (id to apiKey)
+        val updatedOrder = _settings.value.fallbackOrder + id
+        _settings.value = _settings.value.copy(
+            customProviders = updatedCustom,
+            providerApiKeys = updatedKeys,
+            fallbackOrder = updatedOrder
+        )
     }
 
     fun deleteCustomProvider(providerId: String) {
         val updated = _settings.value.customProviders.filter { it.id != providerId }
-        _settings.value = _settings.value.copy(customProviders = updated)
+        val updatedKeys = _settings.value.providerApiKeys.filterKeys { it != providerId }
+        val updatedOrder = _settings.value.fallbackOrder.filter { it != providerId }
+        _settings.value = _settings.value.copy(
+            customProviders = updated,
+            providerApiKeys = updatedKeys,
+            fallbackOrder = updatedOrder
+        )
         if (_settings.value.preferredProvider.id == providerId) {
-            val fallback = AiProvider(
-                id = "gemini-builtin",
-                type = AiProviderType.GEMINI_BUILTIN,
-                name = "gemini-builtin",
-                displayName = "Gemini Flash (Built-in)",
-                modelName = "gemini-2.5-flash",
-                isBuiltIn = true,
-                tier = AiModelTier.LIGHTWEIGHT
-            )
+            val fallback = defaultBuiltInProviders().first { it.type == AiProviderType.GEMINI_BUILTIN }
             _settings.value = _settings.value.copy(preferredProvider = fallback)
             _activeProvider.value = fallback
         }
@@ -374,36 +425,53 @@ object AppStateManager {
             latencyMs = ocrLatencyMs
         )
 
-        val provider = _activeProvider.value ?: _settings.value.preferredProvider
-
         scope.launch {
             _isGenerating.value = true
             _errorMessage.value = null
 
-            val question = DetectedQuestion(
+            val initialQuestion = DetectedQuestion(
                 text = cleanText,
                 sourceApp = sourceApp,
                 packageName = packageName,
-                generatedByProvider = provider,
+                generatedByProvider = _activeProvider.value ?: _settings.value.preferredProvider,
                 detectionMethod = detectionMethod,
                 ocrLatencyMs = ocrLatencyMs
             )
 
-            _currentQuestion.value = question
-            _questionsHistory.value = listOf(question) + _questionsHistory.value.take(49)
+            _currentQuestion.value = initialQuestion
+            _questionsHistory.value = listOf(initialQuestion) + _questionsHistory.value.take(49)
 
             try {
-                val (replies, meaning) = AiFallbackEngine.generateReplies(
-                    cleanText,
-                    _settings.value,
-                    provider
+                val fallbackResult = AiFallbackEngine.generateRepliesWithFallback(
+                    question = cleanText,
+                    settings = _settings.value,
+                    onLog = { src, raw, res, cat, rsn, lat ->
+                        addDiagnosticLog(
+                            source = src,
+                            rawText = raw,
+                            result = res,
+                            category = cat,
+                            reason = rsn,
+                            detectionMethod = detectionMethod,
+                            latencyMs = lat
+                        )
+                    }
                 )
 
-                _currentQuestion.value = question.copy(englishMeaning = meaning)
-                _activeReplies.value = replies
+                // Update active provider state to match the exact provider that successfully yielded the replies
+                _activeProvider.value = fallbackResult.usedProvider
 
-                if (_settings.value.autoCopySingleReply && replies.size == 1) {
-                    copyAndDismissReply(context, replies.first())
+                val finalQuestion = initialQuestion.copy(
+                    englishMeaning = fallbackResult.understanding,
+                    generatedByProvider = fallbackResult.usedProvider,
+                    fallbackNotice = fallbackResult.fallbackNotice
+                )
+
+                _currentQuestion.value = finalQuestion
+                _activeReplies.value = fallbackResult.replies
+
+                if (_settings.value.autoCopySingleReply && fallbackResult.replies.size == 1) {
+                    copyAndDismissReply(context, fallbackResult.replies.first())
                 }
             } catch (e: Exception) {
                 _errorMessage.value = e.localizedMessage ?: "Failed to generate AI replies"

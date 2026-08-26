@@ -327,6 +327,8 @@ fun MainScreen() {
                         settings = settings,
                         activeProvider = activeProvider,
                         onSelectPreferredProvider = { AppStateManager.updatePreferredProvider(it) },
+                        onMoveFallbackOrder = { from, to -> AppStateManager.moveProviderInFallbackOrder(from, to) },
+                        onSetPrimaryFallback = { AppStateManager.setPrimaryFallbackProvider(it) },
                         onUpdateApiKey = { provider, key -> AppStateManager.updateProviderApiKey(provider, key) },
                         onAddCustomProvider = { name, model, endpoint, key ->
                             AppStateManager.addCustomProvider(name, model, endpoint, key)

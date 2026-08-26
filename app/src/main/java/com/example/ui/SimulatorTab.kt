@@ -130,7 +130,15 @@ fun SimulatorTab(
 
     val testScenarios = listOf(
         TestCaseScenario(
-            title = "1. Short Simple Question",
+            title = "1. Real World Conceptual Question",
+            description = "Complex explanation prompt: 'If you have to explain to a 5-year-old what is integration in ONE sentence, what would you say?'",
+            sampleText = "If you have to explain to a 5-year-old what is integration in ONE sentence, what would you say?",
+            expectedOutcome = "MATCHED: Interrogative Question Pattern",
+            categoryIcon = Icons.Default.QuestionAnswer,
+            iconColor = CrimsonLight
+        ),
+        TestCaseScenario(
+            title = "2. Short Simple Question",
             description = "Standard single-sentence question with interrogative punctuation",
             sampleText = "Are you free for lunch tomorrow?",
             expectedOutcome = "MATCHED: Question Punctuation / Interrogative Clause",
@@ -138,7 +146,7 @@ fun SimulatorTab(
             iconColor = TechBlue
         ),
         TestCaseScenario(
-            title = "2. Long Multi-line Question",
+            title = "3. Long Multi-line Question",
             description = "Message spanning multiple paragraphs with embedded inquiry",
             sampleText = "Hi Alex,\nCould we reschedule our meeting to tomorrow afternoon at 3 PM?\nThanks!",
             expectedOutcome = "MATCHED: Multi-line Question Structure",
@@ -146,7 +154,7 @@ fun SimulatorTab(
             iconColor = AccentPurple
         ),
         TestCaseScenario(
-            title = "3. Math Notation Question",
+            title = "4. Math Notation Question",
             description = "Arithmetic calculation & algebraic equation detection",
             sampleText = "Can you calculate 15 * 8 + 32?",
             expectedOutcome = "MATCHED: Math Prompt / Expression Formula",
@@ -154,7 +162,7 @@ fun SimulatorTab(
             iconColor = AccentYellow
         ),
         TestCaseScenario(
-            title = "4. Normal Messaging App Text",
+            title = "5. Normal Messaging App Text",
             description = "Regular non-question statement text in chat stream",
             sampleText = "I'm heading out now, see you soon.",
             expectedOutcome = "REJECTED: Filtered as non-question statement",
@@ -162,7 +170,7 @@ fun SimulatorTab(
             iconColor = TextMuted
         ),
         TestCaseScenario(
-            title = "5. Unreadable Canvas / WebView (OCR Fallback)",
+            title = "6. Unreadable Canvas / WebView (OCR Fallback)",
             description = "Custom graphic canvas / game UI with 0 text nodes — triggers background On-Device ML Kit OCR fallback",
             sampleText = "What is the capital of Australia?",
             expectedOutcome = "MATCHED via On-Device ML Kit OCR Fallback (Non-blocking background inference)",

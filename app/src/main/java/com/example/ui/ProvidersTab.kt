@@ -17,19 +17,23 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.NetworkCheck
 import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -66,6 +70,7 @@ import com.example.model.AiModelTier
 import com.example.model.AiProvider
 import com.example.model.AiProviderType
 import com.example.model.ReplySettings
+import com.example.model.defaultBuiltInProviders
 import com.example.ui.theme.AccentBlue
 import com.example.ui.theme.AccentGreen
 import com.example.ui.theme.AccentPurple
@@ -91,6 +96,8 @@ fun ProvidersTab(
     settings: ReplySettings,
     activeProvider: AiProvider?,
     onSelectPreferredProvider: (AiProvider) -> Unit,
+    onMoveFallbackOrder: (fromIndex: Int, toIndex: Int) -> Unit = { _, _ -> },
+    onSetPrimaryFallback: (String) -> Unit = {},
     onUpdateApiKey: (AiProvider, String) -> Unit,
     onAddCustomProvider: (String, String, String, String) -> Unit,
     onDeleteCustomProvider: (String) -> Unit
@@ -106,55 +113,29 @@ fun ProvidersTab(
     var customEndpoint by remember { mutableStateOf("") }
     var customApiKey by remember { mutableStateOf("") }
 
-    val builtInProviders = listOf(
-        AiProvider(
-            id = "gemini-builtin",
-            type = AiProviderType.GEMINI_BUILTIN,
-            name = "gemini-builtin",
-            displayName = "Gemini Flash (Built-in)",
-            modelName = "gemini-2.5-flash",
-            isBuiltIn = true,
-            tier = AiModelTier.LIGHTWEIGHT
-        ),
-        AiProvider(
-            id = "gemini-api",
-            type = AiProviderType.GEMINI_API,
-            name = "gemini-api",
-            displayName = "Gemini Pro / Flash API",
-            modelName = "gemini-2.5-flash",
-            apiKey = settings.preferredProvider.takeIf { it.id == "gemini-api" }?.apiKey ?: "",
-            tier = AiModelTier.PRO
-        ),
-        AiProvider(
-            id = "openai",
-            type = AiProviderType.OPENAI,
-            name = "openai",
-            displayName = "OpenAI GPT-4o Mini",
-            modelName = "gpt-4o-mini",
-            apiKey = settings.preferredProvider.takeIf { it.id == "openai" }?.apiKey ?: "",
-            tier = AiModelTier.BALANCED
-        ),
-        AiProvider(
-            id = "anthropic",
-            type = AiProviderType.ANTHROPIC,
-            name = "anthropic",
-            displayName = "Anthropic Claude 3.5 Haiku",
-            modelName = "claude-3-5-haiku-20241022",
-            apiKey = settings.preferredProvider.takeIf { it.id == "anthropic" }?.apiKey ?: "",
-            tier = AiModelTier.BALANCED
-        ),
-        AiProvider(
-            id = "ollama",
-            type = AiProviderType.OLLAMA_LOCAL,
-            name = "ollama",
-            displayName = "Ollama Local (Offline)",
-            modelName = "llama3.2:1b",
-            customEndpoint = "http://10.0.2.2:11434",
-            tier = AiModelTier.LIGHTWEIGHT
-        )
-    )
+    val baseBuiltIn = defaultBuiltInProviders()
+    val allProvidersMap = (baseBuiltIn + settings.customProviders).associateBy { it.id }.toMutableMap()
 
-    val allProviders = builtInProviders + settings.customProviders
+    // Sync saved API keys into provider objects
+    settings.providerApiKeys.forEach { (id, key) ->
+        allProvidersMap[id]?.let { allProvidersMap[id] = it.copy(apiKey = key) }
+    }
+    if (settings.preferredProvider.apiKey.isNotBlank()) {
+        allProvidersMap[settings.preferredProvider.id]?.let {
+            allProvidersMap[settings.preferredProvider.id] = it.copy(apiKey = settings.preferredProvider.apiKey)
+        }
+    }
+
+    // Build the ordered list according to settings.fallbackOrder
+    val orderedIds = if (settings.fallbackOrder.isNotEmpty()) {
+        val list = settings.fallbackOrder.toMutableList()
+        allProvidersMap.keys.forEach { if (!list.contains(it)) list.add(it) }
+        list
+    } else {
+        listOf("openai", "gemini-api", "gemini-builtin", "anthropic", "ollama")
+    }
+
+    val orderedProviders = orderedIds.mapNotNull { allProvidersMap[it] }
 
     LazyColumn(
         modifier = Modifier
@@ -166,15 +147,64 @@ fun ProvidersTab(
         item {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 ControlPanelSectionHeader(
-                    title = "AI PROVIDERS, REASONING MODELS & FALLBACK CHAIN",
+                    title = "PROVIDER FALLBACK ORDER & PRIORITY CHAIN",
                     icon = Icons.Default.Psychology,
                     accentColor = CrimsonPrimary
                 )
                 Text(
-                    text = "Select primary inference engine. If API quota is reached or network drops, ReplyFloat immediately fails over to built-in local heuristics.",
+                    text = "ReplyFloat requests suggestions strictly following this fallback order. Position #1 is queried first; if it fails (e.g. missing key, network error, quota exceeded), it immediately fails over to Position #2 with failure reasons logged in Diagnostics.",
                     fontSize = 12.sp,
                     color = TextSecondary
                 )
+            }
+        }
+
+        // Live Fallback Chain Visual Banner
+        item {
+            ControlPanelCard(
+                modifier = Modifier.fillMaxWidth(),
+                shapeRadius = 12.dp
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = "ACTIVE INFERENCE SEQUENCE",
+                        fontSize = 10.5.sp,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold,
+                        color = TechBlue
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        orderedProviders.take(4).forEachIndexed { idx, p ->
+                            val isPrimary = idx == 0
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = if (isPrimary) CrimsonPrimary.copy(alpha = 0.25f) else DarkSurfaceVariant,
+                                border = BorderStroke(1.dp, if (isPrimary) CrimsonPrimary else DarkCardBorder)
+                            ) {
+                                Text(
+                                    text = "#${idx + 1} ${p.displayName.split(" ").first()}",
+                                    fontSize = 10.5.sp,
+                                    fontWeight = if (isPrimary) FontWeight.Bold else FontWeight.Medium,
+                                    color = if (isPrimary) CrimsonLight else TextSecondary,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
+                                )
+                            }
+                            if (idx < orderedProviders.take(4).size - 1) {
+                                Text("➔", fontSize = 11.sp, color = TextMuted)
+                            }
+                        }
+                    }
+                }
             }
         }
 
@@ -317,27 +347,31 @@ fun ProvidersTab(
                                 contentColor = Color.White
                             )
                         ) {
-                            Text("Save & Add Provider", fontSize = 12.5.sp, fontWeight = FontWeight.Bold)
+                            Text("Save & Add to Chain", fontSize = 12.5.sp, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
             }
         }
 
-        // List of AI Providers
-        items(allProviders, key = { it.id }) { provider ->
-            val isSelected = (activeProvider?.id == provider.id) || (settings.preferredProvider.id == provider.id)
-            var keyInput by remember(provider.apiKey) { mutableStateOf(provider.apiKey) }
+        // List of AI Providers in exact fallback order
+        itemsIndexed(orderedProviders, key = { _, provider -> provider.id }) { index, provider ->
+            val positionNum = index + 1
+            val isPrimary = positionNum == 1
+            val isUsedNow = activeProvider?.id == provider.id
+            val currentApiKey = settings.providerApiKeys[provider.id] ?: provider.apiKey
+            var keyInput by remember(currentApiKey) { mutableStateOf(currentApiKey) }
             val isTesting = testingProviderId == provider.id
+
+            val hasKey = currentApiKey.isNotBlank() || provider.isBuiltIn || provider.type == AiProviderType.OLLAMA_LOCAL
 
             ControlPanelCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .testTag("provider_card_${provider.id}"),
                 shapeRadius = 14.dp,
-                isSelected = isSelected,
-                activeColor = CrimsonPrimary,
-                onClick = { onSelectPreferredProvider(provider) }
+                isSelected = isPrimary,
+                activeColor = if (isPrimary) CrimsonPrimary else DarkCardBorder
             ) {
                 Column(
                     modifier = Modifier
@@ -345,6 +379,7 @@ fun ProvidersTab(
                         .padding(14.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
+                    // Header Row: Position Rank + Provider Name + Move Controls
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -354,19 +389,28 @@ fun ProvidersTab(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(16.dp)
-                                    .clip(CircleShape)
-                                    .background(if (isSelected) CrimsonPrimary else DarkSurfaceVariant)
-                                    .border(1.dp, if (isSelected) CrimsonPrimary else DarkCardBorder, CircleShape)
-                            )
+                            // Position Rank Badge
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = if (isPrimary) CrimsonPrimary else DarkSurfaceVariant,
+                                border = BorderStroke(1.dp, if (isPrimary) CrimsonPrimary else DarkCardBorder)
+                            ) {
+                                Text(
+                                    text = if (isPrimary) "#1 PRIMARY" else "#$positionNum FALLBACK",
+                                    fontSize = 10.5.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isPrimary) TextWhite else TechBlue,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                )
+                            }
+
                             Column {
                                 Text(
                                     text = provider.displayName,
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 14.sp,
-                                    color = if (isSelected) CrimsonLight else TextWhite
+                                    color = if (isPrimary) CrimsonLight else TextWhite
                                 )
                                 Text(
                                     text = "Model: ${provider.modelName}",
@@ -377,45 +421,108 @@ fun ProvidersTab(
                             }
                         }
 
-                        StatusBadge(
-                            text = provider.tier.badge,
-                            style = if (isSelected) StatusBadgeStyle.PURPLE_AI else StatusBadgeStyle.BLUE_INFO
-                        )
-                    }
-
-                    // Optional API Key Input for Non-Built-in
-                    if (!provider.isBuiltIn && provider.type != AiProviderType.OLLAMA_LOCAL) {
+                        // Move Up / Down Buttons
                         Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(2.dp)
                         ) {
-                            OutlinedTextField(
-                                value = keyInput,
-                                onValueChange = {
-                                    keyInput = it
-                                    onUpdateApiKey(provider, it)
+                            IconButton(
+                                onClick = {
+                                    if (index > 0) onMoveFallbackOrder(index, index - 1)
                                 },
-                                placeholder = { Text("API Key...", color = TextMuted, fontSize = 11.5.sp) },
-                                leadingIcon = {
-                                    Icon(Icons.Default.Key, contentDescription = null, tint = TextMuted, modifier = Modifier.size(16.dp))
-                                },
-                                singleLine = true,
-                                modifier = Modifier.weight(1f),
-                                shape = RoundedCornerShape(8.dp),
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = CrimsonPrimary,
-                                    unfocusedBorderColor = DarkCardBorder,
-                                    focusedTextColor = TextWhite,
-                                    unfocusedTextColor = TextWhite,
-                                    focusedContainerColor = DarkSurfaceVariant,
-                                    unfocusedContainerColor = DarkSurfaceVariant
+                                enabled = index > 0,
+                                modifier = Modifier.size(30.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.ArrowUpward,
+                                    contentDescription = "Move Up",
+                                    tint = if (index > 0) TextWhite else TextMuted.copy(alpha = 0.3f),
+                                    modifier = Modifier.size(16.dp)
                                 )
-                            )
+                            }
+
+                            IconButton(
+                                onClick = {
+                                    if (index < orderedProviders.size - 1) onMoveFallbackOrder(index, index + 1)
+                                },
+                                enabled = index < orderedProviders.size - 1,
+                                modifier = Modifier.size(30.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.ArrowDownward,
+                                    contentDescription = "Move Down",
+                                    tint = if (index < orderedProviders.size - 1) TextWhite else TextMuted.copy(alpha = 0.3f),
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
                         }
                     }
 
-                    // Test Connection Bar
+                    // Key Status Notice
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (provider.isBuiltIn) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Icon(Icons.Default.CheckCircle, contentDescription = null, tint = TechGreen, modifier = Modifier.size(13.dp))
+                                Text("Built-in Local Heuristics (Always available offline)", fontSize = 11.sp, color = TechGreen)
+                            }
+                        } else if (provider.type == AiProviderType.OLLAMA_LOCAL) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Icon(Icons.Default.CheckCircle, contentDescription = null, tint = TechBlue, modifier = Modifier.size(13.dp))
+                                Text("Local Ollama Daemon (http://10.0.2.2:11434)", fontSize = 11.sp, color = TechBlue)
+                            }
+                        } else if (hasKey) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Icon(Icons.Default.CheckCircle, contentDescription = null, tint = TechGreen, modifier = Modifier.size(13.dp))
+                                Text("API Key configured", fontSize = 11.sp, color = TechGreen)
+                            }
+                        } else {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Icon(Icons.Default.Warning, contentDescription = null, tint = AccentYellow, modifier = Modifier.size(13.dp))
+                                Text("No API key entered (Will auto-skip to next fallback)", fontSize = 11.sp, color = AccentYellow)
+                            }
+                        }
+
+                        if (!isPrimary) {
+                            TextButton(
+                                onClick = { onSetPrimaryFallback(provider.id) },
+                                modifier = Modifier.height(28.dp)
+                            ) {
+                                Text("Set as #1 Primary", fontSize = 11.sp, color = CrimsonLight, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+
+                    // API Key Input for Non-Built-in
+                    if (!provider.isBuiltIn && provider.type != AiProviderType.OLLAMA_LOCAL) {
+                        OutlinedTextField(
+                            value = keyInput,
+                            onValueChange = {
+                                keyInput = it
+                                onUpdateApiKey(provider, it)
+                            },
+                            placeholder = { Text("Enter ${provider.displayName} API Key...", color = TextMuted, fontSize = 11.5.sp) },
+                            leadingIcon = {
+                                Icon(Icons.Default.Key, contentDescription = null, tint = TextMuted, modifier = Modifier.size(16.dp))
+                            },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(8.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = CrimsonPrimary,
+                                unfocusedBorderColor = DarkCardBorder,
+                                focusedTextColor = TextWhite,
+                                unfocusedTextColor = TextWhite,
+                                focusedContainerColor = DarkSurfaceVariant,
+                                unfocusedContainerColor = DarkSurfaceVariant
+                            )
+                        )
+                    }
+
+                    // Bottom Action Bar: Test Connection & Delete Custom
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -425,7 +532,8 @@ fun ProvidersTab(
                             onClick = {
                                 testingProviderId = provider.id
                                 coroutineScope.launch {
-                                    val result = AiFallbackEngine.testProviderConnection(provider)
+                                    val providerWithKey = provider.copy(apiKey = keyInput)
+                                    val result = AiFallbackEngine.testProviderConnection(providerWithKey)
                                     testingProviderId = null
                                     if (result.isSuccess) {
                                         Toast.makeText(context, result.getOrNull() ?: "Connection OK", Toast.LENGTH_SHORT).show()

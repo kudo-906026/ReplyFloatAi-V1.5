@@ -32,12 +32,13 @@ object QuestionDetectionEngine {
 
     // Math operation symbols & patterns
     private val MATH_OPERATOR_REGEX = Regex("[+\\-*/×÷^%=<>√π∫∑±]")
-    private val MATH_ARITHMETIC_REGEX = Regex("(\\d+([.,]\\d+)?\\s*[+\\-*/×÷^%]\\s*\\d+([.,]\\d+)?)")
-    private val MATH_EQUATION_REGEX = Regex("([0-9a-zA-Z_\\^]+(\\s*[+\\-*/×÷^]\\s*[0-9a-zA-Z_]+)*\\s*=\\s*([0-9a-zA-Z_\\^?]+))")
+    private val MATH_ARITHMETIC_REGEX = Regex("(\\b\\d+([.,]\\d+)?\\s*[+\\-*/×÷^%]\\s*\\d+([.,]\\d+)?\\b)")
+    // Strictly match mathematical equations (e.g., "2x + 6 = 18", "25 * 4 = ?", "5^3 = ?"), not arbitrary strings with '='
+    private val MATH_EQUATION_REGEX = Regex("(\\b\\d*[a-zA-Z]?\\s*[+\\-*/×÷^]\\s*\\d*[a-zA-Z]?\\s*=\\s*(\\d+|\\?|[a-zA-Z]+)\\b)|(\\b[a-zA-Z]\\s*=\\s*\\d+\\b)")
     private val MATH_PROMPT_KEYWORDS = listOf(
         "calculate", "solve", "evaluate", "compute", "simplify",
-        "find x", "find y", "integral", "derivative", "math",
-        "equation", "sum of", "product of", "square root", "percentage of", "how much is"
+        "find x", "find y", "integral", "derivative",
+        "square root", "percentage of", "how much is"
     )
 
     // Conversational question phrases

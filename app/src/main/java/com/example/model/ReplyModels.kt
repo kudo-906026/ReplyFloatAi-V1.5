@@ -136,15 +136,9 @@ data class SavedOverlayPosition(
 )
 
 data class ReplySettings(
-    val preferredProvider: AiProvider = AiProvider(
-        id = "gemini-builtin",
-        type = AiProviderType.GEMINI_BUILTIN,
-        name = "gemini-builtin",
-        displayName = "Gemini Flash (Built-in)",
-        modelName = "gemini-2.5-flash",
-        isBuiltIn = true,
-        tier = AiModelTier.LIGHTWEIGHT
-    ),
+    val preferredProvider: AiProvider = defaultBuiltInProviders()[0],
+    val fallbackOrder: List<String> = listOf("openai", "gemini-api", "gemini-builtin", "anthropic", "ollama"),
+    val providerApiKeys: Map<String, String> = emptyMap(),
     val tone: ReplyTone = ReplyTone.CASUAL,
     val count: Int = 3,
     val autoGenerate: Boolean = true,
@@ -176,6 +170,54 @@ data class ReplySettings(
     val ocrDebounceMs: Int = 1200
 )
 
+fun defaultBuiltInProviders(): List<AiProvider> = listOf(
+    AiProvider(
+        id = "openai",
+        type = AiProviderType.OPENAI,
+        name = "openai",
+        displayName = "OpenAI GPT-4o Mini",
+        modelName = "gpt-4o-mini",
+        apiKey = "",
+        tier = AiModelTier.BALANCED
+    ),
+    AiProvider(
+        id = "gemini-api",
+        type = AiProviderType.GEMINI_API,
+        name = "gemini-api",
+        displayName = "Gemini Pro / Flash API",
+        modelName = "gemini-2.5-flash",
+        apiKey = "",
+        tier = AiModelTier.PRO
+    ),
+    AiProvider(
+        id = "gemini-builtin",
+        type = AiProviderType.GEMINI_BUILTIN,
+        name = "gemini-builtin",
+        displayName = "Gemini Flash (Built-in)",
+        modelName = "gemini-2.5-flash",
+        isBuiltIn = true,
+        tier = AiModelTier.LIGHTWEIGHT
+    ),
+    AiProvider(
+        id = "anthropic",
+        type = AiProviderType.ANTHROPIC,
+        name = "anthropic",
+        displayName = "Anthropic Claude 3.5 Haiku",
+        modelName = "claude-3-5-haiku-20241022",
+        apiKey = "",
+        tier = AiModelTier.BALANCED
+    ),
+    AiProvider(
+        id = "ollama",
+        type = AiProviderType.OLLAMA_LOCAL,
+        name = "ollama",
+        displayName = "Ollama Local (Offline)",
+        modelName = "llama3.2:1b",
+        customEndpoint = "http://10.0.2.2:11434",
+        tier = AiModelTier.LIGHTWEIGHT
+    )
+)
+
 fun defaultWhitelistedApps(): List<WhitelistedApp> = listOf(
     WhitelistedApp("com.whatsapp", "WhatsApp", "Messaging", true),
     WhitelistedApp("org.telegram.messenger", "Telegram", "Messaging", true),
@@ -204,6 +246,7 @@ data class DetectedQuestion(
     val timestamp: Long = System.currentTimeMillis(),
     val englishMeaning: String? = null,
     val generatedByProvider: AiProvider? = null,
+    val fallbackNotice: String? = null,
     val detectionMethod: DetectionMethod = DetectionMethod.ACCESSIBILITY,
     val ocrLatencyMs: Long? = null
 )
@@ -214,6 +257,7 @@ data class ReplyItem(
     val text: String,
     val tone: ReplyTone,
     val generatedByProvider: AiProvider? = null,
+    val fallbackNotice: String? = null,
     val isCustomized: Boolean = false
 )
 

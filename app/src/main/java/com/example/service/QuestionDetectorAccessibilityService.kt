@@ -37,6 +37,16 @@ class QuestionDetectorAccessibilityService : AccessibilityService() {
 
         val pkgName = event.packageName?.toString() ?: return
 
+        // CRITICAL FIX: Never scan ReplyFloat's own app windows/screens as inbound third-party chat messages!
+        if (pkgName == applicationContext.packageName) {
+            return
+        }
+
+        // Ignore System UI and Virtual Keyboards / IMEs
+        if (isSystemOrKeyboardPackage(pkgName)) {
+            return
+        }
+
         // Check if package is whitelisted
         val settings = AppStateManager.settings.value
         val whitelistedApp = settings.appsWhitelist.find { it.packageName == pkgName && it.isEnabled }
@@ -50,7 +60,20 @@ class QuestionDetectorAccessibilityService : AccessibilityService() {
 
         val appName = whitelistedApp.appName
 
-        // 1. PRIMARY SCAN: Fast Accessibility Node / Event Text Scan (Instant, zero latency)
+        // 1. PRIMARY SCAN: Priority on event.source (the exact incoming chat bubble / focused message node)
+        val sourceNode = try { event.source } catch (_: Exception) { null }
+        if (sourceNode != null) {
+            val sourceCandidates = mutableListOf<String>()
+            collectTextNodesSafely(sourceNode, sourceCandidates, currentDepth = 0, maxDepth = 4, maxNodes = 10)
+            for (candidate in sourceCandidates) {
+                if (processCandidateText(candidate, appName, pkgName, "EventSourceNode")) {
+                    lastProcessedTime = now
+                    return
+                }
+            }
+        }
+
+        // 2. Scan direct event text list
         val eventTexts = event.text.mapNotNull { it?.toString() }
         for (raw in eventTexts) {
             if (processCandidateText(raw, appName, pkgName, "AccessibilityEvent.text")) {
@@ -59,7 +82,7 @@ class QuestionDetectorAccessibilityService : AccessibilityService() {
             }
         }
 
-        // 2. Scan window node hierarchy
+        // 3. Scan active window node hierarchy prioritizing bottom-most / newest message content
         var foundAnyReadableNodes = false
         if (settings.continuousScreenAnalysis) {
             try {
@@ -71,8 +94,8 @@ class QuestionDetectorAccessibilityService : AccessibilityService() {
                         foundAnyReadableNodes = true
                     }
 
-                    // Test individual text nodes first
-                    for (candidate in collectedCandidates) {
+                    // Reverse candidates to evaluate newest bottom-most chat messages before top action bars
+                    for (candidate in collectedCandidates.asReversed()) {
                         if (processCandidateText(candidate, appName, pkgName, "ScreenNode")) {
                             lastProcessedTime = now
                             return
@@ -81,7 +104,7 @@ class QuestionDetectorAccessibilityService : AccessibilityService() {
 
                     // Test concatenated sibling text if multiple consecutive text segments exist
                     if (collectedCandidates.size > 1) {
-                        val combined = collectedCandidates.take(5).joinToString(" ").trim()
+                        val combined = collectedCandidates.takeLast(5).joinToString(" ").trim()
                         if (combined.length > 6 && combined != lastProcessedText) {
                             if (processCandidateText(combined, appName, pkgName, "ConcatenatedNodes")) {
                                 lastProcessedTime = now
@@ -214,6 +237,17 @@ class QuestionDetectorAccessibilityService : AccessibilityService() {
         }
     }
 
+    private fun isSystemOrKeyboardPackage(pkg: String): Boolean {
+        val lower = pkg.lowercase()
+        return lower.contains("com.android.systemui") ||
+                lower.contains("inputmethod") ||
+                lower.contains("keyboard") ||
+                lower.contains("swiftkey") ||
+                lower.contains("honeyboard") ||
+                lower.contains("latin") ||
+                lower == "android"
+    }
+
     private fun collectTextNodesSafely(
         node: AccessibilityNodeInfo?,
         outList: MutableList<String>,
@@ -223,14 +257,25 @@ class QuestionDetectorAccessibilityService : AccessibilityService() {
     ) {
         if (node == null || currentDepth > maxDepth || outList.size >= maxNodes) return
 
-        val text = node.text?.toString()?.trim()
-        if (!text.isNullOrBlank() && text.length >= 3) {
-            outList.add(text)
-        }
+        // Skip non-message interactive controls such as buttons, checkboxes, progress bars
+        val className = node.className?.toString() ?: ""
+        val isActionButton = className.contains("Button") ||
+                className.contains("SeekBar") ||
+                className.contains("ProgressBar") ||
+                className.contains("TabWidget") ||
+                className.contains("Switch") ||
+                className.contains("CheckBox")
 
-        val contentDesc = node.contentDescription?.toString()?.trim()
-        if (!contentDesc.isNullOrBlank() && contentDesc.length >= 3 && contentDesc != text) {
-            outList.add(contentDesc)
+        if (!isActionButton) {
+            val text = node.text?.toString()?.trim()
+            if (!text.isNullOrBlank() && text.length >= 3 && !isIgnoredUiString(text)) {
+                outList.add(text)
+            }
+
+            val contentDesc = node.contentDescription?.toString()?.trim()
+            if (!contentDesc.isNullOrBlank() && contentDesc.length >= 3 && contentDesc != text && !isIgnoredUiString(contentDesc)) {
+                outList.add(contentDesc)
+            }
         }
 
         val childCount = node.childCount
@@ -245,6 +290,15 @@ class QuestionDetectorAccessibilityService : AccessibilityService() {
                 collectTextNodesSafely(child, outList, currentDepth + 1, maxDepth, maxNodes)
             }
         }
+    }
+
+    private fun isIgnoredUiString(text: String): Boolean {
+        val lower = text.lowercase().trim()
+        return lower in listOf(
+            "type a message", "message", "search", "search...", "send",
+            "calls", "chats", "status", "settings", "camera", "online",
+            "typing...", "today", "yesterday", "delivered", "read", "photo", "video"
+        ) || lower.matches(Regex("^\\d{1,2}:\\d{2}(\\s*(am|pm))?$"))
     }
 
     private fun processCandidateText(raw: String, appName: String, pkgName: String, sourceTag: String): Boolean {

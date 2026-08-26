@@ -3,12 +3,13 @@ package com.example.ai
 import com.example.model.AiModelTier
 import com.example.model.AiProvider
 import com.example.model.AiProviderType
-import com.example.model.DetectedQuestion
+import com.example.model.DetectionResultType
 import com.example.model.ReplyItem
 import com.example.model.ReplySettings
 import com.example.model.ReplyTone
 import com.example.model.ResponseLengthPreset
 import com.example.model.UnderstandingSummaryLength
+import com.example.model.defaultBuiltInProviders
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -21,13 +22,20 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.util.UUID
 
+data class FallbackGenerationResult(
+    val replies: List<ReplyItem>,
+    val understanding: String?,
+    val usedProvider: AiProvider,
+    val fallbackNotice: String? = null
+)
+
 object AiFallbackEngine {
 
-    suspend fun generateReplies(
+    suspend fun generateRepliesWithFallback(
         question: String,
         settings: ReplySettings,
-        activeProvider: AiProvider
-    ): Pair<List<ReplyItem>, String?> = withContext(Dispatchers.IO) {
+        onLog: ((source: String, rawText: String, result: DetectionResultType, category: String, reason: String, latencyMs: Long?) -> Unit)? = null
+    ): FallbackGenerationResult = withContext(Dispatchers.IO) {
         val qId = UUID.randomUUID().toString()
 
         // Generate meaning / understanding if enabled
@@ -35,58 +43,142 @@ object AiFallbackEngine {
             generateUnderstanding(question, settings.understandingSummaryLength)
         } else null
 
-        // Try primary provider first, fallback gracefully if fails
-        var replies = tryCallProvider(activeProvider, question, settings, qId)
-
-        if (replies.isEmpty()) {
-            // Fallback to Built-in Gemini Smart Heuristics
-            replies = generateSmartLocalReplies(question, settings, qId, activeProvider)
+        // 1. Build the map of all registered providers with their stored API keys
+        val allMap = (defaultBuiltInProviders() + settings.customProviders).associateBy { it.id }.toMutableMap()
+        settings.providerApiKeys.forEach { (id, key) ->
+            allMap[id]?.let { allMap[id] = it.copy(apiKey = key) }
+        }
+        if (settings.preferredProvider.apiKey.isNotBlank()) {
+            allMap[settings.preferredProvider.id]?.let {
+                allMap[settings.preferredProvider.id] = it.copy(apiKey = settings.preferredProvider.apiKey)
+            }
         }
 
-        Pair(replies, understanding)
+        // 2. Build ordered provider chain according to settings.fallbackOrder
+        val orderedIds = if (settings.fallbackOrder.isNotEmpty()) {
+            settings.fallbackOrder
+        } else {
+            listOf("openai", "gemini-api", "gemini-builtin", "anthropic", "ollama")
+        }
+
+        val chain = orderedIds.mapNotNull { allMap[it] }.toMutableList()
+
+        // Ensure built-in provider always exists as a fail-safe at the end
+        val builtIn = allMap["gemini-builtin"] ?: defaultBuiltInProviders().first { it.type == AiProviderType.GEMINI_BUILTIN }
+        if (chain.none { it.type == AiProviderType.GEMINI_BUILTIN }) {
+            chain.add(builtIn)
+        }
+
+        val failoverLogs = mutableListOf<String>()
+
+        // 3. Iterate through chain strictly in order starting with #1 Primary
+        for ((index, provider) in chain.withIndex()) {
+            val positionNum = index + 1
+            val startTime = System.currentTimeMillis()
+
+            // Check if provider requires an API key but has none configured
+            if (!provider.isBuiltIn && provider.type != AiProviderType.OLLAMA_LOCAL && provider.apiKey.isBlank()) {
+                val skipReason = "[#$positionNum ${provider.displayName} Skipped]: No API key configured in Settings"
+                failoverLogs.add(skipReason)
+                onLog?.invoke(
+                    provider.displayName,
+                    question,
+                    DetectionResultType.REJECTED,
+                    "PROVIDER_FAILOVER",
+                    "$skipReason. Falling over to next provider in fallback chain...",
+                    null
+                )
+                continue
+            }
+
+            try {
+                val replies = when (provider.type) {
+                    AiProviderType.GEMINI_API -> callGeminiRestApi(provider, question, settings, qId)
+                    AiProviderType.OPENAI, AiProviderType.CUSTOM_REST -> callOpenAiCompatibleRest(provider, question, settings, qId)
+                    AiProviderType.ANTHROPIC -> callAnthropicRest(provider, question, settings, qId)
+                    AiProviderType.OLLAMA_LOCAL -> callOllamaRest(provider, question, settings, qId)
+                    AiProviderType.GEMINI_BUILTIN -> generateSmartLocalReplies(question, settings, qId, provider)
+                    else -> emptyList()
+                }
+
+                val latency = System.currentTimeMillis() - startTime
+
+                if (replies.isNotEmpty()) {
+                    val notice = if (index > 0 && failoverLogs.isNotEmpty()) {
+                        "Fell back from #${1} (${chain.first().displayName}) to #${positionNum} (${provider.displayName})"
+                    } else null
+
+                    onLog?.invoke(
+                        provider.displayName,
+                        question,
+                        DetectionResultType.MATCHED,
+                        "AI_GENERATION",
+                        "Generated ${replies.size} replies via Position #$positionNum (${provider.displayName}) in ${latency}ms" +
+                                if (notice != null) " [$notice]" else "",
+                        latency
+                    )
+
+                    return@withContext FallbackGenerationResult(
+                        replies = replies,
+                        understanding = understanding,
+                        usedProvider = provider,
+                        fallbackNotice = notice
+                    )
+                } else {
+                    val emptyReason = "[#$positionNum ${provider.displayName} Failed]: Empty response returned"
+                    failoverLogs.add(emptyReason)
+                    onLog?.invoke(
+                        provider.displayName,
+                        question,
+                        DetectionResultType.REJECTED,
+                        "PROVIDER_FAILOVER",
+                        "$emptyReason. Falling over to next provider...",
+                        latency
+                    )
+                }
+            } catch (e: Exception) {
+                val latency = System.currentTimeMillis() - startTime
+                val failReason = "[#$positionNum ${provider.displayName} Error]: ${e.message ?: "Network or API failure"}"
+                failoverLogs.add(failReason)
+                onLog?.invoke(
+                    provider.displayName,
+                    question,
+                    DetectionResultType.REJECTED,
+                    "PROVIDER_FAILOVER",
+                    "$failReason. Falling over to next provider...",
+                    latency
+                )
+            }
+        }
+
+        // 4. If all preceding providers failed, use local built-in engine
+        val localReplies = generateSmartLocalReplies(question, settings, qId, builtIn)
+        val fallbackNotice = "Fallback chain exhausted; generated via Built-in Engine (${failoverLogs.firstOrNull() ?: "Offline"})"
+        onLog?.invoke(
+            builtIn.displayName,
+            question,
+            DetectionResultType.MATCHED,
+            "AI_LOCAL_FALLBACK",
+            "Synthesized replies via Built-in Engine. Notice: $fallbackNotice",
+            15L
+        )
+
+        FallbackGenerationResult(
+            replies = localReplies,
+            understanding = understanding,
+            usedProvider = builtIn,
+            fallbackNotice = fallbackNotice
+        )
     }
 
-    private suspend fun tryCallProvider(
-        provider: AiProvider,
+    // Keep legacy signature for backward compatibility if called directly
+    suspend fun generateReplies(
         question: String,
         settings: ReplySettings,
-        questionId: String
-    ): List<ReplyItem> {
-        return try {
-            when (provider.type) {
-                AiProviderType.GEMINI_API -> {
-                    if (provider.apiKey.isNotBlank()) {
-                        callGeminiRestApi(provider, question, settings, questionId)
-                    } else {
-                        emptyList()
-                    }
-                }
-                AiProviderType.OPENAI, AiProviderType.CUSTOM_REST -> {
-                    if (provider.apiKey.isNotBlank() || provider.customEndpoint != null) {
-                        callOpenAiCompatibleRest(provider, question, settings, questionId)
-                    } else {
-                        emptyList()
-                    }
-                }
-                AiProviderType.ANTHROPIC -> {
-                    if (provider.apiKey.isNotBlank()) {
-                        callAnthropicRest(provider, question, settings, questionId)
-                    } else {
-                        emptyList()
-                    }
-                }
-                AiProviderType.OLLAMA_LOCAL -> {
-                    callOllamaRest(provider, question, settings, questionId)
-                }
-                AiProviderType.GEMINI_BUILTIN -> {
-                    // Fast responsive local heuristics + synthesized dynamic responses
-                    generateSmartLocalReplies(question, settings, questionId, provider)
-                }
-                else -> emptyList()
-            }
-        } catch (e: Exception) {
-            emptyList()
-        }
+        activeProvider: AiProvider
+    ): Pair<List<ReplyItem>, String?> = withContext(Dispatchers.IO) {
+        val result = generateRepliesWithFallback(question, settings)
+        Pair(result.replies, result.understanding)
     }
 
     suspend fun testProviderConnection(provider: AiProvider): Result<String> = withContext(Dispatchers.IO) {
@@ -341,6 +433,11 @@ object AiFallbackEngine {
                     .getString("text")
                 return parseJsonArrayReplies(text, questionId, settings.tone, provider)
             }
+        } else {
+            val errorText = try {
+                BufferedReader(InputStreamReader(conn.errorStream ?: conn.inputStream)).use { it.readText() }
+            } catch (_: Exception) { conn.responseMessage }
+            throw java.io.IOException("Gemini API HTTP ${conn.responseCode}: $errorText")
         }
         return emptyList()
     }
@@ -389,6 +486,11 @@ object AiFallbackEngine {
                 val content = choices.getJSONObject(0).getJSONObject("message").getString("content")
                 return parseJsonArrayReplies(content, questionId, settings.tone, provider)
             }
+        } else {
+            val errorText = try {
+                BufferedReader(InputStreamReader(conn.errorStream ?: conn.inputStream)).use { it.readText() }
+            } catch (_: Exception) { conn.responseMessage }
+            throw java.io.IOException("OpenAI Endpoint HTTP ${conn.responseCode}: $errorText")
         }
         return emptyList()
     }
@@ -435,6 +537,11 @@ object AiFallbackEngine {
                 val text = contentArr.getJSONObject(0).getString("text")
                 return parseJsonArrayReplies(text, questionId, settings.tone, provider)
             }
+        } else {
+            val errorText = try {
+                BufferedReader(InputStreamReader(conn.errorStream ?: conn.inputStream)).use { it.readText() }
+            } catch (_: Exception) { conn.responseMessage }
+            throw java.io.IOException("Anthropic API HTTP ${conn.responseCode}: $errorText")
         }
         return emptyList()
     }
