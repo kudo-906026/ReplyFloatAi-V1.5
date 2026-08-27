@@ -66,8 +66,59 @@ object AppStateManager {
     private val _diagnosticLogs = MutableStateFlow<List<DiagnosticLogEntry>>(emptyList())
     val diagnosticLogs: StateFlow<List<DiagnosticLogEntry>> = _diagnosticLogs.asStateFlow()
 
+    private val processedQuestionsCache = mutableMapOf<String, Long>()
+    private val answeredQuestions = mutableSetOf<String>()
+
     init {
         _activeProvider.value = _settings.value.preferredProvider
+    }
+
+    fun normalizeQuestionText(text: String): String {
+        return text.lowercase().trim().replace(Regex("\\s+"), " ")
+    }
+
+    fun isQuestionAlreadyProcessed(text: String): Boolean {
+        val norm = normalizeQuestionText(text)
+        if (_currentQuestion.value != null && normalizeQuestionText(_currentQuestion.value!!.text) == norm) {
+            return true
+        }
+        if (answeredQuestions.contains(norm)) {
+            return true
+        }
+        val processedAt = processedQuestionsCache[norm]
+        if (processedAt != null) {
+            val elapsed = System.currentTimeMillis() - processedAt
+            val retentionMs = (_settings.value.autoPurgeTimerMinutes.coerceAtLeast(1)) * 60 * 1000L
+            if (elapsed < retentionMs) {
+                return true
+            }
+        }
+        return false
+    }
+
+    fun purgeExpiredData() {
+        val minutes = _settings.value.autoPurgeTimerMinutes
+        if (minutes <= 0) return
+        val cutoff = System.currentTimeMillis() - (minutes * 60 * 1000L)
+        _questionsHistory.value = _questionsHistory.value.filter { it.timestamp >= cutoff }
+        val expiredKeys = processedQuestionsCache.filter { it.value < cutoff }.keys
+        expiredKeys.forEach { processedQuestionsCache.remove(it) }
+    }
+
+    fun refreshServiceStatuses(context: Context) {
+        _isAccessibilityRunning.value = checkAccessibilityServiceRunning(context)
+    }
+
+    fun checkAccessibilityServiceRunning(context: Context): Boolean {
+        return try {
+            val enabledServices = android.provider.Settings.Secure.getString(
+                context.contentResolver,
+                android.provider.Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
+            ) ?: ""
+            enabledServices.contains(context.packageName, ignoreCase = true)
+        } catch (_: Exception) {
+            false
+        }
     }
 
     fun addDiagnosticLog(
@@ -281,6 +332,11 @@ object AppStateManager {
         _settings.value = _settings.value.copy(customCharLimit = limit)
     }
 
+    fun setAutoPurgeTimerMinutes(minutes: Int) {
+        _settings.value = _settings.value.copy(autoPurgeTimerMinutes = minutes)
+        purgeExpiredData()
+    }
+
     fun setCacheRetentionMinutes(minutes: Int) {
         _settings.value = _settings.value.copy(cacheRetentionMinutes = minutes)
     }
@@ -361,6 +417,8 @@ object AppStateManager {
         _activeReplies.value = emptyList()
         _questionsHistory.value = emptyList()
         _errorMessage.value = null
+        processedQuestionsCache.clear()
+        answeredQuestions.clear()
     }
 
     fun dismissReply(replyId: String) {
@@ -378,6 +436,10 @@ object AppStateManager {
         val clip = ClipData.newPlainText("ReplyFloat", reply.text)
         clipboard?.setPrimaryClip(clip)
         Toast.makeText(context, "Copied to clipboard: \"${reply.text}\"", Toast.LENGTH_SHORT).show()
+        
+        _currentQuestion.value?.text?.let { qText ->
+            answeredQuestions.add(normalizeQuestionText(qText))
+        }
         dismissReply(reply.id)
     }
 
@@ -392,6 +454,11 @@ object AppStateManager {
     ) {
         val cleanText = text.trim()
         if (cleanText.isBlank()) return
+
+        // Deduplication check: Do not re-trigger if already seen, answered, or currently active
+        if (!forcedBypass && isQuestionAlreadyProcessed(cleanText)) {
+            return
+        }
 
         val sourceLabel = sourceApp ?: packageName ?: if (detectionMethod == DetectionMethod.MLKIT_OCR) "OCR Screen Engine" else "Accessibility Scanner"
         val analysis = QuestionDetectionEngine.analyze(cleanText, _settings.value.detectQuestionsOnly)
@@ -408,6 +475,11 @@ object AppStateManager {
             )
             return
         }
+
+        // Record question in processed cache
+        val norm = normalizeQuestionText(cleanText)
+        processedQuestionsCache[norm] = System.currentTimeMillis()
+        purgeExpiredData()
 
         val reasonSuffix = if (detectionMethod == DetectionMethod.MLKIT_OCR) {
             " [OCR Fallback: ${ocrLatencyMs ?: 0}ms - On-device ML Kit text recognition]"
@@ -469,10 +541,6 @@ object AppStateManager {
 
                 _currentQuestion.value = finalQuestion
                 _activeReplies.value = fallbackResult.replies
-
-                if (_settings.value.autoCopySingleReply && fallbackResult.replies.size == 1) {
-                    copyAndDismissReply(context, fallbackResult.replies.first())
-                }
             } catch (e: Exception) {
                 _errorMessage.value = e.localizedMessage ?: "Failed to generate AI replies"
             } finally {

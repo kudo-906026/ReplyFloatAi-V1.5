@@ -100,6 +100,15 @@ enum class UnderstandingSummaryLength(
     DETAILED("Detailed Analysis", "Full breakdown of intent, context, and nuance", "Asking for clarification on project timeline due to upcoming deadline")
 }
 
+enum class AutoPurgeTimerOption(val minutes: Int, val label: String, val description: String) {
+    MIN_5(5, "5 Minutes", "Auto-clear processed questions & cached replies after 5 minutes"),
+    MIN_15(15, "15 Minutes", "Auto-clear after 15 minutes (recommended)"),
+    MIN_30(30, "30 Minutes", "Keep suggestions active for half an hour"),
+    HOUR_1(60, "1 Hour", "Purge questions after 1 hour"),
+    HOUR_24(1440, "24 Hours", "Daily auto-delete cycle"),
+    NEVER(0, "Disabled", "Keep history until manually cleared")
+}
+
 enum class OverlayBarStyle(
     val title: String,
     val description: String
@@ -150,6 +159,7 @@ data class ReplySettings(
     val expandableReplies: Boolean = true,
     val responseLengthPreset: ResponseLengthPreset = ResponseLengthPreset.SHORT,
     val customCharLimit: Int = 120,
+    val autoPurgeTimerMinutes: Int = 15,
     val cacheRetentionMinutes: Int = 15,
     val historyRetentionDays: Int = 7,
     val continuousScreenAnalysis: Boolean = true,

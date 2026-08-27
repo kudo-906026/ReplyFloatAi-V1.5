@@ -77,6 +77,7 @@ fun DashboardTab(
     isAccessibilityEnabled: Boolean,
     settings: ReplySettings,
     activeProvider: AiProvider?,
+    onRefreshPermissions: () -> Unit = {},
     onStartAssistant: () -> Unit,
     onStopAssistant: () -> Unit,
     onRequestOverlayPermission: () -> Unit,
@@ -85,8 +86,8 @@ fun DashboardTab(
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 16.dp, vertical = 14.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         // Hero Status Card
         item {
@@ -94,15 +95,15 @@ fun DashboardTab(
                 modifier = Modifier
                     .fillMaxWidth()
                     .testTag("dashboard_hero_card"),
-                shapeRadius = 18.dp,
+                shapeRadius = 14.dp,
                 isSelected = isOverlayRunning,
                 activeColor = AccentGreen
             ) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(18.dp),
-                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                        .padding(13.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -111,19 +112,19 @@ fun DashboardTab(
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             Box(
                                 modifier = Modifier
-                                    .size(12.dp)
+                                    .size(10.dp)
                                     .clip(CircleShape)
                                     .background(if (isOverlayRunning) AccentGreen else CrimsonPrimary)
                             )
                             Text(
                                 text = if (isOverlayRunning) "FLOATING OVERLAY RUNNING" else "ASSISTANT OFFLINE",
-                                fontSize = 13.5.sp,
+                                fontSize = 12.5.sp,
                                 fontWeight = FontWeight.Bold,
-                                letterSpacing = 0.6.sp,
+                                letterSpacing = 0.5.sp,
                                 color = if (isOverlayRunning) AccentGreen else CrimsonLight
                             )
                         }
@@ -140,9 +141,9 @@ fun DashboardTab(
                         } else {
                             "Tap 'Start Floating Assistant' below to launch the overlay. Ensure System Overlay and Accessibility permissions are granted."
                         },
-                        fontSize = 12.5.sp,
+                        fontSize = 11.5.sp,
                         color = TextSecondary,
-                        lineHeight = 17.sp
+                        lineHeight = 16.sp
                     )
 
                     // Master Start / Stop Action Button
@@ -152,14 +153,14 @@ fun DashboardTab(
                         },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(48.dp)
+                            .height(44.dp)
                             .testTag("master_assistant_toggle_button")
                             .softGlow(
                                 color = if (isOverlayRunning) CrimsonPrimary.copy(alpha = 0.4f) else AccentGreen.copy(alpha = 0.4f),
-                                radius = 10.dp,
-                                shapeRadius = 12.dp
+                                radius = 8.dp,
+                                shapeRadius = 10.dp
                             ),
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(10.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = if (isOverlayRunning) CrimsonPrimary else AccentGreen,
                             contentColor = Color.White
@@ -168,12 +169,12 @@ fun DashboardTab(
                         Icon(
                             imageVector = if (isOverlayRunning) Icons.Default.Stop else Icons.Default.PlayArrow,
                             contentDescription = null,
-                            modifier = Modifier.size(20.dp)
+                            modifier = Modifier.size(18.dp)
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
                         Text(
                             text = if (isOverlayRunning) "Stop Floating Overlay" else "Start Floating Assistant",
-                            fontSize = 14.5.sp,
+                            fontSize = 13.5.sp,
                             fontWeight = FontWeight.Bold
                         )
                     }
@@ -185,50 +186,64 @@ fun DashboardTab(
         item {
             ControlPanelCard(
                 modifier = Modifier.fillMaxWidth(),
-                shapeRadius = 16.dp
+                shapeRadius = 14.dp
             ) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                        .padding(13.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    ControlPanelSectionHeader(
-                        title = "PERMISSION GATES & ACCESSIBILITY STATUS",
-                        icon = Icons.Default.Security,
-                        accentColor = CrimsonPrimary
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        ControlPanelSectionHeader(
+                            title = "PERMISSION GATES & ACCESSIBILITY STATUS",
+                            icon = Icons.Default.Security,
+                            accentColor = CrimsonPrimary
+                        )
+
+                        androidx.compose.material3.TextButton(
+                            onClick = onRefreshPermissions,
+                            modifier = Modifier.height(28.dp)
+                        ) {
+                            Text("Refresh", fontSize = 11.sp, color = TechBlue, fontWeight = FontWeight.Bold)
+                        }
+                    }
 
                     // Gate 1: System Overlay
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(10.dp))
+                            .clip(RoundedCornerShape(8.dp))
                             .background(DarkSurfaceVariant)
-                            .padding(12.dp),
+                            .padding(10.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.weight(1f)
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Layers,
                                 contentDescription = null,
                                 tint = if (hasOverlayPermission) AccentGreen else AccentYellow,
-                                modifier = Modifier.size(20.dp)
+                                modifier = Modifier.size(18.dp)
                             )
                             Column {
                                 Text(
                                     text = "System Overlay Permission",
                                     fontWeight = FontWeight.SemiBold,
-                                    fontSize = 13.sp,
+                                    fontSize = 12.5.sp,
                                     color = TextWhite
                                 )
                                 Text(
                                     text = if (hasOverlayPermission) "Granted (SYSTEM_ALERT_WINDOW)" else "Required to draw floating pill",
-                                    fontSize = 11.sp,
+                                    fontSize = 10.5.sp,
                                     color = if (hasOverlayPermission) TechGreen else AccentYellow
                                 )
                             }
@@ -237,11 +252,12 @@ fun DashboardTab(
                         if (!hasOverlayPermission) {
                             OutlinedButton(
                                 onClick = onRequestOverlayPermission,
-                                shape = RoundedCornerShape(8.dp),
+                                shape = RoundedCornerShape(6.dp),
                                 border = BorderStroke(1.dp, CrimsonPrimary),
-                                colors = ButtonDefaults.outlinedButtonColors(contentColor = CrimsonLight)
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = CrimsonLight),
+                                modifier = Modifier.height(32.dp)
                             ) {
-                                Text("Grant", fontSize = 11.5.sp, fontWeight = FontWeight.Bold)
+                                Text("Grant", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                             }
                         } else {
                             StatusBadge(text = "ENABLED", style = StatusBadgeStyle.GREEN_LIVE)
@@ -252,32 +268,33 @@ fun DashboardTab(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(10.dp))
+                            .clip(RoundedCornerShape(8.dp))
                             .background(DarkSurfaceVariant)
-                            .padding(12.dp),
+                            .padding(10.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.weight(1f)
                         ) {
                             Icon(
                                 imageVector = Icons.Default.AccessibilityNew,
                                 contentDescription = null,
                                 tint = if (isAccessibilityEnabled) AccentGreen else AccentYellow,
-                                modifier = Modifier.size(20.dp)
+                                modifier = Modifier.size(18.dp)
                             )
                             Column {
                                 Text(
                                     text = "On-Screen Question Detector",
                                     fontWeight = FontWeight.SemiBold,
-                                    fontSize = 13.sp,
+                                    fontSize = 12.5.sp,
                                     color = TextWhite
                                 )
                                 Text(
                                     text = if (isAccessibilityEnabled) "Active background listener" else "Required to detect chat bubbles",
-                                    fontSize = 11.sp,
+                                    fontSize = 10.5.sp,
                                     color = if (isAccessibilityEnabled) TechGreen else AccentYellow
                                 )
                             }
@@ -286,11 +303,12 @@ fun DashboardTab(
                         if (!isAccessibilityEnabled) {
                             OutlinedButton(
                                 onClick = onRequestAccessibilityPermission,
-                                shape = RoundedCornerShape(8.dp),
+                                shape = RoundedCornerShape(6.dp),
                                 border = BorderStroke(1.dp, CrimsonPrimary),
-                                colors = ButtonDefaults.outlinedButtonColors(contentColor = CrimsonLight)
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = CrimsonLight),
+                                modifier = Modifier.height(32.dp)
                             ) {
-                                Text("Enable", fontSize = 11.5.sp, fontWeight = FontWeight.Bold)
+                                Text("Enable", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                             }
                         } else {
                             StatusBadge(text = "RUNNING", style = StatusBadgeStyle.GREEN_LIVE)
@@ -304,13 +322,13 @@ fun DashboardTab(
         item {
             ControlPanelCard(
                 modifier = Modifier.fillMaxWidth(),
-                shapeRadius = 16.dp
+                shapeRadius = 14.dp
             ) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                        .padding(13.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     ControlPanelSectionHeader(
                         title = "CURRENT AI PROFILE & ACTIVE ARCHITECTURE",
@@ -323,19 +341,19 @@ fun DashboardTab(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Column {
-                            Text("Active Model", fontSize = 11.5.sp, color = TextMuted)
+                            Text("Active Model", fontSize = 11.sp, color = TextMuted)
                             Text(
                                 text = activeProvider?.displayName ?: settings.preferredProvider.displayName,
-                                fontSize = 13.sp,
+                                fontSize = 12.5.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = TextWhite
                             )
                         }
                         Column(horizontalAlignment = Alignment.End) {
-                            Text("Reasoning Tone", fontSize = 11.5.sp, color = TextMuted)
+                            Text("Reasoning Tone", fontSize = 11.sp, color = TextMuted)
                             Text(
                                 text = settings.tone.label,
-                                fontSize = 13.sp,
+                                fontSize = 12.5.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = CrimsonLight
                             )
@@ -349,19 +367,19 @@ fun DashboardTab(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Column {
-                            Text("Overlay Style", fontSize = 11.5.sp, color = TextMuted)
+                            Text("Overlay Style", fontSize = 11.sp, color = TextMuted)
                             Text(
                                 text = settings.overlayBarStyle.title,
-                                fontSize = 13.sp,
+                                fontSize = 12.5.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = TechBlue
                             )
                         }
                         Column(horizontalAlignment = Alignment.End) {
-                            Text("Whitelisted Apps", fontSize = 11.5.sp, color = TextMuted)
+                            Text("Whitelisted Apps", fontSize = 11.sp, color = TextMuted)
                             Text(
                                 text = "${settings.appsWhitelist.count { it.isEnabled }} Enabled",
-                                fontSize = 13.sp,
+                                fontSize = 12.5.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = TechGreen
                             )

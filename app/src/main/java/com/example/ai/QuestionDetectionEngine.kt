@@ -11,12 +11,13 @@ data class DetectionAnalysisResult(
 
 object QuestionDetectionEngine {
 
-    // Common question starter keywords & auxiliary verbs
-    private val QUESTION_STARTERS = listOf(
+    // Common question starter keywords & auxiliary interrogative verbs
+    val QUESTION_WORDS = setOf(
         // Wh- interrogatives
-        "what", "what's", "whats", "when", "when's", "whens",
-        "where", "where's", "wheres", "which", "who", "who's", "whos",
-        "whom", "whose", "why", "why's", "how", "how's", "hows",
+        "why", "what", "how", "who", "whom", "whose", "when", "where", "which",
+        // Contractions
+        "what's", "whats", "how's", "hows", "why's", "whys", "who's", "whos",
+        "where's", "wheres", "when's", "whens",
         // Modal & auxiliary verbs
         "can", "can't", "cant", "could", "couldn't", "couldnt",
         "would", "wouldn't", "wouldnt", "will", "won't", "wont",
@@ -33,7 +34,6 @@ object QuestionDetectionEngine {
     // Math operation symbols & patterns
     private val MATH_OPERATOR_REGEX = Regex("[+\\-*/×÷^%=<>√π∫∑±]")
     private val MATH_ARITHMETIC_REGEX = Regex("(\\b\\d+([.,]\\d+)?\\s*[+\\-*/×÷^%]\\s*\\d+([.,]\\d+)?\\b)")
-    // Strictly match mathematical equations (e.g., "2x + 6 = 18", "25 * 4 = ?", "5^3 = ?"), not arbitrary strings with '='
     private val MATH_EQUATION_REGEX = Regex("(\\b\\d*[a-zA-Z]?\\s*[+\\-*/×÷^]\\s*\\d*[a-zA-Z]?\\s*=\\s*(\\d+|\\?|[a-zA-Z]+)\\b)|(\\b[a-zA-Z]\\s*=\\s*\\d+\\b)")
     private val MATH_PROMPT_KEYWORDS = listOf(
         "calculate", "solve", "evaluate", "compute", "simplify",
@@ -61,19 +61,61 @@ object QuestionDetectionEngine {
             )
         }
 
+        // Ignore URLs and file paths that happen to have '?'
+        if (isUrlOrFilePath(trimmed)) {
+            return DetectionAnalysisResult(
+                isQuestion = false,
+                category = "URL_OR_PATH",
+                reason = "Text appears to be a URL, link, or path with query parameters",
+                extractedQuestionText = trimmed
+            )
+        }
+
         // 1. Check for Math Notation / Math Prompts first
         val mathResult = checkMathNotation(trimmed)
         if (mathResult != null) {
             return mathResult
         }
 
-        // 2. Check for explicit question punctuation (accounting for trailing emojis/quotes/spaces)
-        val questionMarkResult = checkQuestionMark(trimmed)
-        if (questionMarkResult != null) {
-            return questionMarkResult
+        // 2. Extract words
+        val words = extractWords(trimmed)
+
+        // Find if text contains any question words
+        val matchedQuestionWord = words.firstOrNull { it in QUESTION_WORDS }
+
+        // Check if text contains interrogative punctuation mark '?' or '？'
+        val hasQuestionMark = trimmed.contains("?") || trimmed.contains("？") || trimmed.contains("¿")
+
+        // 3. Combined Question Word + Question Mark detection (Strict high-precision requirement)
+        if (hasQuestionMark && matchedQuestionWord != null) {
+            return DetectionAnalysisResult(
+                isQuestion = true,
+                category = "QUESTION_WORD_AND_MARK",
+                reason = "Contains question mark '?' combined with question word '$matchedQuestionWord'",
+                extractedQuestionText = trimmed
+            )
         }
 
-        // 3. Check for multi-line question structure
+        // 4. Conversational question phrases (e.g. "let me know if...", "are you free...")
+        val lowerText = trimmed.lowercase()
+        for (phrase in QUESTION_PHRASES) {
+            if (lowerText.contains(phrase)) {
+                return DetectionAnalysisResult(
+                    isQuestion = true,
+                    category = "CONVERSATIONAL_PHRASE",
+                    reason = "Detected conversational inquiry phrase '$phrase'",
+                    extractedQuestionText = trimmed
+                )
+            }
+        }
+
+        // 5. Sentence starter with question word
+        val starterResult = checkSentenceStarters(trimmed)
+        if (starterResult != null) {
+            return starterResult
+        }
+
+        // 6. Multi-line checks
         if (trimmed.contains("\n")) {
             val multiLineResult = checkMultiLineQuestion(trimmed)
             if (multiLineResult != null) {
@@ -81,13 +123,20 @@ object QuestionDetectionEngine {
             }
         }
 
-        // 4. Check for sentence-level question starters or interrogative phrases
-        val starterResult = checkQuestionStarters(trimmed)
-        if (starterResult != null) {
-            return starterResult
+        // 7. If text has '?' and is short (<= 6 words) and sounds like a query
+        if (hasQuestionMark && words.size in 1..6 && !isUrlOrFilePath(trimmed)) {
+            val lastWord = words.lastOrNull() ?: ""
+            if (lastWord in listOf("right", "really", "sure", "correct", "true", "ready", "ok", "okay", "yes", "no") || words.size <= 3) {
+                return DetectionAnalysisResult(
+                    isQuestion = true,
+                    category = "SHORT_QUESTION",
+                    reason = "Short conversational query with question mark '?'",
+                    extractedQuestionText = trimmed
+                )
+            }
         }
 
-        // 5. If detectQuestionsOnly is disabled, accept all messaging text
+        // 8. If detectQuestionsOnly is disabled, accept all messaging text
         if (!detectQuestionsOnly) {
             return DetectionAnalysisResult(
                 isQuestion = true,
@@ -97,19 +146,38 @@ object QuestionDetectionEngine {
             )
         }
 
-        // 6. Otherwise, safely classify as normal non-question messaging text
+        // 9. Otherwise, safely classify as normal non-question messaging text
         return DetectionAnalysisResult(
             isQuestion = false,
             category = "NORMAL_STATEMENT",
-            reason = "No question mark ('?'), interrogative starter, or math formula detected. Filtered as statement text.",
+            reason = if (hasQuestionMark) {
+                "Punctuation '?' found but missing question words (why, what, how, who, etc.)"
+            } else {
+                "No question words or interrogative structure detected."
+            },
             extractedQuestionText = trimmed
         )
+    }
+
+    private fun extractWords(text: String): List<String> {
+        return text.lowercase()
+            .split(Regex("[\\s,;:.!?\"'()\\[\\]{}]+"))
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+    }
+
+    private fun isUrlOrFilePath(text: String): Boolean {
+        val lower = text.lowercase()
+        return lower.startsWith("http://") ||
+                lower.startsWith("https://") ||
+                lower.startsWith("www.") ||
+                lower.startsWith("file://") ||
+                (lower.contains("?") && (lower.contains("utm_") || lower.contains(".com/") || lower.contains(".org/") || lower.contains(".net/")))
     }
 
     private fun checkMathNotation(text: String): DetectionAnalysisResult? {
         val lower = text.lowercase().trim()
 
-        // Check for math keywords (calculate, solve, evaluate, etc.)
         for (kw in MATH_PROMPT_KEYWORDS) {
             if (lower.contains(kw)) {
                 return DetectionAnalysisResult(
@@ -121,7 +189,6 @@ object QuestionDetectionEngine {
             }
         }
 
-        // Check for algebraic equations e.g. "2x + 6 = 18", "x^2 + 5 = 30", "5^3 = ?"
         val eqMatch = MATH_EQUATION_REGEX.find(text)
         if (eqMatch != null) {
             return DetectionAnalysisResult(
@@ -132,7 +199,6 @@ object QuestionDetectionEngine {
             )
         }
 
-        // Check for arithmetic operations e.g. "15 * 8 + 32", "240 / 6"
         val arithMatch = MATH_ARITHMETIC_REGEX.find(text)
         if (arithMatch != null && (text.contains("?") || lower.startsWith("what") || lower.startsWith("how") || lower.startsWith("is") || text.contains("="))) {
             return DetectionAnalysisResult(
@@ -146,17 +212,21 @@ object QuestionDetectionEngine {
         return null
     }
 
-    private fun checkQuestionMark(text: String): DetectionAnalysisResult? {
-        // Strip trailing emojis, closing quotes, brackets, and whitespace
-        val sanitizedEnd = text.trimEnd { it.isWhitespace() || it == '"' || it == '\'' || it == ')' || it == ']' || it == '}' || it.isSurrogate() || it.category == CharCategory.OTHER_SYMBOL }
+    private fun checkSentenceStarters(text: String): DetectionAnalysisResult? {
+        val sentences = text.split(Regex("[.!;]\\s*|\n+")).map { it.trim() }.filter { it.isNotBlank() }
 
-        if (sanitizedEnd.endsWith("?") || sanitizedEnd.endsWith("？") || text.contains("?") || text.contains("？")) {
-            return DetectionAnalysisResult(
-                isQuestion = true,
-                category = "QUESTION_PUNCTUATION",
-                reason = "Detected interrogative punctuation mark '?' in message",
-                extractedQuestionText = text
-            )
+        for (sentence in sentences) {
+            val words = extractWords(sentence)
+            val firstWord = words.firstOrNull() ?: continue
+
+            if (firstWord in QUESTION_WORDS) {
+                return DetectionAnalysisResult(
+                    isQuestion = true,
+                    category = "QUESTION_STARTER",
+                    reason = "Sentence begins with interrogative starter '$firstWord' (\"$sentence\")",
+                    extractedQuestionText = text
+                )
+            }
         }
         return null
     }
@@ -165,10 +235,11 @@ object QuestionDetectionEngine {
         val lines = text.lines().map { it.trim() }.filter { it.isNotBlank() }
 
         for ((index, line) in lines.withIndex()) {
-            val stripped = line.trimEnd { it.isWhitespace() || it == '"' || it == '\'' || it == ')' }
+            val lineWords = extractWords(line)
+            val hasQMark = line.contains("?") || line.contains("？")
+            val hasQWord = lineWords.any { it in QUESTION_WORDS }
 
-            // Line ends with question mark
-            if (stripped.endsWith("?") || stripped.endsWith("？") || stripped.contains("?")) {
+            if (hasQMark && hasQWord) {
                 return DetectionAnalysisResult(
                     isQuestion = true,
                     category = "MULTILINE_QUESTION",
@@ -177,9 +248,8 @@ object QuestionDetectionEngine {
                 )
             }
 
-            // Line starts with question starter
-            val firstWord = stripped.split(Regex("\\s+")).firstOrNull()?.lowercase()?.trim(',', ':', ';', '\"', '\'')
-            if (firstWord != null && QUESTION_STARTERS.contains(firstWord)) {
+            val firstWord = lineWords.firstOrNull()
+            if (firstWord != null && firstWord in QUESTION_WORDS) {
                 return DetectionAnalysisResult(
                     isQuestion = true,
                     category = "MULTILINE_QUESTION",
@@ -188,39 +258,6 @@ object QuestionDetectionEngine {
                 )
             }
         }
-        return null
-    }
-
-    private fun checkQuestionStarters(text: String): DetectionAnalysisResult? {
-        val clean = text.trim()
-        val sentences = clean.split(Regex("[.!;]\\s*|\n+")).map { it.trim() }.filter { it.isNotBlank() }
-
-        for (sentence in sentences) {
-            val words = sentence.split(Regex("\\s+")).map { it.trim(',', ':', ';', '\"', '\'', '(', ')') }
-            val firstWord = words.firstOrNull()?.lowercase() ?: continue
-
-            if (QUESTION_STARTERS.contains(firstWord)) {
-                return DetectionAnalysisResult(
-                    isQuestion = true,
-                    category = "QUESTION_STARTER",
-                    reason = "Sentence begins with interrogative starter '$firstWord' (\"$sentence\")",
-                    extractedQuestionText = clean
-                )
-            }
-
-            val lowerSentence = sentence.lowercase()
-            for (phrase in QUESTION_PHRASES) {
-                if (lowerSentence.startsWith(phrase) || lowerSentence.contains(phrase)) {
-                    return DetectionAnalysisResult(
-                        isQuestion = true,
-                        category = "CONVERSATIONAL_PHRASE",
-                        reason = "Detected conversational inquiry phrase '$phrase'",
-                        extractedQuestionText = clean
-                    )
-                }
-            }
-        }
-
         return null
     }
 }

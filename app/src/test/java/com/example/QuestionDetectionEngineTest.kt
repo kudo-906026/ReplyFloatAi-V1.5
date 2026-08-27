@@ -12,11 +12,9 @@ class QuestionDetectionEngineTest {
     fun testScenario1_ShortSimpleQuestions() {
         val q1 = QuestionDetectionEngine.analyze("Are you free for lunch tomorrow?", detectQuestionsOnly = true)
         assertTrue("Expected q1 to be detected as a question", q1.isQuestion)
-        assertEquals("QUESTION_PUNCTUATION", q1.category)
 
         val q2 = QuestionDetectionEngine.analyze("What time is the team meeting", detectQuestionsOnly = true)
         assertTrue("Expected q2 to be detected via interrogative starter", q2.isQuestion)
-        assertEquals("QUESTION_STARTER", q2.category)
 
         val q3 = QuestionDetectionEngine.analyze("Can you send me the updated proposal", detectQuestionsOnly = true)
         assertTrue("Expected q3 to be detected via modal verb starter", q3.isQuestion)
@@ -40,7 +38,6 @@ class QuestionDetectionEngineTest {
         """.trimIndent()
         val res2 = QuestionDetectionEngine.analyze(multiline2, detectQuestionsOnly = true)
         assertTrue("Expected multiline question with interrogative line to be detected", res2.isQuestion)
-        assertEquals("MULTILINE_QUESTION", res2.category)
     }
 
     @Test

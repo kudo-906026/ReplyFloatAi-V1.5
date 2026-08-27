@@ -95,6 +95,7 @@ enum class ControlPanelTab(val title: String, val icon: ImageVector, val tag: St
 @Composable
 fun MainScreen() {
     val context = LocalContext.current
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
     var selectedTab by remember { mutableIntStateOf(0) }
 
     val settings by AppStateManager.settings.collectAsStateWithLifecycle()
@@ -115,6 +116,25 @@ fun MainScreen() {
         )
     }
 
+    fun updatePermissions() {
+        hasOverlayPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            Settings.canDrawOverlays(context)
+        } else true
+        AppStateManager.refreshServiceStatuses(context)
+    }
+
+    androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                updatePermissions()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         containerColor = DarkBg,
@@ -128,27 +148,27 @@ fun MainScreen() {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(32.dp)
-                                .clip(RoundedCornerShape(8.dp))
+                                .size(28.dp)
+                                .clip(RoundedCornerShape(6.dp))
                                 .background(CrimsonPrimary.copy(alpha = 0.2f))
-                                .border(1.dp, CrimsonPrimary.copy(alpha = 0.5f), RoundedCornerShape(8.dp)),
+                                .border(1.dp, CrimsonPrimary.copy(alpha = 0.5f), RoundedCornerShape(6.dp)),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Speed,
                                 contentDescription = null,
                                 tint = CrimsonPrimary,
-                                modifier = Modifier.size(18.dp)
+                                modifier = Modifier.size(16.dp)
                             )
                         }
 
@@ -156,17 +176,17 @@ fun MainScreen() {
                             Text(
                                 text = "ReplyFloat",
                                 fontWeight = FontWeight.Bold,
-                                fontSize = 16.sp,
+                                fontSize = 15.sp,
                                 color = TextWhite,
                                 letterSpacing = 0.5.sp
                             )
                             Text(
                                 text = "INTELLIGENT OVERLAY DAEMON",
                                 fontFamily = FontFamily.Monospace,
-                                fontSize = 9.sp,
+                                fontSize = 8.5.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = TextSecondary,
-                                letterSpacing = 1.sp
+                                letterSpacing = 0.8.sp
                             )
                         }
                     }
@@ -174,23 +194,23 @@ fun MainScreen() {
                     // Status Pill
                     Row(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(20.dp))
+                            .clip(RoundedCornerShape(16.dp))
                             .background(DarkSurfaceVariant)
-                            .border(1.dp, if (isOverlayRunning) AccentGreen.copy(alpha = 0.5f) else DarkCardBorder, RoundedCornerShape(20.dp))
-                            .padding(horizontal = 10.dp, vertical = 4.dp),
+                            .border(1.dp, if (isOverlayRunning) AccentGreen.copy(alpha = 0.5f) else DarkCardBorder, RoundedCornerShape(16.dp))
+                            .padding(horizontal = 8.dp, vertical = 3.dp),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        horizontalArrangement = Arrangement.spacedBy(5.dp)
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(8.dp)
+                                .size(7.dp)
                                 .clip(CircleShape)
                                 .background(if (isOverlayRunning) AccentGreen else CrimsonPrimary)
                         )
                         Text(
                             text = if (isOverlayRunning) "OVERLAY ACTIVE" else "IDLE",
                             fontFamily = FontFamily.Monospace,
-                            fontSize = 10.sp,
+                            fontSize = 9.5.sp,
                             fontWeight = FontWeight.Bold,
                             color = if (isOverlayRunning) TechGreen else TextMuted
                         )
@@ -202,12 +222,12 @@ fun MainScreen() {
                     selectedTabIndex = selectedTab,
                     containerColor = DarkSurfaceCard,
                     contentColor = CrimsonPrimary,
-                    edgePadding = 12.dp,
+                    edgePadding = 8.dp,
                     indicator = { tabPositions ->
                         TabRowDefaults.SecondaryIndicator(
                             modifier = Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
                             color = CrimsonPrimary,
-                            height = 2.5.dp
+                            height = 2.dp
                         )
                     },
                     divider = {}
@@ -221,17 +241,17 @@ fun MainScreen() {
                             text = {
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                                 ) {
                                     Icon(
                                         imageVector = tab.icon,
                                         contentDescription = null,
                                         tint = if (isSelected) CrimsonPrimary else TextMuted,
-                                        modifier = Modifier.size(15.dp)
+                                        modifier = Modifier.size(13.dp)
                                     )
                                     Text(
                                         text = tab.title,
-                                        fontSize = 12.5.sp,
+                                        fontSize = 11.5.sp,
                                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                                         color = if (isSelected) TextWhite else TextMuted
                                     )
@@ -256,7 +276,9 @@ fun MainScreen() {
                         isAccessibilityEnabled = isAccessibilityRunning,
                         settings = settings,
                         activeProvider = activeProvider,
+                        onRefreshPermissions = { updatePermissions() },
                         onStartAssistant = {
+                            updatePermissions()
                             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(context)) {
                                 Toast.makeText(context, "Please grant Overlay Permission first", Toast.LENGTH_SHORT).show()
                                 val intent = Intent(
