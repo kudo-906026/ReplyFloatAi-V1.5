@@ -1,5 +1,6 @@
 package com.example.ui
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -48,6 +49,10 @@ import com.example.model.ReplyTone
 import com.example.model.ResponseLengthPreset
 import com.example.model.UnderstandingSummaryLength
 import com.example.state.AppStateManager
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.filled.Timer
+import androidx.compose.material.icons.filled.ContentCopy
 import com.example.ui.theme.AccentBlue
 import com.example.ui.theme.AccentGreen
 import com.example.ui.theme.AccentPurple
@@ -80,6 +85,8 @@ fun RepliesTab(
     onSetExpandableReplies: (Boolean) -> Unit,
     onSetResponseLengthPreset: (ResponseLengthPreset) -> Unit,
     onSetCustomCharLimit: (Int) -> Unit,
+    onSetReplyAutoDeleteMinutes: (Int) -> Unit = { AppStateManager.setReplyAutoDeleteMinutes(it) },
+    onSetHistoryPurgeMinutes: (Int) -> Unit = { AppStateManager.setHistoryPurgeMinutes(it) },
     onSetCacheRetentionMinutes: (Int) -> Unit,
     onSetHistoryRetentionDays: (Int) -> Unit
 ) {
@@ -338,50 +345,141 @@ fun RepliesTab(
 
                     HorizontalDivider(color = DarkCardBorder)
 
-                    // Auto Purge Duplicate Questions Timer Option
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    HorizontalDivider(color = DarkCardBorder)
+
+                    // Reply Auto-Delete on Copy Timer (1m up to 10m)
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text("Duplicate Suppression Window", fontWeight = FontWeight.SemiBold, fontSize = 12.5.sp, color = TextWhite)
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Reply Auto-Delete on Copy Timer", fontWeight = FontWeight.SemiBold, fontSize = 12.5.sp, color = TextWhite)
+                                Text("Auto-clears copied replies from floating bar after delay", fontSize = 10.5.sp, color = TextSecondary)
+                            }
                             MonospaceValue(
-                                text = if (settings.autoPurgeTimerMinutes == 0) "Manual" else "${settings.autoPurgeTimerMinutes} min",
-                                color = TechGreen
+                                text = if (settings.replyAutoDeleteMinutes == 0) "Instant" else "${settings.replyAutoDeleteMinutes} min",
+                                color = CrimsonLight
                             )
                         }
-                        Text("Prevents re-triggering AI for the same question within this window", fontSize = 10.5.sp, color = TextSecondary)
 
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        // 1m..10m Selectable Range Pills
+                        LazyRow(
+                            horizontalArrangement = Arrangement.spacedBy(5.dp),
+                            modifier = Modifier.fillMaxWidth()
                         ) {
-                            AutoPurgeTimerOption.entries.forEach { option ->
-                                val isSelected = settings.autoPurgeTimerMinutes == option.minutes
-                                ControlPanelCard(
-                                    modifier = Modifier.weight(1f),
-                                    isSelected = isSelected,
-                                    activeColor = CrimsonPrimary,
-                                    onClick = { AppStateManager.setAutoPurgeTimerMinutes(option.minutes) },
-                                    shapeRadius = 6.dp
+                            item {
+                                val isSelected = settings.replyAutoDeleteMinutes == 0
+                                Surface(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .clickable { onSetReplyAutoDeleteMinutes(0) },
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = if (isSelected) CrimsonPrimary else DarkSurfaceVariant,
+                                    border = BorderStroke(1.dp, if (isSelected) CrimsonLight else DarkCardBorder)
                                 ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(vertical = 6.dp),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text(
-                                            text = option.label,
-                                            fontSize = 9.5.sp,
-                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                            color = if (isSelected) CrimsonLight else TextWhite
-                                        )
-                                    }
+                                    Text(
+                                        text = "Instant",
+                                        fontSize = 10.sp,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                        color = if (isSelected) TextWhite else TextSecondary,
+                                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 4.dp)
+                                    )
+                                }
+                            }
+                            items((1..10).toList()) { min ->
+                                val isSelected = settings.replyAutoDeleteMinutes == min
+                                Surface(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .clickable { onSetReplyAutoDeleteMinutes(min) },
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = if (isSelected) CrimsonPrimary else DarkSurfaceVariant,
+                                    border = BorderStroke(1.dp, if (isSelected) CrimsonLight else DarkCardBorder)
+                                ) {
+                                    Text(
+                                        text = "${min}m",
+                                        fontSize = 10.sp,
+                                        fontFamily = FontFamily.Monospace,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                        color = if (isSelected) TextWhite else TextSecondary,
+                                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 4.dp)
+                                    )
                                 }
                             }
                         }
+
+                        Slider(
+                            value = settings.replyAutoDeleteMinutes.toFloat(),
+                            onValueChange = { onSetReplyAutoDeleteMinutes(it.toInt()) },
+                            valueRange = 0f..10f,
+                            steps = 9,
+                            colors = SliderDefaults.colors(
+                                thumbColor = CrimsonPrimary,
+                                activeTrackColor = CrimsonPrimary,
+                                inactiveTrackColor = DarkSurfaceVariant
+                            )
+                        )
+                    }
+
+                    HorizontalDivider(color = DarkCardBorder)
+
+                    // History Storage Purge Timer (1m up to 10m)
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("History Storage Purge Timer", fontWeight = FontWeight.SemiBold, fontSize = 12.5.sp, color = TextWhite)
+                                Text("Auto-purges captured question logs and duplicate cache", fontSize = 10.5.sp, color = TextSecondary)
+                            }
+                            MonospaceValue(
+                                text = "${settings.historyPurgeMinutes} min",
+                                color = TechBlue
+                            )
+                        }
+
+                        // 1m..10m Selectable Range Pills
+                        LazyRow(
+                            horizontalArrangement = Arrangement.spacedBy(5.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            items((1..10).toList()) { min ->
+                                val isSelected = settings.historyPurgeMinutes == min
+                                Surface(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .clickable { onSetHistoryPurgeMinutes(min) },
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = if (isSelected) TechBlue else DarkSurfaceVariant,
+                                    border = BorderStroke(1.dp, if (isSelected) AccentBlue else DarkCardBorder)
+                                ) {
+                                    Text(
+                                        text = "${min}m",
+                                        fontSize = 10.sp,
+                                        fontFamily = FontFamily.Monospace,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                        color = if (isSelected) TextWhite else TextSecondary,
+                                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 4.dp)
+                                    )
+                                }
+                            }
+                        }
+
+                        Slider(
+                            value = settings.historyPurgeMinutes.toFloat(),
+                            onValueChange = { onSetHistoryPurgeMinutes(it.toInt()) },
+                            valueRange = 1f..10f,
+                            steps = 8,
+                            colors = SliderDefaults.colors(
+                                thumbColor = TechBlue,
+                                activeTrackColor = TechBlue,
+                                inactiveTrackColor = DarkSurfaceVariant
+                            )
+                        )
                     }
 
                     HorizontalDivider(color = DarkCardBorder)

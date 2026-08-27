@@ -332,9 +332,34 @@ object AppStateManager {
         _settings.value = _settings.value.copy(customCharLimit = limit)
     }
 
-    fun setAutoPurgeTimerMinutes(minutes: Int) {
-        _settings.value = _settings.value.copy(autoPurgeTimerMinutes = minutes)
+    fun setReplyAutoDeleteMinutes(minutes: Int) {
+        _settings.value = _settings.value.copy(replyAutoDeleteMinutes = minutes.coerceIn(0, 10))
+    }
+
+    fun setHistoryPurgeMinutes(minutes: Int) {
+        _settings.value = _settings.value.copy(
+            historyPurgeMinutes = minutes.coerceIn(1, 10),
+            autoPurgeTimerMinutes = minutes.coerceIn(1, 10)
+        )
         purgeExpiredData()
+    }
+
+    fun setAutoPurgeTimerMinutes(minutes: Int) {
+        _settings.value = _settings.value.copy(
+            autoPurgeTimerMinutes = minutes,
+            historyPurgeMinutes = if (minutes in 1..10) minutes else _settings.value.historyPurgeMinutes
+        )
+        purgeExpiredData()
+    }
+
+    fun deleteHistoryItem(id: String) {
+        _questionsHistory.value = _questionsHistory.value.filter { it.id != id }
+    }
+
+    fun clearHistory() {
+        _questionsHistory.value = emptyList()
+        processedQuestionsCache.clear()
+        answeredQuestions.clear()
     }
 
     fun setCacheRetentionMinutes(minutes: Int) {

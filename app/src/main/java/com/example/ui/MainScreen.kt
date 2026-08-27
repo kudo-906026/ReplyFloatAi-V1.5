@@ -24,11 +24,14 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Apps
+import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.Dashboard
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.QuestionAnswer
 import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -84,12 +87,14 @@ import com.example.ui.theme.TextSecondary
 import com.example.ui.theme.TextWhite
 
 enum class ControlPanelTab(val title: String, val icon: ImageVector, val tag: String) {
-    DASHBOARD("Dashboard", Icons.Default.Dashboard, "tab_dashboard"),
+    CONTROLS("Controls", Icons.Default.Dashboard, "tab_controls"),
     SIMULATOR("Simulator", Icons.Default.Speed, "tab_simulator"),
-    APPS("Apps", Icons.Default.Apps, "tab_apps"),
+    DIAGNOSTICS("Diagnostics", Icons.Default.BugReport, "tab_diagnostics"),
+    HISTORY("History", Icons.Default.History, "tab_history"),
     PROVIDERS("Providers", Icons.Default.Psychology, "tab_providers"),
     OVERLAY("Overlay", Icons.Default.Layers, "tab_overlay"),
-    REPLIES("Replies", Icons.Default.QuestionAnswer, "tab_replies")
+    SETTINGS("Settings", Icons.Default.Tune, "tab_settings"),
+    APPS("Apps", Icons.Default.Apps, "tab_apps")
 }
 
 @Composable
@@ -107,6 +112,7 @@ fun MainScreen() {
     val isGenerating by AppStateManager.isGenerating.collectAsStateWithLifecycle()
     val errorMessage by AppStateManager.errorMessage.collectAsStateWithLifecycle()
     val diagnosticLogs by AppStateManager.diagnosticLogs.collectAsStateWithLifecycle()
+    val questionsHistory by AppStateManager.questionsHistory.collectAsStateWithLifecycle()
 
     var hasOverlayPermission by remember {
         mutableStateOf(
@@ -269,7 +275,7 @@ fun MainScreen() {
                 .padding(paddingValues)
         ) {
             when (ControlPanelTab.entries[selectedTab]) {
-                ControlPanelTab.DASHBOARD -> {
+                ControlPanelTab.CONTROLS -> {
                     DashboardTab(
                         isOverlayRunning = isOverlayRunning,
                         hasOverlayPermission = hasOverlayPermission,
@@ -336,12 +342,29 @@ fun MainScreen() {
                         }
                     )
                 }
-                ControlPanelTab.APPS -> {
-                    AppsTab(
-                        appsList = settings.appsWhitelist,
-                        onToggleApp = { AppStateManager.toggleAppWhitelist(it) },
-                        onAddCustomApp = { name, pkg, cat -> AppStateManager.addCustomApp(name, pkg, cat) },
-                        onDeleteCustomApp = { AppStateManager.deleteCustomApp(it) }
+                ControlPanelTab.DIAGNOSTICS -> {
+                    DiagnosticsTab(
+                        settings = settings,
+                        activeProvider = activeProvider,
+                        isOverlayRunning = isOverlayRunning,
+                        hasOverlayPermission = hasOverlayPermission,
+                        isAccessibilityRunning = isAccessibilityRunning,
+                        diagnosticLogs = diagnosticLogs,
+                        onClearLogs = {
+                            AppStateManager.clearDiagnosticLogs()
+                        }
+                    )
+                }
+                ControlPanelTab.HISTORY -> {
+                    HistoryTab(
+                        questionsHistory = questionsHistory,
+                        settings = settings,
+                        onDeleteItem = { id ->
+                            AppStateManager.deleteHistoryItem(id)
+                        },
+                        onClearHistory = {
+                            AppStateManager.clearHistory()
+                        }
                     )
                 }
                 ControlPanelTab.PROVIDERS -> {
@@ -378,7 +401,7 @@ fun MainScreen() {
                         onClearAllSavedPositions = { AppStateManager.clearAllSavedPositions() }
                     )
                 }
-                ControlPanelTab.REPLIES -> {
+                ControlPanelTab.SETTINGS -> {
                     RepliesTab(
                         settings = settings,
                         onUpdateTone = { AppStateManager.updateTone(it) },
@@ -392,8 +415,18 @@ fun MainScreen() {
                         onSetExpandableReplies = { AppStateManager.setExpandableReplies(it) },
                         onSetResponseLengthPreset = { AppStateManager.setResponseLengthPreset(it) },
                         onSetCustomCharLimit = { AppStateManager.setCustomCharLimit(it) },
+                        onSetReplyAutoDeleteMinutes = { AppStateManager.setReplyAutoDeleteMinutes(it) },
+                        onSetHistoryPurgeMinutes = { AppStateManager.setHistoryPurgeMinutes(it) },
                         onSetCacheRetentionMinutes = { AppStateManager.setCacheRetentionMinutes(it) },
                         onSetHistoryRetentionDays = { AppStateManager.setHistoryRetentionDays(it) }
+                    )
+                }
+                ControlPanelTab.APPS -> {
+                    AppsTab(
+                        appsList = settings.appsWhitelist,
+                        onToggleApp = { AppStateManager.toggleAppWhitelist(it) },
+                        onAddCustomApp = { name, pkg, cat -> AppStateManager.addCustomApp(name, pkg, cat) },
+                        onDeleteCustomApp = { AppStateManager.deleteCustomApp(it) }
                     )
                 }
             }

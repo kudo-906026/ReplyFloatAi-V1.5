@@ -101,12 +101,17 @@ enum class UnderstandingSummaryLength(
 }
 
 enum class AutoPurgeTimerOption(val minutes: Int, val label: String, val description: String) {
-    MIN_5(5, "5 Minutes", "Auto-clear processed questions & cached replies after 5 minutes"),
-    MIN_15(15, "15 Minutes", "Auto-clear after 15 minutes (recommended)"),
-    MIN_30(30, "30 Minutes", "Keep suggestions active for half an hour"),
-    HOUR_1(60, "1 Hour", "Purge questions after 1 hour"),
-    HOUR_24(1440, "24 Hours", "Daily auto-delete cycle"),
-    NEVER(0, "Disabled", "Keep history until manually cleared")
+    MIN_1(1, "1 Min", "Purge after 1 minute"),
+    MIN_2(2, "2 Min", "Purge after 2 minutes"),
+    MIN_3(3, "3 Min", "Purge after 3 minutes"),
+    MIN_4(4, "4 Min", "Purge after 4 minutes"),
+    MIN_5(5, "5 Min", "Purge after 5 minutes"),
+    MIN_6(6, "6 Min", "Purge after 6 minutes"),
+    MIN_7(7, "7 Min", "Purge after 7 minutes"),
+    MIN_8(8, "8 Min", "Purge after 8 minutes"),
+    MIN_9(9, "9 Min", "Purge after 9 minutes"),
+    MIN_10(10, "10 Min", "Purge after 10 minutes"),
+    NEVER(0, "Disabled", "Keep until manually cleared")
 }
 
 enum class OverlayBarStyle(
@@ -159,8 +164,10 @@ data class ReplySettings(
     val expandableReplies: Boolean = true,
     val responseLengthPreset: ResponseLengthPreset = ResponseLengthPreset.SHORT,
     val customCharLimit: Int = 120,
-    val autoPurgeTimerMinutes: Int = 15,
-    val cacheRetentionMinutes: Int = 15,
+    val replyAutoDeleteMinutes: Int = 1,
+    val historyPurgeMinutes: Int = 5,
+    val autoPurgeTimerMinutes: Int = 5,
+    val cacheRetentionMinutes: Int = 5,
     val historyRetentionDays: Int = 7,
     val continuousScreenAnalysis: Boolean = true,
     val realTimeNodeTracking: Boolean = true,
