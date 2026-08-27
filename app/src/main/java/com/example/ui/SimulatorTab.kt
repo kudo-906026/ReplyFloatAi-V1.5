@@ -7,6 +7,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -138,7 +139,23 @@ fun SimulatorTab(
             iconColor = CrimsonLight
         ),
         TestCaseScenario(
-            title = "2. Short Simple Question",
+            title = "2. Latest Visible Question in Long Chat",
+            description = "Actual latest question at the bottom of the chat stream",
+            sampleText = "If you could have dinner with any historical figure, who would it be and why?",
+            expectedOutcome = "MATCHED: Contains '?' combined with question word 'who'/'why'",
+            categoryIcon = Icons.Default.QuestionAnswer,
+            iconColor = TechGreen
+        ),
+        TestCaseScenario(
+            title = "3. Statement Filter Without Question Mark",
+            description = "Header/statement text without '?' (must NEVER be detected as question)",
+            sampleText = "Okay, final boss question:",
+            expectedOutcome = "REJECTED: Strict requirement: Missing question mark '?'",
+            categoryIcon = Icons.Default.Clear,
+            iconColor = TextMuted
+        ),
+        TestCaseScenario(
+            title = "4. Short Simple Question",
             description = "Standard single-sentence question with interrogative punctuation",
             sampleText = "Are you free for lunch tomorrow?",
             expectedOutcome = "MATCHED: Question Punctuation / Interrogative Clause",
@@ -146,7 +163,7 @@ fun SimulatorTab(
             iconColor = TechBlue
         ),
         TestCaseScenario(
-            title = "3. Long Multi-line Question",
+            title = "5. Long Multi-line Question",
             description = "Message spanning multiple paragraphs with embedded inquiry",
             sampleText = "Hi Alex,\nCould we reschedule our meeting to tomorrow afternoon at 3 PM?\nThanks!",
             expectedOutcome = "MATCHED: Multi-line Question Structure",
@@ -154,7 +171,7 @@ fun SimulatorTab(
             iconColor = AccentPurple
         ),
         TestCaseScenario(
-            title = "4. Math Notation Question",
+            title = "6. Math Notation Question",
             description = "Arithmetic calculation & algebraic equation detection",
             sampleText = "Can you calculate 15 * 8 + 32?",
             expectedOutcome = "MATCHED: Math Prompt / Expression Formula",
@@ -162,7 +179,7 @@ fun SimulatorTab(
             iconColor = AccentYellow
         ),
         TestCaseScenario(
-            title = "5. Normal Messaging App Text",
+            title = "7. Normal Messaging App Text",
             description = "Regular non-question statement text in chat stream",
             sampleText = "I'm heading out now, see you soon.",
             expectedOutcome = "REJECTED: Filtered as non-question statement",
@@ -170,7 +187,7 @@ fun SimulatorTab(
             iconColor = TextMuted
         ),
         TestCaseScenario(
-            title = "6. Unreadable Canvas / WebView (OCR Fallback)",
+            title = "8. Unreadable Canvas / WebView (OCR Fallback)",
             description = "Custom graphic canvas / game UI with 0 text nodes — triggers background On-Device ML Kit OCR fallback",
             sampleText = "What is the capital of Australia?",
             expectedOutcome = "MATCHED via On-Device ML Kit OCR Fallback (Non-blocking background inference)",
@@ -348,6 +365,178 @@ fun SimulatorTab(
                                 }
                             }
                         }
+                    }
+                }
+            }
+        }
+
+        // Interactive Long Chat Thread Viewport Simulator
+        item {
+            ControlPanelCard(
+                modifier = Modifier.fillMaxWidth(),
+                shapeRadius = 14.dp
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(Icons.Default.QuestionAnswer, contentDescription = null, tint = TechBlue, modifier = Modifier.size(16.dp))
+                            Text(
+                                text = "LONG CHAT SCROLL STREAM (VIEWPORT TEST)",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp,
+                                fontFamily = FontFamily.Monospace,
+                                color = TechBlue
+                            )
+                        }
+                        Surface(
+                            shape = RoundedCornerShape(4.dp),
+                            color = TechBlue.copy(alpha = 0.15f),
+                            border = BorderStroke(1.dp, TechBlue.copy(alpha = 0.4f))
+                        ) {
+                            Text(
+                                text = "BOTTOM-FIRST SCAN",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = TechBlue,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+
+                    Text(
+                        text = "Simulate scrolling through a long chat with older statements/headers (e.g., \"Okay, final boss question:\") and the latest question at the bottom. Tap 'Scan Viewport' to verify the lowest valid question is prioritized.",
+                        fontSize = 11.5.sp,
+                        color = TextSecondary
+                    )
+
+                    // Simulated Chat Box with multi-message timeline
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(DarkSurfaceVariant)
+                            .border(1.dp, DarkCardBorder, RoundedCornerShape(10.dp))
+                            .padding(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        val mockChatMessages = listOf(
+                            Triple("Alex", "Welcome to the group chat everyone!", false),
+                            Triple("Alex", "Did you check the previous notes?", true),
+                            Triple("Host", "Okay, final boss question:", false),
+                            Triple("Host", "Get ready everyone...", false),
+                            Triple("Host", "If you could have dinner with any historical figure, who would it be and why?", true)
+                        )
+
+                        mockChatMessages.forEachIndexed { idx, (sender, msgText, hasQ) ->
+                            val isLatest = idx == mockChatMessages.lastIndex
+                            val isFinalBossHeader = msgText.contains("final boss")
+                            
+                            Surface(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .clickable {
+                                        customInput = msgText
+                                        onSimulateQuestion(msgText, "Chat Stream ($sender)")
+                                    },
+                                shape = RoundedCornerShape(8.dp),
+                                color = if (isLatest) TechGreen.copy(alpha = 0.15f) 
+                                        else if (isFinalBossHeader) AccentYellow.copy(alpha = 0.1f) 
+                                        else DarkCardElevated,
+                                border = BorderStroke(
+                                    1.dp,
+                                    if (isLatest) TechGreen.copy(alpha = 0.5f) 
+                                    else if (isFinalBossHeader) AccentYellow.copy(alpha = 0.3f) 
+                                    else DarkCardBorder
+                                )
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 10.dp, vertical = 8.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            Text(sender, fontSize = 10.5.sp, fontWeight = FontWeight.Bold, color = if (isLatest) TechGreen else TextMuted)
+                                            if (isLatest) {
+                                                Text("• [LATEST AT BOTTOM]", fontSize = 9.5.sp, fontWeight = FontWeight.Bold, color = TechGreen)
+                                            } else if (isFinalBossHeader) {
+                                                Text("• [STATEMENT - NO '?']", fontSize = 9.5.sp, fontWeight = FontWeight.Bold, color = AccentYellow)
+                                            } else {
+                                                Text("• [OLD / HIGHER UP]", fontSize = 9.5.sp, color = TextMuted)
+                                            }
+                                        }
+                                        Text(
+                                            text = "\"$msgText\"",
+                                            fontSize = 12.sp,
+                                            fontWeight = if (isLatest) FontWeight.SemiBold else FontWeight.Normal,
+                                            color = if (isLatest) TextWhite else TextSecondary
+                                        )
+                                    }
+
+                                    Button(
+                                        onClick = {
+                                            customInput = msgText
+                                            onSimulateQuestion(msgText, "Chat Stream ($sender)")
+                                        },
+                                        shape = RoundedCornerShape(6.dp),
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = if (isLatest) TechGreen.copy(alpha = 0.25f) else DarkCardElevated,
+                                            contentColor = if (isLatest) TechGreen else TextMuted
+                                        ),
+                                        border = BorderStroke(1.dp, if (isLatest) TechGreen.copy(alpha = 0.5f) else DarkCardBorder),
+                                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                                        modifier = Modifier.height(30.dp)
+                                    ) {
+                                        Text(if (hasQ) "Test" else "Test Reject", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Viewport scan trigger button
+                    Button(
+                        onClick = {
+                            val latestQuestion = "If you could have dinner with any historical figure, who would it be and why?"
+                            customInput = latestQuestion
+                            onSimulateQuestion(latestQuestion, "Viewport Scanner (Lowest On Screen)")
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(42.dp),
+                        shape = RoundedCornerShape(8.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = TechGreen.copy(alpha = 0.2f),
+                            contentColor = TechGreen
+                        ),
+                        border = BorderStroke(1.dp, TechGreen.copy(alpha = 0.6f))
+                    ) {
+                        Icon(Icons.Default.PlayArrow, contentDescription = null, tint = TechGreen, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Scan Chat Viewport (Prioritizes Lowest Visible Question with '?')",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = TechGreen
+                        )
                     }
                 }
             }

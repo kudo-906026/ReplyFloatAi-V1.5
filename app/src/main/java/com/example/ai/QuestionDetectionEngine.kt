@@ -71,7 +71,20 @@ object QuestionDetectionEngine {
             )
         }
 
-        // 1. Check for Math Notation / Math Prompts first
+        // Check if text contains interrogative punctuation mark '?' or '？' or '¿'
+        val hasQuestionMark = trimmed.contains("?") || trimmed.contains("？") || trimmed.contains("¿")
+
+        // MANDATORY CHECK: If detectQuestionsOnly is enabled, text WITHOUT a '?' is NEVER a detected question
+        if (detectQuestionsOnly && !hasQuestionMark) {
+            return DetectionAnalysisResult(
+                isQuestion = false,
+                category = "NO_QUESTION_MARK",
+                reason = "Rejected: Text does not contain a question mark '?' (Mandatory question mark check)",
+                extractedQuestionText = trimmed
+            )
+        }
+
+        // 1. Check for Math Notation / Math Prompts (Must contain '?' or math calculation keywords)
         val mathResult = checkMathNotation(trimmed)
         if (mathResult != null) {
             return mathResult
@@ -83,10 +96,7 @@ object QuestionDetectionEngine {
         // Find if text contains any question words
         val matchedQuestionWord = words.firstOrNull { it in QUESTION_WORDS }
 
-        // Check if text contains interrogative punctuation mark '?' or '？'
-        val hasQuestionMark = trimmed.contains("?") || trimmed.contains("？") || trimmed.contains("¿")
-
-        // 3. Combined Question Word + Question Mark detection (Strict high-precision requirement)
+        // 3. Combined Question Word + Question Mark detection (Highest priority)
         if (hasQuestionMark && matchedQuestionWord != null) {
             return DetectionAnalysisResult(
                 isQuestion = true,
@@ -96,26 +106,22 @@ object QuestionDetectionEngine {
             )
         }
 
-        // 4. Conversational question phrases (e.g. "let me know if...", "are you free...")
+        // 4. Conversational question phrases with question mark (e.g. "let me know if...?", "are you free...?")
         val lowerText = trimmed.lowercase()
         for (phrase in QUESTION_PHRASES) {
             if (lowerText.contains(phrase)) {
-                return DetectionAnalysisResult(
-                    isQuestion = true,
-                    category = "CONVERSATIONAL_PHRASE",
-                    reason = "Detected conversational inquiry phrase '$phrase'",
-                    extractedQuestionText = trimmed
-                )
+                if (hasQuestionMark || !detectQuestionsOnly) {
+                    return DetectionAnalysisResult(
+                        isQuestion = true,
+                        category = "CONVERSATIONAL_PHRASE",
+                        reason = "Detected conversational inquiry phrase '$phrase' with '?'",
+                        extractedQuestionText = trimmed
+                    )
+                }
             }
         }
 
-        // 5. Sentence starter with question word
-        val starterResult = checkSentenceStarters(trimmed)
-        if (starterResult != null) {
-            return starterResult
-        }
-
-        // 6. Multi-line checks
+        // 5. Multi-line checks with question mark
         if (trimmed.contains("\n")) {
             val multiLineResult = checkMultiLineQuestion(trimmed)
             if (multiLineResult != null) {
@@ -123,10 +129,16 @@ object QuestionDetectionEngine {
             }
         }
 
+        // 6. Sentence starter with question word AND question mark
+        val starterResult = checkSentenceStarters(trimmed)
+        if (starterResult != null && (hasQuestionMark || !detectQuestionsOnly)) {
+            return starterResult
+        }
+
         // 7. If text has '?' and is short (<= 6 words) and sounds like a query
         if (hasQuestionMark && words.size in 1..6 && !isUrlOrFilePath(trimmed)) {
             val lastWord = words.lastOrNull() ?: ""
-            if (lastWord in listOf("right", "really", "sure", "correct", "true", "ready", "ok", "okay", "yes", "no") || words.size <= 3) {
+            if (lastWord in listOf("right", "really", "sure", "correct", "true", "ready", "ok", "okay", "yes", "no") || words.size <= 4) {
                 return DetectionAnalysisResult(
                     isQuestion = true,
                     category = "SHORT_QUESTION",
@@ -151,9 +163,9 @@ object QuestionDetectionEngine {
             isQuestion = false,
             category = "NORMAL_STATEMENT",
             reason = if (hasQuestionMark) {
-                "Punctuation '?' found but missing question words (why, what, how, who, etc.)"
+                "Punctuation '?' found but missing interrogative question words (why, what, how, who, etc.)"
             } else {
-                "No question words or interrogative structure detected."
+                "No question mark '?' or interrogative structure detected."
             },
             extractedQuestionText = trimmed
         )
@@ -233,10 +245,11 @@ object QuestionDetectionEngine {
 
     private fun checkMultiLineQuestion(text: String): DetectionAnalysisResult? {
         val lines = text.lines().map { it.trim() }.filter { it.isNotBlank() }
+        val hasAnyQMark = text.contains("?") || text.contains("？") || text.contains("¿")
 
         for ((index, line) in lines.withIndex()) {
             val lineWords = extractWords(line)
-            val hasQMark = line.contains("?") || line.contains("？")
+            val hasQMark = line.contains("?") || line.contains("？") || line.contains("¿")
             val hasQWord = lineWords.any { it in QUESTION_WORDS }
 
             if (hasQMark && hasQWord) {
@@ -249,7 +262,7 @@ object QuestionDetectionEngine {
             }
 
             val firstWord = lineWords.firstOrNull()
-            if (firstWord != null && firstWord in QUESTION_WORDS) {
+            if (firstWord != null && firstWord in QUESTION_WORDS && (hasQMark || hasAnyQMark)) {
                 return DetectionAnalysisResult(
                     isQuestion = true,
                     category = "MULTILINE_QUESTION",

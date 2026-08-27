@@ -463,7 +463,21 @@ object AppStateManager {
         val sourceLabel = sourceApp ?: packageName ?: if (detectionMethod == DetectionMethod.MLKIT_OCR) "OCR Screen Engine" else "Accessibility Scanner"
         val analysis = QuestionDetectionEngine.analyze(cleanText, _settings.value.detectQuestionsOnly)
 
-        if (!analysis.isQuestion && !forcedBypass) {
+        val hasQuestionMark = cleanText.contains("?") || cleanText.contains("？") || cleanText.contains("¿")
+        if (_settings.value.detectQuestionsOnly && !hasQuestionMark) {
+            addDiagnosticLog(
+                source = sourceLabel,
+                rawText = cleanText,
+                result = DetectionResultType.REJECTED,
+                category = "NO_QUESTION_MARK",
+                reason = "Rejected: Text does not contain a question mark '?' (Strict interrogation mark check)",
+                detectionMethod = detectionMethod,
+                latencyMs = ocrLatencyMs
+            )
+            return
+        }
+
+        if (!analysis.isQuestion) {
             addDiagnosticLog(
                 source = sourceLabel,
                 rawText = cleanText,

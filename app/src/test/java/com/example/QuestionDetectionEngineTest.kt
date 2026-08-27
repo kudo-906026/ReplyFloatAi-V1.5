@@ -13,12 +13,27 @@ class QuestionDetectionEngineTest {
         val q1 = QuestionDetectionEngine.analyze("Are you free for lunch tomorrow?", detectQuestionsOnly = true)
         assertTrue("Expected q1 to be detected as a question", q1.isQuestion)
 
-        val q2 = QuestionDetectionEngine.analyze("What time is the team meeting", detectQuestionsOnly = true)
-        assertTrue("Expected q2 to be detected via interrogative starter", q2.isQuestion)
+        val q2 = QuestionDetectionEngine.analyze("If you could have dinner with any historical figure, who would it be and why?", detectQuestionsOnly = true)
+        assertTrue("Expected dinner with historical figure question to be detected", q2.isQuestion)
 
-        val q3 = QuestionDetectionEngine.analyze("Can you send me the updated proposal", detectQuestionsOnly = true)
-        assertTrue("Expected q3 to be detected via modal verb starter", q3.isQuestion)
-        assertEquals("QUESTION_STARTER", q3.category)
+        val q3 = QuestionDetectionEngine.analyze("Can you send me the updated proposal?", detectQuestionsOnly = true)
+        assertTrue("Expected q3 to be detected via modal verb starter with '?'", q3.isQuestion)
+    }
+
+    @Test
+    fun testScenario_StatementWithoutQuestionMarkIsRejected() {
+        // User reported: "Okay, final boss question:" was previously grabbed despite not having '?'
+        val statement = QuestionDetectionEngine.analyze("Okay, final boss question:", detectQuestionsOnly = true)
+        assertFalse("Expected 'Okay, final boss question:' to be rejected because it lacks '?'", statement.isQuestion)
+        assertEquals("NO_QUESTION_MARK", statement.category)
+
+        val statement2 = QuestionDetectionEngine.analyze("Let me ask you something", detectQuestionsOnly = true)
+        assertFalse("Expected statement without '?' to be rejected", statement2.isQuestion)
+        assertEquals("NO_QUESTION_MARK", statement2.category)
+
+        val statement3 = QuestionDetectionEngine.analyze("Final boss question for today", detectQuestionsOnly = true)
+        assertFalse("Expected statement without '?' to be rejected", statement3.isQuestion)
+        assertEquals("NO_QUESTION_MARK", statement3.category)
     }
 
     @Test
@@ -34,7 +49,7 @@ class QuestionDetectionEngineTest {
         val multiline2 = """
             Hey team, quick update on the roadmap.
             We finished sprint 4 yesterday.
-            When should we sync up for sprint planning
+            When should we sync up for sprint planning?
         """.trimIndent()
         val res2 = QuestionDetectionEngine.analyze(multiline2, detectQuestionsOnly = true)
         assertTrue("Expected multiline question with interrogative line to be detected", res2.isQuestion)
@@ -46,11 +61,11 @@ class QuestionDetectionEngineTest {
         assertTrue("Expected math question with arithmetic to be detected", math1.isQuestion)
         assertEquals("MATH_PROMPT", math1.category)
 
-        val math2 = QuestionDetectionEngine.analyze("Solve for x: 2x + 6 = 18", detectQuestionsOnly = true)
+        val math2 = QuestionDetectionEngine.analyze("Solve for x: 2x + 6 = 18?", detectQuestionsOnly = true)
         assertTrue("Expected algebraic equation to be detected", math2.isQuestion)
         assertEquals("MATH_PROMPT", math2.category)
 
-        val math3 = QuestionDetectionEngine.analyze("What is 5^3", detectQuestionsOnly = true)
+        val math3 = QuestionDetectionEngine.analyze("What is 5^3?", detectQuestionsOnly = true)
         assertTrue("Expected exponent math prompt to be detected", math3.isQuestion)
 
         val math4 = QuestionDetectionEngine.analyze("25 * 4 = ?", detectQuestionsOnly = true)
@@ -61,11 +76,11 @@ class QuestionDetectionEngineTest {
     fun testScenario4_NormalMessagingTextNonQuestions() {
         val msg1 = QuestionDetectionEngine.analyze("I'm heading out now, see you soon.", detectQuestionsOnly = true)
         assertFalse("Expected normal statement to be rejected when filtering is on", msg1.isQuestion)
-        assertEquals("NORMAL_STATEMENT", msg1.category)
+        assertEquals("NO_QUESTION_MARK", msg1.category)
 
         val msg2 = QuestionDetectionEngine.analyze("Thanks for sending the files over.", detectQuestionsOnly = true)
         assertFalse("Expected greeting/acknowledgement statement to be rejected", msg2.isQuestion)
-        assertEquals("NORMAL_STATEMENT", msg2.category)
+        assertEquals("NO_QUESTION_MARK", msg2.category)
 
         val msg3 = QuestionDetectionEngine.analyze("ok", detectQuestionsOnly = true)
         assertFalse("Expected short snippet to be rejected", msg3.isQuestion)
