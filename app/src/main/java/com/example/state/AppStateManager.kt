@@ -514,6 +514,7 @@ object AppStateManager {
         scope.launch {
             _isGenerating.value = true
             _errorMessage.value = null
+            _activeReplies.value = emptyList()
 
             val initialQuestion = DetectedQuestion(
                 text = cleanText,

@@ -961,6 +961,14 @@ fun SimulatorTab(
                             diagnosticLogs.take(20).forEach { log ->
                                 val isMatched = log.result == DetectionResultType.MATCHED
                                 val isOcr = log.detectionMethod == DetectionMethod.MLKIT_OCR
+                                val isError = log.category in listOf("AUTH_FAILURE", "QUOTA_EXCEEDED", "NO_API_KEY", "PROVIDER_ERROR", "BAD_REQUEST", "MODEL_NOT_FOUND", "EMPTY_RESPONSE")
+
+                                val borderColor = when {
+                                    isError -> CrimsonPrimary.copy(alpha = 0.6f)
+                                    isMatched && isOcr -> AccentPurple.copy(alpha = 0.6f)
+                                    isMatched -> TechGreen.copy(alpha = 0.5f)
+                                    else -> DarkCardBorder
+                                }
 
                                 Surface(
                                     modifier = Modifier
@@ -968,12 +976,7 @@ fun SimulatorTab(
                                         .clip(RoundedCornerShape(8.dp)),
                                     shape = RoundedCornerShape(8.dp),
                                     color = DarkSurfaceVariant,
-                                    border = BorderStroke(
-                                        1.dp,
-                                        if (isMatched) {
-                                            if (isOcr) AccentPurple.copy(alpha = 0.6f) else TechGreen.copy(alpha = 0.5f)
-                                        } else DarkCardBorder
-                                    )
+                                    border = BorderStroke(1.dp, borderColor)
                                 ) {
                                     Column(
                                         modifier = Modifier
@@ -994,14 +997,24 @@ fun SimulatorTab(
                                                     modifier = Modifier
                                                         .size(8.dp)
                                                         .clip(CircleShape)
-                                                        .background(if (isMatched) TechGreen else AccentYellow)
+                                                        .background(
+                                                            when {
+                                                                isError -> CrimsonPrimary
+                                                                isMatched -> TechGreen
+                                                                else -> AccentYellow
+                                                            }
+                                                        )
                                                 )
                                                 Text(
-                                                    text = log.result.label,
+                                                    text = if (isError) log.category else log.result.label,
                                                     fontWeight = FontWeight.Bold,
                                                     fontSize = 11.sp,
                                                     fontFamily = FontFamily.Monospace,
-                                                    color = if (isMatched) TechGreen else AccentYellow
+                                                    color = when {
+                                                        isError -> CrimsonLight
+                                                        isMatched -> TechGreen
+                                                        else -> AccentYellow
+                                                    }
                                                 )
 
                                                 // Detection Method Pill Badge
@@ -1033,11 +1046,13 @@ fun SimulatorTab(
                                                     }
                                                 }
 
-                                                Text(
-                                                    text = "• ${log.category}",
-                                                    fontSize = 10.5.sp,
-                                                    color = TextSecondary
-                                                )
+                                                if (!isError) {
+                                                    Text(
+                                                        text = "• ${log.category}",
+                                                        fontSize = 10.5.sp,
+                                                        color = TextSecondary
+                                                    )
+                                                }
                                             }
 
                                             Text(
@@ -1056,11 +1071,15 @@ fun SimulatorTab(
                                         )
 
                                         Text(
-                                            text = "Reason: ${log.reason}",
+                                            text = if (isError) "Diagnostic: ${log.reason}" else "Reason: ${log.reason}",
                                             fontSize = 11.sp,
-                                            color = if (isMatched) {
-                                                if (isOcr) AccentPurple.copy(alpha = 0.95f) else TechGreen.copy(alpha = 0.9f)
-                                            } else TextSecondary
+                                            fontWeight = if (isError) FontWeight.SemiBold else FontWeight.Normal,
+                                            color = when {
+                                                isError -> CrimsonLight
+                                                isMatched && isOcr -> AccentPurple.copy(alpha = 0.95f)
+                                                isMatched -> TechGreen.copy(alpha = 0.9f)
+                                                else -> TextSecondary
+                                            }
                                         )
                                     }
                                 }
