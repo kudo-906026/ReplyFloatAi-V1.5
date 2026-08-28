@@ -514,7 +514,79 @@ object AiFallbackEngine {
             }
         }
 
-        // 2. Dinner with historical figure
+        // 2. Personal & Reflective: Secretly proud / Achievements
+        if (lower.contains("proud") || lower.contains("achievement")) {
+            return when (tone) {
+                ReplyTone.CASUAL -> listOf(
+                    "Learning how to stay calm and resilient during tough situations!",
+                    "Building habits that quietly improved my daily health and routine.",
+                    "Teaching myself new skills completely from scratch without giving up."
+                )
+                ReplyTone.PROFESSIONAL -> listOf(
+                    "Consistently delivering on complex commitments while mentoring others.",
+                    "Developing core technical competencies independently through self-discipline.",
+                    "Maintaining a high standard of quality and calm under tight deadlines."
+                )
+                ReplyTone.CONCISE -> listOf(
+                    "Staying disciplined and consistent.",
+                    "Teaching myself new skills independently.",
+                    "Overcoming difficult challenges calmly."
+                )
+                ReplyTone.WITTY -> listOf(
+                    "Keeping my plants alive for more than two weeks in a row!",
+                    "Waking up on the first alarm without pressing snooze.",
+                    "Parallel parking perfectly on the first try!"
+                )
+                ReplyTone.EMPATHETIC -> listOf(
+                    "Always making time to listen and support friends when they need it most.",
+                    "Learning to set healthy boundaries and protect my peace of mind.",
+                    "Staying kind and patient even when things get overwhelming."
+                )
+                ReplyTone.TECHNICAL -> listOf(
+                    "Designing robust, fault-tolerant solutions from first principles.",
+                    "Consistently maintaining clean, modular architecture across projects.",
+                    "Optimizing critical execution pipelines for zero latency overhead."
+                )
+            }
+        }
+
+        // 3. Educational & Conceptual: Integration / Explain to a 5-year-old
+        if (lower.contains("integration") || (lower.contains("explain") && (lower.contains("5-year-old") || lower.contains("5 year old")))) {
+            return when (tone) {
+                ReplyTone.CASUAL -> listOf(
+                    "Integration is like putting all the tiny puzzle pieces together to see the whole big picture!",
+                    "It's adding up lots of little slices of something to find the total size!",
+                    "Integration means bringing lots of small parts together into one complete whole."
+                )
+                ReplyTone.PROFESSIONAL -> listOf(
+                    "Integration is the process of combining individual components or data streams into a unified, coherent system.",
+                    "In mathematics and systems, integration represents finding the total cumulative value by summing continuous parts.",
+                    "It is the systematic unification of separate elements into an effective, cohesive architecture."
+                )
+                ReplyTone.CONCISE -> listOf(
+                    "Combining small pieces into a whole.",
+                    "Summing all tiny parts to get the total.",
+                    "Connecting separate pieces into one complete system."
+                )
+                ReplyTone.WITTY -> listOf(
+                    "Like taking all the Lego bricks scattered on the floor and building a giant spaceship!",
+                    "Math's way of saying: 'Let's gather all the crumbs to make the whole cookie!'",
+                    "Turning puzzle chaos into a glorious masterpiece."
+                )
+                ReplyTone.EMPATHETIC -> listOf(
+                    "It's like bringing people together so everyone's unique contribution makes a complete, beautiful community.",
+                    "Gathering all the little moments together to make a wonderful memory.",
+                    "Uniting all the small pieces with care so they work harmoniously."
+                )
+                ReplyTone.TECHNICAL -> listOf(
+                    "In calculus, integration computes the continuous accumulation or area under a curve by taking the Riemann sum limit; in software, it binds modular APIs into a single ecosystem.",
+                    "Integration mathematically represents the inverse operation of differentiation, computing accumulated quantities.",
+                    "The synthesis of disparate discrete elements into a contiguous, unified pipeline."
+                )
+            }
+        }
+
+        // 4. Dinner with historical figure
         if (lower.contains("dinner") && (lower.contains("historical") || lower.contains("history"))) {
             return when (tone) {
                 ReplyTone.CASUAL -> listOf(

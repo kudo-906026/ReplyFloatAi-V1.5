@@ -444,6 +444,7 @@ object AppStateManager {
         _errorMessage.value = null
         processedQuestionsCache.clear()
         answeredQuestions.clear()
+        com.example.service.QuestionDetectorAccessibilityService.resetLastProcessedText()
     }
 
     fun dismissReply(replyId: String) {
@@ -454,6 +455,7 @@ object AppStateManager {
         _currentQuestion.value = null
         _activeReplies.value = emptyList()
         _errorMessage.value = null
+        com.example.service.QuestionDetectorAccessibilityService.resetLastProcessedText()
     }
 
     fun copyAndDismissReply(context: Context, reply: ReplyItem) {

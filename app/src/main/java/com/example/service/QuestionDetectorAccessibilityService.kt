@@ -27,6 +27,15 @@ data class VisibleScannedNode(
 
 class QuestionDetectorAccessibilityService : AccessibilityService() {
 
+    companion object {
+        @Volatile
+        private var instance: QuestionDetectorAccessibilityService? = null
+
+        fun resetLastProcessedText() {
+            instance?.lastProcessedText = ""
+        }
+    }
+
     private var lastProcessedText: String = ""
     private var lastProcessedTime: Long = 0L
     private var lastOcrScanTime: Long = 0L
@@ -37,6 +46,7 @@ class QuestionDetectorAccessibilityService : AccessibilityService() {
 
     override fun onServiceConnected() {
         super.onServiceConnected()
+        instance = this
         AppStateManager.setAccessibilityRunning(true)
     }
 
@@ -128,35 +138,41 @@ class QuestionDetectorAccessibilityService : AccessibilityService() {
                 .map { (_, nodes) -> nodes.maxByOrNull { it.bottomY } ?: nodes.first() }
 
             // CRITICAL REQUIREMENT: Prioritize the one that is visually lowest/most recent on screen (highest bottomY)
-            // AND actually matches question criteria with '?'
             val sortedNodes = distinctNodes.sortedByDescending { it.bottomY }
 
-            for (candidate in sortedNodes) {
-                val candidateText = candidate.text.trim()
-                if (candidateText.length < 3) continue
-                if (candidateText == lastProcessedText) continue
-
-                // Check question criteria
+            // 1. Identify the single lowest/most recent valid question currently on screen
+            val lowestValidQuestionNode = sortedNodes.firstOrNull { node ->
+                val candidateText = node.text.trim()
+                if (candidateText.length < 3) return@firstOrNull false
                 val analysis = QuestionDetectionEngine.analyze(candidateText, settings.detectQuestionsOnly)
                 val hasQuestionMark = candidateText.contains("?") || candidateText.contains("？") || candidateText.contains("¿")
-
-                if (analysis.isQuestion && (hasQuestionMark || !settings.detectQuestionsOnly)) {
-                    lastProcessedText = candidateText
-                    lastProcessedTime = now
-
-                    AppStateManager.onQuestionDetected(
-                        context = this@QuestionDetectorAccessibilityService,
-                        text = candidateText,
-                        sourceApp = appName,
-                        packageName = pkgName,
-                        forcedBypass = false,
-                        detectionMethod = DetectionMethod.ACCESSIBILITY
-                    )
-                    return
-                }
+                analysis.isQuestion && (hasQuestionMark || !settings.detectQuestionsOnly)
             }
 
-            // If no visible node met the strict question criteria, do NOT fall back to non-questions!
+            if (lowestValidQuestionNode != null) {
+                val candidateText = lowestValidQuestionNode.text.trim()
+
+                // If the most recent question on screen is identical to the one currently displayed or processed, do not re-trigger or search older scrollback
+                if (candidateText == lastProcessedText || candidateText == AppStateManager.currentQuestion.value?.text) {
+                    return
+                }
+
+                // Genuinely fresh new question detected! Clear old state and process fresh question immediately.
+                lastProcessedText = candidateText
+                lastProcessedTime = now
+
+                AppStateManager.onQuestionDetected(
+                    context = this@QuestionDetectorAccessibilityService,
+                    text = candidateText,
+                    sourceApp = appName,
+                    packageName = pkgName,
+                    forcedBypass = false,
+                    detectionMethod = DetectionMethod.ACCESSIBILITY
+                )
+                return
+            }
+
+            // If no visible node met the question criteria, do NOT fall back to older questions!
             // Log rejection diagnostic for the lowest visible message
             val lowestNode = sortedNodes.firstOrNull()
             if (lowestNode != null && lowestNode.text != lastProcessedText) {
@@ -405,6 +421,9 @@ class QuestionDetectorAccessibilityService : AccessibilityService() {
     }
 
     override fun onDestroy() {
+        if (instance == this) {
+            instance = null
+        }
         AppStateManager.setAccessibilityRunning(false)
         serviceScope.cancel()
         super.onDestroy()

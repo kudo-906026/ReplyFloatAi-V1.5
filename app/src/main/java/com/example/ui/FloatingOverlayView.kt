@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -115,16 +116,15 @@ fun FloatingOverlayView(
 
     val hasContent = currentQuestion != null || activeReplies.isNotEmpty() || isGenerating
 
-    // Main Floating Container
+    // Main Floating Container - 100% Solid opaque dark card so underlying content never bleeds through
     Box(
         modifier = Modifier
-            .widthIn(min = 180.dp, max = 340.dp)
-            .alpha(settings.overlayOpacity)
+            .widthIn(min = 200.dp, max = 350.dp)
             .clip(RoundedCornerShape(if (currentMode == OverlayBarMode.SMALL_PILL) 24.dp else settings.overlayCornerRadius.dp))
-            .background(DarkBg.copy(alpha = 0.96f))
+            .background(DarkBg)
             .border(
                 1.5.dp,
-                if (hasContent) CrimsonPrimary.copy(alpha = 0.85f) else DarkCardBorder,
+                if (hasContent) CrimsonPrimary.copy(alpha = 0.9f) else DarkCardBorder,
                 RoundedCornerShape(if (currentMode == OverlayBarMode.SMALL_PILL) 24.dp else settings.overlayCornerRadius.dp)
             )
             .pointerInput(Unit) {
@@ -545,39 +545,90 @@ private fun MainBarExpanded(
                 }
             }
 
-            // Quick Actions Footer
+            // Quick Actions Footer with solid opaque background, clear contrast and spacing
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                TextButton(
-                    onClick = {
-                        AppStateManager.onQuestionDetected(
-                            context = context,
-                            text = currentQuestion.text,
-                            sourceApp = currentQuestion.sourceApp,
-                            packageName = currentQuestion.packageName,
-                            forcedBypass = true
-                        )
-                    },
-                    modifier = Modifier.height(26.dp)
+                // Solid Re-generate Button
+                Surface(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(34.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .clickable {
+                            AppStateManager.onQuestionDetected(
+                                context = context,
+                                text = currentQuestion.text,
+                                sourceApp = currentQuestion.sourceApp,
+                                packageName = currentQuestion.packageName,
+                                forcedBypass = true
+                            )
+                        },
+                    shape = RoundedCornerShape(6.dp),
+                    color = DarkCardElevated,
+                    border = BorderStroke(1.dp, CrimsonPrimary.copy(alpha = 0.8f))
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Refresh,
-                        contentDescription = "Regenerate",
-                        tint = CrimsonLight,
-                        modifier = Modifier.size(12.dp)
-                    )
-                    Spacer(modifier = Modifier.width(3.dp))
-                    Text("Re-generate", fontSize = 9.5.sp, color = CrimsonLight)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 8.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = "Regenerate",
+                            tint = CrimsonLight,
+                            modifier = Modifier.size(13.dp)
+                        )
+                        Spacer(modifier = Modifier.width(5.dp))
+                        Text(
+                            text = "Re-generate",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = CrimsonLight
+                        )
+                    }
                 }
 
-                TextButton(
-                    onClick = { AppStateManager.clearReplies() },
-                    modifier = Modifier.height(26.dp)
+                // Solid Dismiss Button
+                Surface(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(34.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .clickable {
+                            AppStateManager.clearReplies()
+                        },
+                    shape = RoundedCornerShape(6.dp),
+                    color = DarkSurfaceVariant,
+                    border = BorderStroke(1.dp, DarkCardBorder)
                 ) {
-                    Text("Dismiss", fontSize = 9.5.sp, color = TextMuted)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 8.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Dismiss",
+                            tint = TextSecondary,
+                            modifier = Modifier.size(13.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "Dismiss",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = TextWhite
+                        )
+                    }
                 }
             }
         } else {
