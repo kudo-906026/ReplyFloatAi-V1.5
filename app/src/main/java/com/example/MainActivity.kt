@@ -10,6 +10,7 @@ import com.example.ui.theme.ReplyFloatTheme
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        com.example.state.AppStateManager.init(this)
         enableEdgeToEdge()
         setContent {
             ReplyFloatTheme {

@@ -47,6 +47,7 @@ class QuestionDetectorAccessibilityService : AccessibilityService() {
     override fun onServiceConnected() {
         super.onServiceConnected()
         instance = this
+        AppStateManager.init(this)
         AppStateManager.setAccessibilityRunning(true)
     }
 

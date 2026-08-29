@@ -67,6 +67,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.model.AiProvider
@@ -259,6 +260,9 @@ fun DiagnosticsTab(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Row(
+                            modifier = Modifier
+                                .weight(1f, fill = false)
+                                .padding(end = 8.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
@@ -278,20 +282,24 @@ fun DiagnosticsTab(
                                 )
                             }
 
-                            Column {
+                            Column(modifier = Modifier.weight(1f, fill = false)) {
                                 Text(
                                     text = "SYSTEM HEALTH MONITOR",
                                     fontFamily = FontFamily.Monospace,
                                     fontSize = 9.5.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = TextSecondary,
-                                    letterSpacing = 0.8.sp
+                                    letterSpacing = 0.8.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                                 Text(
                                     text = systemHealthStatus,
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 13.sp,
-                                    color = healthColor
+                                    color = healthColor,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                             }
                         }
@@ -307,6 +315,8 @@ fun DiagnosticsTab(
                                 fontFamily = FontFamily.Monospace,
                                 fontWeight = FontWeight.Bold,
                                 color = healthColor,
+                                maxLines = 1,
+                                softWrap = false,
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                             )
                         }
@@ -434,7 +444,7 @@ fun DiagnosticsTab(
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .padding(11.dp),
-                                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                                        verticalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
                                         Row(
                                             modifier = Modifier.fillMaxWidth(),
@@ -442,6 +452,9 @@ fun DiagnosticsTab(
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
                                             Row(
+                                                modifier = Modifier
+                                                    .weight(1f, fill = false)
+                                                    .padding(end = 8.dp),
                                                 verticalAlignment = Alignment.CenterVertically,
                                                 horizontalArrangement = Arrangement.spacedBy(6.dp)
                                             ) {
@@ -455,7 +468,9 @@ fun DiagnosticsTab(
                                                     text = issue.component,
                                                     fontWeight = FontWeight.Bold,
                                                     fontSize = 12.sp,
-                                                    color = TextWhite
+                                                    color = TextWhite,
+                                                    maxLines = 2,
+                                                    overflow = TextOverflow.Ellipsis
                                                 )
                                             }
 
@@ -470,7 +485,10 @@ fun DiagnosticsTab(
                                                     fontSize = 9.5.sp,
                                                     fontWeight = FontWeight.Bold,
                                                     color = if (issue.isCritical) CrimsonLight else AccentYellow,
-                                                    modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.5.dp)
+                                                    maxLines = 1,
+                                                    softWrap = false,
+                                                    overflow = TextOverflow.Ellipsis,
+                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.5.dp)
                                                 )
                                             }
                                         }
@@ -478,7 +496,8 @@ fun DiagnosticsTab(
                                         Text(
                                             text = issue.explanation,
                                             fontSize = 11.sp,
-                                            color = TextSecondary
+                                            color = TextSecondary,
+                                            modifier = Modifier.fillMaxWidth()
                                         )
 
                                         Surface(
@@ -489,11 +508,16 @@ fun DiagnosticsTab(
                                             Row(
                                                 modifier = Modifier
                                                     .fillMaxWidth()
-                                                    .padding(horizontal = 8.dp, vertical = 6.dp),
+                                                    .padding(horizontal = 8.dp, vertical = 8.dp),
                                                 verticalAlignment = Alignment.CenterVertically,
                                                 horizontalArrangement = Arrangement.SpaceBetween
                                             ) {
-                                                Column(modifier = Modifier.weight(1f)) {
+                                                Column(
+                                                    modifier = Modifier
+                                                        .weight(1f)
+                                                        .padding(end = if (issue.actionLabel != null) 8.dp else 0.dp),
+                                                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                                                ) {
                                                     Text(
                                                         text = "SUGGESTED FIX:",
                                                         fontSize = 9.sp,
@@ -509,7 +533,6 @@ fun DiagnosticsTab(
                                                 }
 
                                                 if (issue.actionLabel != null && issue.onAction != null) {
-                                                    Spacer(modifier = Modifier.width(6.dp))
                                                     Button(
                                                         onClick = issue.onAction,
                                                         colors = ButtonDefaults.buttonColors(
@@ -517,9 +540,15 @@ fun DiagnosticsTab(
                                                         ),
                                                         shape = RoundedCornerShape(6.dp),
                                                         contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                                                        modifier = Modifier.height(28.dp)
+                                                        modifier = Modifier.height(30.dp)
                                                     ) {
-                                                        Text(issue.actionLabel, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                                        Text(
+                                                            text = issue.actionLabel,
+                                                            fontSize = 10.sp,
+                                                            fontWeight = FontWeight.Bold,
+                                                            maxLines = 1,
+                                                            softWrap = false
+                                                        )
                                                     }
                                                 }
                                             }
@@ -623,6 +652,8 @@ fun DiagnosticsTab(
                                     fontSize = 10.5.sp,
                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                                     color = if (isSelected) TextWhite else TextSecondary,
+                                    maxLines = 1,
+                                    softWrap = false,
                                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                                 )
                             }
@@ -645,7 +676,7 @@ fun DiagnosticsTab(
                             )
                         }
                     } else {
-                        Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             filteredLogs.take(25).forEach { log ->
                                 val isMatched = log.result == DetectionResultType.MATCHED
                                 val isOcr = log.detectionMethod == DetectionMethod.MLKIT_OCR
@@ -669,8 +700,8 @@ fun DiagnosticsTab(
                                     Column(
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .padding(9.dp),
-                                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                                            .padding(10.dp),
+                                        verticalArrangement = Arrangement.spacedBy(6.dp)
                                     ) {
                                         Row(
                                             modifier = Modifier.fillMaxWidth(),
@@ -678,6 +709,9 @@ fun DiagnosticsTab(
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
                                             Row(
+                                                modifier = Modifier
+                                                    .weight(1f, fill = false)
+                                                    .padding(end = 6.dp),
                                                 verticalAlignment = Alignment.CenterVertically,
                                                 horizontalArrangement = Arrangement.spacedBy(5.dp)
                                             ) {
@@ -698,6 +732,9 @@ fun DiagnosticsTab(
                                                     fontWeight = FontWeight.Bold,
                                                     fontSize = 10.5.sp,
                                                     fontFamily = FontFamily.Monospace,
+                                                    maxLines = 1,
+                                                    softWrap = false,
+                                                    overflow = TextOverflow.Ellipsis,
                                                     color = when {
                                                         isError -> CrimsonLight
                                                         isMatched -> TechGreen
@@ -716,24 +753,32 @@ fun DiagnosticsTab(
                                                         fontFamily = FontFamily.Monospace,
                                                         fontWeight = FontWeight.Bold,
                                                         color = if (isOcr) AccentPurple else TechBlue,
+                                                        maxLines = 1,
+                                                        softWrap = false,
                                                         modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
                                                     )
                                                 }
 
-                                                if (!isError) {
+                                                if (!isError && log.category.isNotBlank()) {
                                                     Text(
                                                         text = "• ${log.category}",
                                                         fontSize = 10.sp,
-                                                        color = TextSecondary
+                                                        color = TextSecondary,
+                                                        maxLines = 1,
+                                                        softWrap = false,
+                                                        overflow = TextOverflow.Ellipsis
                                                     )
                                                 }
                                             }
 
                                             Text(
                                                 text = "${log.source} @ ${timeFormat.format(Date(log.timestamp))}",
-                                                fontSize = 9.5.sp,
+                                                fontSize = 9.sp,
                                                 fontFamily = FontFamily.Monospace,
-                                                color = TextMuted
+                                                color = TextMuted,
+                                                maxLines = 1,
+                                                softWrap = false,
+                                                overflow = TextOverflow.Ellipsis
                                             )
                                         }
 
@@ -742,7 +787,9 @@ fun DiagnosticsTab(
                                             fontSize = 11.5.sp,
                                             fontWeight = FontWeight.Medium,
                                             color = TextWhite,
-                                            maxLines = 2
+                                            maxLines = 3,
+                                            overflow = TextOverflow.Ellipsis,
+                                            modifier = Modifier.fillMaxWidth()
                                         )
 
                                         Text(
@@ -754,7 +801,10 @@ fun DiagnosticsTab(
                                                 isMatched && isOcr -> AccentPurple.copy(alpha = 0.95f)
                                                 isMatched -> TechGreen.copy(alpha = 0.9f)
                                                 else -> TextSecondary
-                                            }
+                                            },
+                                            maxLines = 4,
+                                            overflow = TextOverflow.Ellipsis,
+                                            modifier = Modifier.fillMaxWidth()
                                         )
                                     }
                                 }
@@ -783,7 +833,7 @@ private fun ComponentStatusBadge(
         border = BorderStroke(0.5.dp, DarkCardBorder)
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = 5.dp, vertical = 6.dp),
+            modifier = Modifier.padding(horizontal = 4.dp, vertical = 6.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(3.dp)
         ) {
@@ -795,17 +845,21 @@ private fun ComponentStatusBadge(
             )
             Text(
                 text = name,
-                fontSize = 9.sp,
+                fontSize = 8.5.sp,
                 color = TextSecondary,
-                maxLines = 1
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Ellipsis
             )
             Text(
                 text = status,
-                fontSize = 9.5.sp,
+                fontSize = 9.sp,
                 fontWeight = FontWeight.Bold,
                 fontFamily = FontFamily.Monospace,
                 color = statusColor,
-                maxLines = 1
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Ellipsis
             )
         }
     }

@@ -58,7 +58,7 @@ object AiFallbackEngine {
         val orderedIds = if (settings.fallbackOrder.isNotEmpty()) {
             settings.fallbackOrder
         } else {
-            listOf("openai", "gemini-api", "gemini-builtin", "anthropic", "ollama")
+            listOf("openai", "gemini-api", "gemini-builtin", "anthropic", "groq")
         }
 
         val chain = orderedIds.mapNotNull { allMap[it] }.toMutableList()
@@ -77,7 +77,7 @@ object AiFallbackEngine {
             val startTime = System.currentTimeMillis()
 
             // Check if provider requires an API key but has none configured
-            if (!provider.isBuiltIn && provider.type != AiProviderType.OLLAMA_LOCAL && provider.apiKey.isBlank()) {
+            if (!provider.isBuiltIn && provider.apiKey.isBlank()) {
                 val skipReason = "[#$positionNum ${provider.displayName} Skipped]: No API key configured in Settings > Providers (HTTP 401 / Missing Bearer Token)"
                 failoverLogs.add(skipReason)
                 onLog?.invoke(
@@ -94,9 +94,8 @@ object AiFallbackEngine {
             try {
                 val replies = when (provider.type) {
                     AiProviderType.GEMINI_API -> callGeminiRestApi(provider, question, settings, qId)
-                    AiProviderType.OPENAI, AiProviderType.CUSTOM_REST -> callOpenAiCompatibleRest(provider, question, settings, qId)
+                    AiProviderType.OPENAI, AiProviderType.GROQ, AiProviderType.CUSTOM_REST -> callOpenAiCompatibleRest(provider, question, settings, qId)
                     AiProviderType.ANTHROPIC -> callAnthropicRest(provider, question, settings, qId)
-                    AiProviderType.OLLAMA_LOCAL -> callOllamaRest(provider, question, settings, qId)
                     AiProviderType.GEMINI_BUILTIN -> generateSmartLocalReplies(question, settings, qId, provider)
                     else -> emptyList()
                 }
@@ -331,19 +330,45 @@ object AiFallbackEngine {
                         Result.success("Success: Verified Anthropic '${provider.modelName}' (${latency}ms)\nSample: \"$sample\"")
                     }
                 }
-                AiProviderType.OLLAMA_LOCAL -> {
-                    val replies = callOllamaRest(provider, testQuestion, settings, qId)
-                    val latency = System.currentTimeMillis() - startTime
-                    val sample = replies.firstOrNull()?.text ?: "Ready."
-                    onLog?.invoke(
-                        provider.displayName,
-                        testQuestion,
-                        DetectionResultType.MATCHED,
-                        "TEST_CONNECTION_SUCCESS",
-                        "[Test Connection Passed]: Verified Ollama '${provider.modelName}' (${latency}ms). Sample reply: \"$sample\"",
-                        latency
-                    )
-                    Result.success("Success: Verified Ollama '${provider.modelName}' (${latency}ms)\nSample: \"$sample\"")
+                AiProviderType.GROQ -> {
+                    if (provider.apiKey.isBlank()) {
+                        val err = "Groq API Key is missing. Enter key in Settings > Providers."
+                        onLog?.invoke(
+                            provider.displayName,
+                            testQuestion,
+                            DetectionResultType.REJECTED,
+                            "TEST_CONNECTION_FAILED",
+                            "[Test Connection Failed]: $err",
+                            0L
+                        )
+                        Result.failure(Exception(err))
+                    } else {
+                        val replies = callOpenAiCompatibleRest(provider, testQuestion, settings, qId)
+                        val latency = System.currentTimeMillis() - startTime
+                        if (replies.isNotEmpty()) {
+                            val sample = replies.first().text
+                            onLog?.invoke(
+                                provider.displayName,
+                                testQuestion,
+                                DetectionResultType.MATCHED,
+                                "TEST_CONNECTION_SUCCESS",
+                                "[Test Connection Passed]: Verified Groq '${provider.modelName}' (${latency}ms). Sample reply: \"$sample\"",
+                                latency
+                            )
+                            Result.success("Success: Verified Groq '${provider.modelName}' (${latency}ms)\nSample: \"$sample\"")
+                        } else {
+                            val err = "Groq API returned empty response choices."
+                            onLog?.invoke(
+                                provider.displayName,
+                                testQuestion,
+                                DetectionResultType.REJECTED,
+                                "TEST_CONNECTION_FAILED",
+                                "[Test Connection Failed]: $err",
+                                latency
+                            )
+                            Result.failure(Exception(err))
+                        }
+                    }
                 }
                 else -> Result.success("Provider ready")
             }
@@ -763,7 +788,16 @@ object AiFallbackEngine {
         settings: ReplySettings,
         questionId: String
     ): List<ReplyItem> {
-        val model = provider.modelName.ifBlank { "gemini-2.5-flash" }
+        var rawModel = provider.modelName.trim()
+        if (rawModel.startsWith("models/")) {
+            rawModel = rawModel.removePrefix("models/")
+        }
+        rawModel = rawModel.replace(" ", "-")
+        val model = when (rawModel) {
+            "", "gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash" -> "gemini-3.1-flash-lite"
+            "gemini-3.1-flash-lite-preview", "gemini-3.1-flash-lite", "gemini-flash-lite" -> "gemini-3.1-flash-lite"
+            else -> rawModel
+        }
         val url = URL("https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=${provider.apiKey.trim()}")
         val conn = (url.openConnection() as HttpURLConnection).apply {
             requestMethod = "POST"
@@ -787,6 +821,10 @@ object AiFallbackEngine {
                         put(JSONObject().apply { put("text", systemPrompt) })
                     })
                 })
+            })
+            put("generationConfig", JSONObject().apply {
+                put("responseMimeType", "application/json")
+                put("temperature", 0.7)
             })
         }
 
@@ -829,9 +867,14 @@ object AiFallbackEngine {
         settings: ReplySettings,
         questionId: String
     ): List<ReplyItem> {
-        val endpoint = provider.customEndpoint ?: "https://api.openai.com/v1/chat/completions"
+        val defaultEndpoint = if (provider.type == AiProviderType.GROQ) {
+            "https://api.groq.com/openai/v1/chat/completions"
+        } else {
+            "https://api.openai.com/v1/chat/completions"
+        }
+        val endpoint = provider.customEndpoint?.takeIf { it.isNotBlank() } ?: defaultEndpoint
         if (provider.apiKey.isBlank() && !endpoint.contains("localhost") && !endpoint.contains("10.0.2.2")) {
-            throw java.io.IOException("OpenAI Missing API Key (HTTP 401): No API key provided in Settings > Providers.")
+            throw java.io.IOException("${provider.displayName} Missing API Key (HTTP 401): No API key provided in Settings > Providers.")
         }
 
         val url = URL(endpoint)
@@ -858,8 +901,9 @@ object AiFallbackEngine {
                 "Generate ${settings.count} distinct quick reply options that directly answer this inquiry.\n" +
                 "Respond ONLY with a JSON array of strings: [\"reply 1\", \"reply 2\"]"
 
+        val defaultModel = if (provider.type == AiProviderType.GROQ) "llama-3.3-70b-versatile" else "gpt-4o-mini"
         val body = JSONObject().apply {
-            put("model", provider.modelName.ifBlank { "gpt-4o-mini" })
+            put("model", provider.modelName.ifBlank { defaultModel })
             put("messages", JSONArray().apply {
                 put(JSONObject().apply {
                     put("role", "system")
@@ -901,14 +945,15 @@ object AiFallbackEngine {
                 }
             } catch (_: Exception) {}
 
+            val pName = provider.displayName
             val formattedReason = when (conn.responseCode) {
-                401 -> "OpenAI Auth Failure (HTTP 401 - ${errorCode ?: "invalid_api_key"}): ${errorMsg ?: "Incorrect or expired API key. Please check your OpenAI API key in Providers settings."}"
-                429 -> "OpenAI Quota/Rate Limit (HTTP 429 - ${errorCode ?: "insufficient_quota"}): ${errorMsg ?: "You exceeded your current OpenAI quota or rate limit. Check billing."}"
-                404 -> "OpenAI Model Not Found (HTTP 404 - ${errorCode ?: "model_not_found"}): ${errorMsg ?: "The requested model '${provider.modelName}' does not exist or you lack access."}"
-                400 -> "OpenAI Bad Request (HTTP 400 - ${errorCode ?: "invalid_request"}): ${errorMsg ?: rawErrorText}"
-                403 -> "OpenAI Access Forbidden (HTTP 403): ${errorMsg ?: "Access denied to OpenAI endpoint."}"
-                in 500..599 -> "OpenAI Server Error (HTTP ${conn.responseCode}): ${errorMsg ?: "OpenAI service is temporarily down."}"
-                else -> "OpenAI HTTP ${conn.responseCode}: ${errorMsg ?: rawErrorText}"
+                401 -> "$pName Auth Failure (HTTP 401 - ${errorCode ?: "invalid_api_key"}): ${errorMsg ?: "Incorrect or expired API key. Please check your API key in Providers settings."}"
+                429 -> "$pName Quota/Rate Limit (HTTP 429 - ${errorCode ?: "insufficient_quota"}): ${errorMsg ?: "You exceeded your current API quota or rate limit. Check billing."}"
+                404 -> "$pName Model Not Found (HTTP 404 - ${errorCode ?: "model_not_found"}): ${errorMsg ?: "The requested model '${provider.modelName}' does not exist or you lack access."}"
+                400 -> "$pName Bad Request (HTTP 400 - ${errorCode ?: "invalid_request"}): ${errorMsg ?: rawErrorText}"
+                403 -> "$pName Access Forbidden (HTTP 403): ${errorMsg ?: "Access denied to API endpoint."}"
+                in 500..599 -> "$pName Server Error (HTTP ${conn.responseCode}): ${errorMsg ?: "Service is temporarily down."}"
+                else -> "$pName HTTP ${conn.responseCode}: ${errorMsg ?: rawErrorText}"
             }
             throw java.io.IOException(formattedReason)
         }
@@ -962,43 +1007,6 @@ object AiFallbackEngine {
                 BufferedReader(InputStreamReader(conn.errorStream ?: conn.inputStream)).use { it.readText() }
             } catch (_: Exception) { conn.responseMessage }
             throw java.io.IOException("Anthropic API HTTP ${conn.responseCode}: $errorText")
-        }
-        return emptyList()
-    }
-
-    private fun callOllamaRest(
-        provider: AiProvider,
-        question: String,
-        settings: ReplySettings,
-        questionId: String
-    ): List<ReplyItem> {
-        val endpoint = (provider.customEndpoint ?: "http://10.0.2.2:11434") + "/api/generate"
-        val url = URL(endpoint)
-        val conn = (url.openConnection() as HttpURLConnection).apply {
-            requestMethod = "POST"
-            doOutput = true
-            setRequestProperty("Content-Type", "application/json")
-            connectTimeout = 6000
-            readTimeout = 6000
-        }
-
-        val prompt = "Generate ${settings.count} short quick replies answering: \"$question\". " +
-                "Tone: ${settings.tone.systemPromptHint}. " +
-                "Return ONLY a JSON array: [\"reply1\", \"reply2\"]."
-
-        val body = JSONObject().apply {
-            put("model", provider.modelName.ifBlank { "llama3.2:1b" })
-            put("prompt", prompt)
-            put("stream", false)
-        }
-
-        OutputStreamWriter(conn.outputStream).use { it.write(body.toString()) }
-
-        if (conn.responseCode == 200) {
-            val resp = BufferedReader(InputStreamReader(conn.inputStream)).use { it.readText() }
-            val root = JSONObject(resp)
-            val text = root.optString("response")
-            return parseJsonArrayReplies(text, questionId, settings.tone, provider)
         }
         return emptyList()
     }

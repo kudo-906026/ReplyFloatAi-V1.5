@@ -67,6 +67,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.model.AiProvider
@@ -249,9 +250,12 @@ fun SimulatorTab(
                         Text(
                             text = "VERIFICATION TEST SCENARIOS",
                             fontWeight = FontWeight.Bold,
-                            fontSize = 12.sp,
+                            fontSize = 11.5.sp,
                             fontFamily = FontFamily.Monospace,
-                            color = TextWhite
+                            color = TextWhite,
+                            modifier = Modifier.weight(1f, fill = false).padding(end = 8.dp),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
 
                         OutlinedButton(
@@ -274,14 +278,18 @@ fun SimulatorTab(
                             },
                             shape = RoundedCornerShape(8.dp),
                             border = BorderStroke(1.dp, CrimsonPrimary),
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = CrimsonLight)
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = CrimsonLight),
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                            modifier = Modifier.height(32.dp)
                         ) {
-                            Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(14.dp))
+                            Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(13.dp))
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
                                 text = if (isRunningBatchSuite) "Running Suite..." else "Run All 5 Scenarios",
                                 fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold
+                                fontWeight = FontWeight.Bold,
+                                softWrap = false,
+                                maxLines = 1
                             )
                         }
                     }
@@ -529,21 +537,25 @@ fun SimulatorTab(
                         },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(42.dp),
+                            .height(40.dp),
                         shape = RoundedCornerShape(8.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = TechGreen.copy(alpha = 0.2f),
                             contentColor = TechGreen
                         ),
-                        border = BorderStroke(1.dp, TechGreen.copy(alpha = 0.6f))
+                        border = BorderStroke(1.dp, TechGreen.copy(alpha = 0.6f)),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
                     ) {
-                        Icon(Icons.Default.PlayArrow, contentDescription = null, tint = TechGreen, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Icon(Icons.Default.PlayArrow, contentDescription = null, tint = TechGreen, modifier = Modifier.size(15.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = "Scan Chat Viewport (Prioritizes Lowest Visible Question with '?')",
-                            fontSize = 12.sp,
+                            text = "Scan Chat Viewport (Prioritizes Lowest Question with '?')",
+                            fontSize = 11.5.sp,
                             fontWeight = FontWeight.Bold,
-                            color = TechGreen
+                            color = TechGreen,
+                            maxLines = 1,
+                            softWrap = false,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                 }

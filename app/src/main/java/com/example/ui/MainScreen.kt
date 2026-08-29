@@ -32,6 +32,10 @@ import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.QuestionAnswer
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -144,126 +148,133 @@ fun MainScreen() {
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         containerColor = DarkBg,
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(DarkSurfaceCard)
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = DarkSurfaceCard,
+                shadowElevation = 4.dp
             ) {
-                // Top Header Bar
-                Row(
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                        .statusBarsPadding()
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(28.dp)
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(CrimsonPrimary.copy(alpha = 0.2f))
-                                .border(1.dp, CrimsonPrimary.copy(alpha = 0.5f), RoundedCornerShape(6.dp)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Speed,
-                                contentDescription = null,
-                                tint = CrimsonPrimary,
-                                modifier = Modifier.size(16.dp)
-                            )
-                        }
-
-                        Column {
-                            Text(
-                                text = "ReplyFloat",
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 15.sp,
-                                color = TextWhite,
-                                letterSpacing = 0.5.sp
-                            )
-                            Text(
-                                text = "INTELLIGENT OVERLAY DAEMON",
-                                fontFamily = FontFamily.Monospace,
-                                fontSize = 8.5.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = TextSecondary,
-                                letterSpacing = 0.8.sp
-                            )
-                        }
-                    }
-
-                    // Status Pill
+                    // Top Header Bar
                     Row(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(DarkSurfaceVariant)
-                            .border(1.dp, if (isOverlayRunning) AccentGreen.copy(alpha = 0.5f) else DarkCardBorder, RoundedCornerShape(16.dp))
-                            .padding(horizontal = 8.dp, vertical = 3.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(5.dp)
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(7.dp)
-                                .clip(CircleShape)
-                                .background(if (isOverlayRunning) AccentGreen else CrimsonPrimary)
-                        )
-                        Text(
-                            text = if (isOverlayRunning) "OVERLAY ACTIVE" else "IDLE",
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 9.5.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = if (isOverlayRunning) TechGreen else TextMuted
-                        )
-                    }
-                }
-
-                // Scrollable Top Tabs Row
-                ScrollableTabRow(
-                    selectedTabIndex = selectedTab,
-                    containerColor = DarkSurfaceCard,
-                    contentColor = CrimsonPrimary,
-                    edgePadding = 8.dp,
-                    indicator = { tabPositions ->
-                        TabRowDefaults.SecondaryIndicator(
-                            modifier = Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
-                            color = CrimsonPrimary,
-                            height = 2.dp
-                        )
-                    },
-                    divider = {}
-                ) {
-                    ControlPanelTab.entries.forEachIndexed { index, tab ->
-                        val isSelected = selectedTab == index
-                        Tab(
-                            selected = isSelected,
-                            onClick = { selectedTab = index },
-                            modifier = Modifier.testTag(tab.tag),
-                            text = {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = tab.icon,
-                                        contentDescription = null,
-                                        tint = if (isSelected) CrimsonPrimary else TextMuted,
-                                        modifier = Modifier.size(13.dp)
-                                    )
-                                    Text(
-                                        text = tab.title,
-                                        fontSize = 11.5.sp,
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                        color = if (isSelected) TextWhite else TextMuted
-                                    )
-                                }
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(28.dp)
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(CrimsonPrimary.copy(alpha = 0.2f))
+                                    .border(1.dp, CrimsonPrimary.copy(alpha = 0.5f), RoundedCornerShape(6.dp)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Speed,
+                                    contentDescription = null,
+                                    tint = CrimsonPrimary,
+                                    modifier = Modifier.size(16.dp)
+                                )
                             }
-                        )
+
+                            Column {
+                                Text(
+                                    text = "ReplyFloat",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 15.sp,
+                                    color = TextWhite,
+                                    letterSpacing = 0.5.sp
+                                )
+                                Text(
+                                    text = "INTELLIGENT OVERLAY DAEMON",
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 8.5.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = TextSecondary,
+                                    letterSpacing = 0.8.sp
+                                )
+                            }
+                        }
+
+                        // Status Pill
+                        Row(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(DarkSurfaceVariant)
+                                .border(1.dp, if (isOverlayRunning) AccentGreen.copy(alpha = 0.5f) else DarkCardBorder, RoundedCornerShape(16.dp))
+                                .padding(horizontal = 8.dp, vertical = 3.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(5.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(7.dp)
+                                    .clip(CircleShape)
+                                    .background(if (isOverlayRunning) AccentGreen else CrimsonPrimary)
+                            )
+                            Text(
+                                text = if (isOverlayRunning) "OVERLAY ACTIVE" else "IDLE",
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 9.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isOverlayRunning) TechGreen else TextMuted
+                            )
+                        }
+                    }
+
+                    // Scrollable Top Tabs Row
+                    ScrollableTabRow(
+                        selectedTabIndex = selectedTab,
+                        containerColor = DarkSurfaceCard,
+                        contentColor = CrimsonPrimary,
+                        edgePadding = 8.dp,
+                        indicator = { tabPositions ->
+                            TabRowDefaults.SecondaryIndicator(
+                                modifier = Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
+                                color = CrimsonPrimary,
+                                height = 2.dp
+                            )
+                        },
+                        divider = {}
+                    ) {
+                        ControlPanelTab.entries.forEachIndexed { index, tab ->
+                            val isSelected = selectedTab == index
+                            Tab(
+                                selected = isSelected,
+                                onClick = { selectedTab = index },
+                                modifier = Modifier.testTag(tab.tag),
+                                text = {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = tab.icon,
+                                            contentDescription = null,
+                                            tint = if (isSelected) CrimsonPrimary else TextMuted,
+                                            modifier = Modifier.size(13.dp)
+                                        )
+                                        Text(
+                                            text = tab.title,
+                                            fontSize = 11.5.sp,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                            color = if (isSelected) TextWhite else TextMuted
+                                        )
+                                    }
+                                }
+                            )
+                        }
                     }
                 }
             }
@@ -273,6 +284,7 @@ fun MainScreen() {
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
+                .navigationBarsPadding()
         ) {
             when (ControlPanelTab.entries[selectedTab]) {
                 ControlPanelTab.CONTROLS -> {

@@ -58,6 +58,7 @@ dependencies {
     implementation(libs.mlkit.text.recognition)
 
     testImplementation(libs.junit)
+    testImplementation(libs.json)
 
     debugImplementation(libs.androidx.ui.tooling)
 }

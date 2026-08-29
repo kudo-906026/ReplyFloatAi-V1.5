@@ -69,8 +69,25 @@ object AppStateManager {
     private val processedQuestionsCache = mutableMapOf<String, Long>()
     private val answeredQuestions = mutableSetOf<String>()
 
+    @Volatile
+    private var appContext: Context? = null
+
     init {
         _activeProvider.value = _settings.value.preferredProvider
+    }
+
+    fun init(context: Context) {
+        val appCtx = context.applicationContext
+        appContext = appCtx
+        val loaded = SettingsStorage.loadSettings(appCtx)
+        _settings.value = loaded
+        _activeProvider.value = loaded.preferredProvider
+    }
+
+    private fun saveCurrentSettings(settingsToSave: ReplySettings = _settings.value) {
+        appContext?.let { ctx ->
+            SettingsStorage.saveSettings(ctx, settingsToSave)
+        }
     }
 
     fun normalizeQuestionText(text: String): String {
@@ -151,6 +168,7 @@ object AppStateManager {
             enableOcrFallback = enableOcr,
             ocrDebounceMs = debounceMs
         )
+        saveCurrentSettings()
     }
 
     fun setOverlayRunning(running: Boolean) {
@@ -174,6 +192,7 @@ object AppStateManager {
             fallbackOrder = currentOrder
         )
         _activeProvider.value = provider
+        saveCurrentSettings()
     }
 
     fun updateFallbackOrder(newOrder: List<String>) {
@@ -184,6 +203,7 @@ object AppStateManager {
             preferredProvider = topProvider
         )
         _activeProvider.value = topProvider
+        saveCurrentSettings()
     }
 
     fun moveProviderInFallbackOrder(fromIndex: Int, toIndex: Int) {
@@ -223,6 +243,7 @@ object AppStateManager {
             _settings.value = _settings.value.copy(preferredProvider = updatedPref)
             _activeProvider.value = updatedPref
         }
+        saveCurrentSettings()
     }
 
     fun addCustomProvider(name: String, model: String, endpoint: String, apiKey: String) {
@@ -246,6 +267,7 @@ object AppStateManager {
             providerApiKeys = updatedKeys,
             fallbackOrder = updatedOrder
         )
+        saveCurrentSettings()
     }
 
     fun deleteCustomProvider(providerId: String) {
@@ -262,6 +284,7 @@ object AppStateManager {
             _settings.value = _settings.value.copy(preferredProvider = fallback)
             _activeProvider.value = fallback
         }
+        saveCurrentSettings()
     }
 
     fun toggleAppWhitelist(packageName: String) {
@@ -269,6 +292,7 @@ object AppStateManager {
             if (it.packageName == packageName) it.copy(isEnabled = !it.isEnabled) else it
         }
         _settings.value = _settings.value.copy(appsWhitelist = updated)
+        saveCurrentSettings()
     }
 
     fun addCustomApp(appName: String, packageName: String, category: String) {
@@ -281,59 +305,73 @@ object AppStateManager {
         )
         val updated = _settings.value.appsWhitelist + newApp
         _settings.value = _settings.value.copy(appsWhitelist = updated)
+        saveCurrentSettings()
     }
 
     fun deleteCustomApp(packageName: String) {
         val updated = _settings.value.appsWhitelist.filter { it.packageName != packageName }
         _settings.value = _settings.value.copy(appsWhitelist = updated)
+        saveCurrentSettings()
     }
 
     fun updateTone(tone: ReplyTone) {
         _settings.value = _settings.value.copy(tone = tone)
+        saveCurrentSettings()
     }
 
     fun updateReplyCount(count: Int) {
         _settings.value = _settings.value.copy(count = count.coerceIn(1, 3))
+        saveCurrentSettings()
     }
 
     fun setUnderstandingMode(enabled: Boolean) {
         _settings.value = _settings.value.copy(understandingMode = enabled)
+        saveCurrentSettings()
     }
 
     fun setUnderstandingSummaryLength(length: UnderstandingSummaryLength) {
         _settings.value = _settings.value.copy(understandingSummaryLength = length)
+        saveCurrentSettings()
     }
 
     fun setAutoGenerateReplies(enabled: Boolean) {
         _settings.value = _settings.value.copy(autoGenerate = enabled)
+        saveCurrentSettings()
     }
 
     fun setDetectQuestionsOnly(enabled: Boolean) {
         _settings.value = _settings.value.copy(detectQuestionsOnly = enabled)
+        saveCurrentSettings()
     }
 
     fun setPrefetchOnAppFocus(enabled: Boolean) {
         _settings.value = _settings.value.copy(prefetchOnAppFocus = enabled)
+        saveCurrentSettings()
     }
 
     fun setAutoCopySingleReply(enabled: Boolean) {
         _settings.value = _settings.value.copy(autoCopySingleReply = enabled)
+        saveCurrentSettings()
     }
 
     fun setExpandableReplies(enabled: Boolean) {
         _settings.value = _settings.value.copy(expandableReplies = enabled)
+        saveCurrentSettings()
     }
 
     fun setResponseLengthPreset(preset: ResponseLengthPreset) {
         _settings.value = _settings.value.copy(responseLengthPreset = preset)
+        saveCurrentSettings()
     }
 
     fun setCustomCharLimit(limit: Int) {
         _settings.value = _settings.value.copy(customCharLimit = limit)
+        saveCurrentSettings()
     }
 
     fun setReplyAutoDeleteMinutes(minutes: Int) {
         _settings.value = _settings.value.copy(replyAutoDeleteMinutes = minutes.coerceIn(0, 10))
+        saveCurrentSettings()
     }
 
     fun setHistoryPurgeMinutes(minutes: Int) {
@@ -341,6 +379,7 @@ object AppStateManager {
             historyPurgeMinutes = minutes.coerceIn(1, 10),
             autoPurgeTimerMinutes = minutes.coerceIn(1, 10)
         )
+        saveCurrentSettings()
         purgeExpiredData()
     }
 
@@ -349,6 +388,7 @@ object AppStateManager {
             autoPurgeTimerMinutes = minutes,
             historyPurgeMinutes = if (minutes in 1..10) minutes else _settings.value.historyPurgeMinutes
         )
+        saveCurrentSettings()
         purgeExpiredData()
     }
 
@@ -364,77 +404,95 @@ object AppStateManager {
 
     fun setCacheRetentionMinutes(minutes: Int) {
         _settings.value = _settings.value.copy(cacheRetentionMinutes = minutes)
+        saveCurrentSettings()
     }
 
     fun setHistoryRetentionDays(days: Int) {
         _settings.value = _settings.value.copy(historyRetentionDays = days)
+        saveCurrentSettings()
     }
 
     fun setContinuousScreenAnalysis(enabled: Boolean) {
         _settings.value = _settings.value.copy(continuousScreenAnalysis = enabled)
+        saveCurrentSettings()
     }
 
     fun setRealTimeNodeTracking(enabled: Boolean) {
         _settings.value = _settings.value.copy(realTimeNodeTracking = enabled)
+        saveCurrentSettings()
     }
 
     fun setSmartDebounceMs(ms: Int) {
         _settings.value = _settings.value.copy(smartDebounceMs = ms)
+        saveCurrentSettings()
     }
 
     fun setOcrFallbackEnabled(enabled: Boolean) {
         _settings.value = _settings.value.copy(enableOcrFallback = enabled)
+        saveCurrentSettings()
     }
 
     fun setOcrDebounceMs(ms: Int) {
         _settings.value = _settings.value.copy(ocrDebounceMs = ms)
+        saveCurrentSettings()
     }
 
     fun setOverlayBarStyle(style: OverlayBarStyle) {
         _settings.value = _settings.value.copy(overlayBarStyle = style)
+        saveCurrentSettings()
     }
 
     fun setOverlayInteractionMode(mode: OverlayInteractionMode) {
         _settings.value = _settings.value.copy(overlayInteractionMode = mode)
+        saveCurrentSettings()
     }
 
     fun setAutoHideEnabled(enabled: Boolean) {
         _settings.value = _settings.value.copy(autoHideEnabled = enabled)
+        saveCurrentSettings()
     }
 
     fun setAutoHideDelaySec(sec: Int) {
         _settings.value = _settings.value.copy(autoHideDelaySec = sec)
+        saveCurrentSettings()
     }
 
     fun setScreenIdleTimeoutSec(sec: Int) {
         _settings.value = _settings.value.copy(screenIdleTimeoutSec = sec)
+        saveCurrentSettings()
     }
 
     fun setOverlayOpacity(opacity: Float) {
         _settings.value = _settings.value.copy(overlayOpacity = opacity)
+        saveCurrentSettings()
     }
 
     fun setOverlayCornerRadius(radius: Int) {
         _settings.value = _settings.value.copy(overlayCornerRadius = radius)
+        saveCurrentSettings()
     }
 
     fun setOverlayTextSizeSp(size: Int) {
         _settings.value = _settings.value.copy(overlayTextSizeSp = size)
+        saveCurrentSettings()
     }
 
     fun saveOverlayPosition(packageName: String, appName: String, x: Int, y: Int) {
         val filtered = _settings.value.savedPositions.filter { it.packageName != packageName }
         val newPos = SavedOverlayPosition(packageName = packageName, appName = appName, x = x, y = y)
         _settings.value = _settings.value.copy(savedPositions = filtered + newPos)
+        saveCurrentSettings()
     }
 
     fun deleteSavedPosition(id: String) {
         val updated = _settings.value.savedPositions.filter { it.id != id }
         _settings.value = _settings.value.copy(savedPositions = updated)
+        saveCurrentSettings()
     }
 
     fun clearAllSavedPositions() {
         _settings.value = _settings.value.copy(savedPositions = emptyList())
+        saveCurrentSettings()
     }
 
     fun clearAllStorage() {
@@ -572,12 +630,39 @@ object AppStateManager {
                     }
                 )
 
-                // Update active provider state to match the exact provider that successfully yielded the replies
-                _activeProvider.value = fallbackResult.usedProvider
+                val usedProvider = fallbackResult.usedProvider
+                val currentTopId = _settings.value.fallbackOrder.firstOrNull() ?: _settings.value.preferredProvider.id
+
+                // Sticky fallback update: When a provider fails and a fallback provider succeeds,
+                // permanently stick to this working provider for all future requests!
+                if (usedProvider.id != currentTopId) {
+                    val newOrder = _settings.value.fallbackOrder.toMutableList()
+                    newOrder.remove(usedProvider.id)
+                    newOrder.add(0, usedProvider.id)
+                    val updatedSettings = _settings.value.copy(
+                        preferredProvider = usedProvider,
+                        fallbackOrder = newOrder
+                    )
+                    _settings.value = updatedSettings
+                    _activeProvider.value = usedProvider
+                    saveCurrentSettings(updatedSettings)
+
+                    addDiagnosticLog(
+                        source = "AI Fallback Manager",
+                        rawText = cleanText,
+                        result = DetectionResultType.MATCHED,
+                        category = "STICKY_FALLBACK",
+                        reason = "Sticky Fallback: Provider '${usedProvider.displayName}' succeeded. Automatically promoted to #1 Primary Provider and persisted.",
+                        detectionMethod = detectionMethod,
+                        latencyMs = null
+                    )
+                } else {
+                    _activeProvider.value = usedProvider
+                }
 
                 val finalQuestion = initialQuestion.copy(
                     englishMeaning = fallbackResult.understanding,
-                    generatedByProvider = fallbackResult.usedProvider,
+                    generatedByProvider = usedProvider,
                     fallbackNotice = fallbackResult.fallbackNotice
                 )
 

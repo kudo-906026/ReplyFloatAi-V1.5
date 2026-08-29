@@ -136,7 +136,7 @@ fun ProvidersTab(
         allProvidersMap.keys.forEach { if (!list.contains(it)) list.add(it) }
         list
     } else {
-        listOf("openai", "gemini-api", "gemini-builtin", "anthropic", "ollama")
+        listOf("openai", "gemini-api", "gemini-builtin", "anthropic", "groq")
     }
 
     val orderedProviders = orderedIds.mapNotNull { allProvidersMap[it] }
@@ -367,7 +367,7 @@ fun ProvidersTab(
             var keyInput by remember(currentApiKey) { mutableStateOf(currentApiKey) }
             val isTesting = testingProviderId == provider.id
 
-            val hasKey = currentApiKey.isNotBlank() || provider.isBuiltIn || provider.type == AiProviderType.OLLAMA_LOCAL
+            val hasKey = currentApiKey.isNotBlank() || provider.isBuiltIn
 
             ControlPanelCard(
                 modifier = Modifier
@@ -473,11 +473,6 @@ fun ProvidersTab(
                                 Icon(Icons.Default.CheckCircle, contentDescription = null, tint = TechGreen, modifier = Modifier.size(13.dp))
                                 Text("Built-in Local Heuristics (Always available offline)", fontSize = 11.sp, color = TechGreen)
                             }
-                        } else if (provider.type == AiProviderType.OLLAMA_LOCAL) {
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                Icon(Icons.Default.CheckCircle, contentDescription = null, tint = TechBlue, modifier = Modifier.size(13.dp))
-                                Text("Local Ollama Daemon (http://10.0.2.2:11434)", fontSize = 11.sp, color = TechBlue)
-                            }
                         } else if (hasKey) {
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                                 Icon(Icons.Default.CheckCircle, contentDescription = null, tint = TechGreen, modifier = Modifier.size(13.dp))
@@ -501,7 +496,7 @@ fun ProvidersTab(
                     }
 
                     // API Key Input for Non-Built-in
-                    if (!provider.isBuiltIn && provider.type != AiProviderType.OLLAMA_LOCAL) {
+                    if (!provider.isBuiltIn) {
                         OutlinedTextField(
                             value = keyInput,
                             onValueChange = {

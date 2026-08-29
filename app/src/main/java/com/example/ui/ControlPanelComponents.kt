@@ -53,6 +53,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.style.TextOverflow
 import com.example.ui.theme.AccentBlue
 import com.example.ui.theme.AccentGreen
 import com.example.ui.theme.AccentGreenLight
@@ -149,6 +150,7 @@ fun ControlPanelSectionHeader(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Row(
+            modifier = Modifier.weight(1f, fill = false).padding(end = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
@@ -181,7 +183,9 @@ fun ControlPanelSectionHeader(
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
                 letterSpacing = 0.8.sp,
-                color = TextWhite
+                color = TextWhite,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
         }
 
@@ -198,7 +202,9 @@ fun ControlPanelSectionHeader(
                     fontSize = 10.sp,
                     fontFamily = FontFamily.Monospace,
                     fontWeight = FontWeight.Bold,
-                    color = badgeColor
+                    color = badgeColor,
+                    maxLines = 1,
+                    softWrap = false
                 )
             }
         }

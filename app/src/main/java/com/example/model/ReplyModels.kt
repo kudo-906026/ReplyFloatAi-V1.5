@@ -8,7 +8,7 @@ enum class AiProviderType {
     OPENAI,
     ANTHROPIC,
     DEEPSEEK,
-    OLLAMA_LOCAL,
+    GROQ,
     CUSTOM_REST
 }
 
@@ -151,7 +151,7 @@ data class SavedOverlayPosition(
 
 data class ReplySettings(
     val preferredProvider: AiProvider = defaultBuiltInProviders()[0],
-    val fallbackOrder: List<String> = listOf("openai", "gemini-api", "gemini-builtin", "anthropic", "ollama"),
+    val fallbackOrder: List<String> = listOf("openai", "gemini-api", "gemini-builtin", "anthropic", "groq"),
     val providerApiKeys: Map<String, String> = emptyMap(),
     val tone: ReplyTone = ReplyTone.CASUAL,
     val count: Int = 3,
@@ -201,8 +201,8 @@ fun defaultBuiltInProviders(): List<AiProvider> = listOf(
         id = "gemini-api",
         type = AiProviderType.GEMINI_API,
         name = "gemini-api",
-        displayName = "Gemini Pro / Flash API",
-        modelName = "gemini-2.5-flash",
+        displayName = "Gemini Flash Lite API",
+        modelName = "gemini-3.1-flash-lite",
         apiKey = "",
         tier = AiModelTier.PRO
     ),
@@ -210,8 +210,8 @@ fun defaultBuiltInProviders(): List<AiProvider> = listOf(
         id = "gemini-builtin",
         type = AiProviderType.GEMINI_BUILTIN,
         name = "gemini-builtin",
-        displayName = "Gemini Flash (Built-in)",
-        modelName = "gemini-2.5-flash",
+        displayName = "Gemini Flash Lite (Built-in)",
+        modelName = "gemini-3.1-flash-lite",
         isBuiltIn = true,
         tier = AiModelTier.LIGHTWEIGHT
     ),
@@ -225,12 +225,13 @@ fun defaultBuiltInProviders(): List<AiProvider> = listOf(
         tier = AiModelTier.BALANCED
     ),
     AiProvider(
-        id = "ollama",
-        type = AiProviderType.OLLAMA_LOCAL,
-        name = "ollama",
-        displayName = "Ollama Local (Offline)",
-        modelName = "llama3.2:1b",
-        customEndpoint = "http://10.0.2.2:11434",
+        id = "groq",
+        type = AiProviderType.GROQ,
+        name = "groq",
+        displayName = "Groq (Llama 3.3 70B)",
+        modelName = "llama-3.3-70b-versatile",
+        apiKey = "",
+        customEndpoint = "https://api.groq.com/openai/v1/chat/completions",
         tier = AiModelTier.LIGHTWEIGHT
     )
 )
