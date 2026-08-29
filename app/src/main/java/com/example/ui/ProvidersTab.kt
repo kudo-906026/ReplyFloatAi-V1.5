@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.NetworkCheck
 import androidx.compose.material.icons.filled.Psychology
@@ -69,8 +70,10 @@ import com.example.ai.AiFallbackEngine
 import com.example.model.AiModelTier
 import com.example.model.AiProvider
 import com.example.model.AiProviderType
+import com.example.model.DetectionMethod
 import com.example.model.ReplySettings
 import com.example.model.defaultBuiltInProviders
+import com.example.state.AppStateManager
 import com.example.ui.theme.AccentBlue
 import com.example.ui.theme.AccentGreen
 import com.example.ui.theme.AccentPurple
@@ -106,6 +109,7 @@ fun ProvidersTab(
     val coroutineScope = rememberCoroutineScope()
 
     var testingProviderId by remember { mutableStateOf<String?>(null) }
+    var testResultsMap by remember { mutableStateOf<Map<String, Pair<Boolean, String>>>(emptyMap()) }
     var showAddCustomDialog by remember { mutableStateOf(false) }
 
     var customName by remember { mutableStateOf("") }
@@ -533,12 +537,31 @@ fun ProvidersTab(
                                 testingProviderId = provider.id
                                 coroutineScope.launch {
                                     val providerWithKey = provider.copy(apiKey = keyInput)
-                                    val result = AiFallbackEngine.testProviderConnection(providerWithKey)
+                                    onUpdateApiKey(providerWithKey, keyInput)
+                                    val result = AiFallbackEngine.testProviderConnection(
+                                        provider = providerWithKey,
+                                        settings = settings,
+                                        onLog = { src, raw, res, cat, rsn, lat ->
+                                            AppStateManager.addDiagnosticLog(
+                                                source = src,
+                                                rawText = raw,
+                                                result = res,
+                                                category = cat,
+                                                reason = rsn,
+                                                detectionMethod = DetectionMethod.ACCESSIBILITY,
+                                                latencyMs = lat
+                                            )
+                                        }
+                                    )
                                     testingProviderId = null
                                     if (result.isSuccess) {
-                                        Toast.makeText(context, result.getOrNull() ?: "Connection OK", Toast.LENGTH_SHORT).show()
+                                        val msg = result.getOrNull() ?: "Verified OK"
+                                        testResultsMap = testResultsMap + (provider.id to (true to msg))
+                                        Toast.makeText(context, "Success: Verified ${provider.displayName}", Toast.LENGTH_SHORT).show()
                                     } else {
-                                        Toast.makeText(context, "Error: ${result.exceptionOrNull()?.message}", Toast.LENGTH_LONG).show()
+                                        val err = result.exceptionOrNull()?.message ?: "Unknown error"
+                                        testResultsMap = testResultsMap + (provider.id to (false to err))
+                                        Toast.makeText(context, "Connection Error: $err", Toast.LENGTH_LONG).show()
                                     }
                                 }
                             },
@@ -550,7 +573,7 @@ fun ProvidersTab(
                             if (isTesting) {
                                 CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp, color = TechBlue)
                                 Spacer(modifier = Modifier.width(6.dp))
-                                Text("Testing...", fontSize = 11.sp)
+                                Text("Testing POST generation...", fontSize = 11.sp)
                             } else {
                                 Icon(Icons.Default.NetworkCheck, contentDescription = null, modifier = Modifier.size(14.dp))
                                 Spacer(modifier = Modifier.width(6.dp))
@@ -564,6 +587,48 @@ fun ProvidersTab(
                                 modifier = Modifier.size(32.dp)
                             ) {
                                 Icon(Icons.Default.Delete, contentDescription = "Delete", tint = CrimsonLight, modifier = Modifier.size(16.dp))
+                            }
+                        }
+                    }
+
+                    // Rich Verified / Error Status Box
+                    val testResult = testResultsMap[provider.id]
+                    if (testResult != null) {
+                        val isOk = testResult.first
+                        val resultText = testResult.second
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (isOk) TechGreen.copy(alpha = 0.10f) else CrimsonPrimary.copy(alpha = 0.10f),
+                            border = BorderStroke(1.dp, if (isOk) TechGreen.copy(alpha = 0.45f) else CrimsonPrimary.copy(alpha = 0.45f)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 10.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.Top,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = if (isOk) Icons.Default.CheckCircle else Icons.Default.ErrorOutline,
+                                    contentDescription = null,
+                                    tint = if (isOk) TechGreen else CrimsonLight,
+                                    modifier = Modifier.size(16.dp).padding(top = 2.dp)
+                                )
+                                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                    Text(
+                                        text = if (isOk) "Real Generation Verified (Exact POST & Model)" else "Generation Check Failed",
+                                        fontSize = 11.5.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isOk) TechGreen else CrimsonLight
+                                    )
+                                    Text(
+                                        text = resultText,
+                                        fontSize = 10.5.sp,
+                                        fontFamily = FontFamily.Monospace,
+                                        color = if (isOk) TextPrimary else CrimsonLight.copy(alpha = 0.95f)
+                                    )
+                                }
                             }
                         }
                     }

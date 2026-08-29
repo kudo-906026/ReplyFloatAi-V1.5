@@ -204,93 +204,160 @@ object AiFallbackEngine {
         Pair(result.replies, result.understanding)
     }
 
-    suspend fun testProviderConnection(provider: AiProvider): Result<String> = withContext(Dispatchers.IO) {
+    suspend fun testProviderConnection(
+        provider: AiProvider,
+        settings: ReplySettings = ReplySettings(),
+        onLog: ((String, String, DetectionResultType, String, String, Long) -> Unit)? = null
+    ): Result<String> = withContext(Dispatchers.IO) {
         val startTime = System.currentTimeMillis()
+        val testQuestion = "Are you available for a quick chat today?"
+        val qId = "test_conn_${System.currentTimeMillis()}"
+
         try {
             when (provider.type) {
                 AiProviderType.GEMINI_BUILTIN -> {
-                    delay(50)
-                    Result.success("Connected to Gemini Built-in Engine (Latency: 12ms)")
+                    val replies = generateSmartLocalReplies(testQuestion, settings, qId, provider)
+                    val latency = System.currentTimeMillis() - startTime
+                    val sample = replies.firstOrNull()?.text ?: "I am ready."
+                    onLog?.invoke(
+                        provider.displayName,
+                        testQuestion,
+                        DetectionResultType.MATCHED,
+                        "TEST_CONNECTION_SUCCESS",
+                        "[Test Connection Passed]: Gemini Built-in Engine verified (Latency: ${latency}ms). Sample reply: \"$sample\"",
+                        latency
+                    )
+                    Result.success("Success: Built-in Engine verified (${latency}ms)\nSample: \"$sample\"")
                 }
                 AiProviderType.GEMINI_API -> {
                     if (provider.apiKey.isBlank()) {
-                        Result.failure(Exception("API Key is missing. Please enter your Gemini API Key in Providers."))
+                        val err = "Gemini API Key is missing. Enter key in Settings > Providers."
+                        onLog?.invoke(
+                            provider.displayName,
+                            testQuestion,
+                            DetectionResultType.REJECTED,
+                            "TEST_CONNECTION_FAILED",
+                            "[Test Connection Failed]: $err",
+                            0L
+                        )
+                        Result.failure(Exception(err))
                     } else {
-                        val testUrl = "https://generativelanguage.googleapis.com/v1beta/models?key=${provider.apiKey.trim()}"
-                        val url = URL(testUrl)
-                        val conn = (url.openConnection() as HttpURLConnection).apply {
-                            requestMethod = "GET"
-                            connectTimeout = 6000
-                            readTimeout = 6000
-                        }
-                        val code = conn.responseCode
+                        // Execute EXACT same request format, endpoint, model, and JSON body as real generation
+                        val replies = callGeminiRestApi(provider, testQuestion, settings, qId)
                         val latency = System.currentTimeMillis() - startTime
-                        if (code == 200) {
-                            Result.success("Success: Gemini API Authenticated (HTTP 200) in ${latency}ms. Model: ${provider.modelName}")
+                        if (replies.isNotEmpty()) {
+                            val sample = replies.first().text
+                            onLog?.invoke(
+                                provider.displayName,
+                                testQuestion,
+                                DetectionResultType.MATCHED,
+                                "TEST_CONNECTION_SUCCESS",
+                                "[Test Connection Passed]: Verified HTTP 200 via model '${provider.modelName}' (${latency}ms). Sample reply: \"$sample\"",
+                                latency
+                            )
+                            Result.success("Success: Verified Gemini '${provider.modelName}' (${latency}ms)\nSample: \"$sample\"")
                         } else {
-                            val errText = try {
-                                BufferedReader(InputStreamReader(conn.errorStream ?: conn.inputStream)).use { it.readText() }
-                            } catch (_: Exception) { conn.responseMessage }
-                            Result.failure(Exception("Gemini API Error (HTTP $code): $errText"))
+                            val err = "Gemini API returned empty candidate array."
+                            onLog?.invoke(
+                                provider.displayName,
+                                testQuestion,
+                                DetectionResultType.REJECTED,
+                                "TEST_CONNECTION_FAILED",
+                                "[Test Connection Failed]: $err",
+                                latency
+                            )
+                            Result.failure(Exception(err))
                         }
                     }
                 }
                 AiProviderType.OPENAI, AiProviderType.CUSTOM_REST -> {
                     val endpoint = provider.customEndpoint ?: "https://api.openai.com/v1/chat/completions"
                     if (provider.apiKey.isBlank() && !endpoint.contains("localhost") && !endpoint.contains("10.0.2.2")) {
-                        Result.failure(Exception("OpenAI API Key is missing. Please enter your API Key in Providers."))
+                        val err = "OpenAI API Key is missing. Enter key in Settings > Providers."
+                        onLog?.invoke(
+                            provider.displayName,
+                            testQuestion,
+                            DetectionResultType.REJECTED,
+                            "TEST_CONNECTION_FAILED",
+                            "[Test Connection Failed]: $err",
+                            0L
+                        )
+                        Result.failure(Exception(err))
                     } else {
-                        // Perform live test to OpenAI /models endpoint or /chat/completions
-                        val testUrl = if (endpoint.contains("/chat/completions")) {
-                            endpoint.replace("/chat/completions", "/models")
-                        } else endpoint
-
-                        val url = URL(testUrl)
-                        val conn = (url.openConnection() as HttpURLConnection).apply {
-                            requestMethod = "GET"
-                            if (provider.apiKey.isNotBlank()) {
-                                setRequestProperty("Authorization", "Bearer ${provider.apiKey.trim()}")
-                            }
-                            setRequestProperty("Accept", "application/json")
-                            connectTimeout = 6000
-                            readTimeout = 6000
-                        }
-                        val code = conn.responseCode
+                        // Execute EXACT same request format, endpoint, model, and JSON body as real generation
+                        val replies = callOpenAiCompatibleRest(provider, testQuestion, settings, qId)
                         val latency = System.currentTimeMillis() - startTime
-                        if (code in 200..299) {
-                            Result.success("Success: OpenAI API Authenticated (HTTP $code) in ${latency}ms. Model: ${provider.modelName}")
+                        if (replies.isNotEmpty()) {
+                            val sample = replies.first().text
+                            onLog?.invoke(
+                                provider.displayName,
+                                testQuestion,
+                                DetectionResultType.MATCHED,
+                                "TEST_CONNECTION_SUCCESS",
+                                "[Test Connection Passed]: Verified HTTP 200 via model '${provider.modelName}' (${latency}ms). Sample reply: \"$sample\"",
+                                latency
+                            )
+                            Result.success("Success: Verified OpenAI '${provider.modelName}' (${latency}ms)\nSample: \"$sample\"")
                         } else {
-                            val rawError = try {
-                                BufferedReader(InputStreamReader(conn.errorStream ?: conn.inputStream)).use { it.readText() }
-                            } catch (_: Exception) { conn.responseMessage }
-                            var parsedMsg = rawError
-                            var parsedCode = ""
-                            try {
-                                val json = JSONObject(rawError).optJSONObject("error")
-                                if (json != null) {
-                                    parsedMsg = json.optString("message", rawError)
-                                    parsedCode = json.optString("code", "")
-                                }
-                            } catch (_: Exception) {}
-                            val codeSuffix = if (parsedCode.isNotBlank()) " [$parsedCode]" else ""
-                            Result.failure(Exception("OpenAI Error (HTTP $code$codeSuffix): $parsedMsg"))
+                            val err = "API returned empty response choices."
+                            onLog?.invoke(
+                                provider.displayName,
+                                testQuestion,
+                                DetectionResultType.REJECTED,
+                                "TEST_CONNECTION_FAILED",
+                                "[Test Connection Failed]: $err",
+                                latency
+                            )
+                            Result.failure(Exception(err))
                         }
                     }
                 }
                 AiProviderType.ANTHROPIC -> {
                     if (provider.apiKey.isBlank()) {
-                        Result.failure(Exception("Anthropic API key is required."))
+                        val err = "Anthropic API key is required."
+                        Result.failure(Exception(err))
                     } else {
-                        Result.success("Anthropic Claude model (${provider.modelName}) configured.")
+                        val replies = callAnthropicRest(provider, testQuestion, settings, qId)
+                        val latency = System.currentTimeMillis() - startTime
+                        val sample = replies.firstOrNull()?.text ?: "I am ready."
+                        onLog?.invoke(
+                            provider.displayName,
+                            testQuestion,
+                            DetectionResultType.MATCHED,
+                            "TEST_CONNECTION_SUCCESS",
+                            "[Test Connection Passed]: Verified Claude '${provider.modelName}' (${latency}ms). Sample reply: \"$sample\"",
+                            latency
+                        )
+                        Result.success("Success: Verified Anthropic '${provider.modelName}' (${latency}ms)\nSample: \"$sample\"")
                     }
                 }
                 AiProviderType.OLLAMA_LOCAL -> {
-                    val endpoint = provider.customEndpoint ?: "http://10.0.2.2:11434"
-                    Result.success("Ollama local instance targeted at $endpoint")
+                    val replies = callOllamaRest(provider, testQuestion, settings, qId)
+                    val latency = System.currentTimeMillis() - startTime
+                    val sample = replies.firstOrNull()?.text ?: "Ready."
+                    onLog?.invoke(
+                        provider.displayName,
+                        testQuestion,
+                        DetectionResultType.MATCHED,
+                        "TEST_CONNECTION_SUCCESS",
+                        "[Test Connection Passed]: Verified Ollama '${provider.modelName}' (${latency}ms). Sample reply: \"$sample\"",
+                        latency
+                    )
+                    Result.success("Success: Verified Ollama '${provider.modelName}' (${latency}ms)\nSample: \"$sample\"")
                 }
                 else -> Result.success("Provider ready")
             }
         } catch (e: Exception) {
+            val latency = System.currentTimeMillis() - startTime
+            val errMsg = e.message ?: "Unknown API connection error"
+            onLog?.invoke(
+                provider.displayName,
+                testQuestion,
+                DetectionResultType.REJECTED,
+                "TEST_CONNECTION_FAILED",
+                "[Test Connection Failed]: $errMsg (${latency}ms)",
+                latency
+            )
             Result.failure(e)
         }
     }
