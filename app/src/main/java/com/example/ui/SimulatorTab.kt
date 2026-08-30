@@ -77,6 +77,8 @@ import com.example.model.DetectedQuestion
 import com.example.model.DiagnosticLogEntry
 import com.example.model.ReplyItem
 import com.example.model.ReplySettings
+import com.example.model.ResponseLengthPreset
+import com.example.state.AppStateManager
 import com.example.ui.theme.AccentBlue
 import com.example.ui.theme.AccentGreen
 import com.example.ui.theme.AccentPurple
@@ -629,6 +631,52 @@ fun SimulatorTab(
                         singleLine = false,
                         maxLines = 4
                     )
+
+                    // Response Length Preset Quick Selector for Simulator Testing
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("Response Length Preset:", fontSize = 11.sp, color = TextSecondary)
+                            Text(
+                                text = "${settings.responseLengthPreset.title} (≤ ${minOf(settings.customCharLimit, settings.responseLengthPreset.charCeiling)} chars)",
+                                fontSize = 10.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = CrimsonLight
+                            )
+                        }
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            ResponseLengthPreset.entries.forEach { preset ->
+                                val isSelected = settings.responseLengthPreset == preset
+                                Surface(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(30.dp)
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .clickable {
+                                            AppStateManager.setResponseLengthPreset(preset)
+                                        },
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = if (isSelected) CrimsonPrimary else DarkCardElevated,
+                                    border = BorderStroke(1.dp, if (isSelected) CrimsonLight else DarkCardBorder)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Text(
+                                            text = preset.shortLabel,
+                                            fontSize = 11.sp,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                            color = if (isSelected) TextWhite else TextSecondary
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),

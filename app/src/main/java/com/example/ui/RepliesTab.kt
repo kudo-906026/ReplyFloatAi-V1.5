@@ -40,6 +40,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -191,7 +192,10 @@ fun RepliesTab(
                                             .border(1.dp, if (isSelected) CrimsonPrimary else DarkCardBorder, CircleShape)
                                     )
 
-                                    Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                                    Column(
+                                        modifier = Modifier.weight(1f),
+                                        verticalArrangement = Arrangement.spacedBy(3.dp)
+                                    ) {
                                         Text(
                                             text = tone.label,
                                             fontSize = 12.sp,
@@ -201,8 +205,23 @@ fun RepliesTab(
                                         Text(
                                             text = tone.description,
                                             fontSize = 10.5.sp,
-                                            color = TextSecondary
+                                            color = TextSecondary,
+                                            lineHeight = 14.sp
                                         )
+                                        Surface(
+                                            shape = RoundedCornerShape(4.dp),
+                                            color = if (isSelected) CrimsonPrimary.copy(alpha = 0.15f) else DarkSurfaceVariant.copy(alpha = 0.6f),
+                                            border = BorderStroke(0.5.dp, if (isSelected) CrimsonPrimary.copy(alpha = 0.4f) else DarkCardBorder)
+                                        ) {
+                                            Text(
+                                                text = "Example: \"${tone.exampleReply}\"",
+                                                fontSize = 9.5.sp,
+                                                fontStyle = FontStyle.Italic,
+                                                color = if (isSelected) TextWhite.copy(alpha = 0.9f) else TextMuted,
+                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
+                                                lineHeight = 13.sp
+                                            )
+                                        }
                                     }
                                 }
                             }

@@ -75,19 +75,65 @@ enum class ReplyTone(
         description = "Direct, factual, and mathematically accurate",
         systemPromptHint = "Technical, factual, direct, precise response.",
         exampleReply = "Confirmed. The latency is within the acceptable threshold."
+    ),
+    TRASH_TALK(
+        label = "Trash Talk",
+        description = "Savage, witty, competitive banter — playful roasting, not genuinely abusive.",
+        systemPromptHint = "Savage, sharp, cutting, confident comebacks and playful put-downs about someone's argument, logic, or taste — like friendly trash talk between friends. Keep it playful-aggressive, not genuinely offensive. HARD SAFETY RULE: Never include sexual content, slurs, threats, or degrading language about someone's family members. When Lang mode is ON or the detected message is in Hinglish or another language, reply in that same language/script with natural casual slang appropriate to it, not a literal translation.",
+        exampleReply = "Bold claim for someone whose logic is currently held together by hope and duct tape! 😂"
     )
 }
 
 enum class ResponseLengthPreset(
     val title: String,
+    val shortLabel: String,
     val subtitle: String,
     val approxChars: String,
-    val maxWords: Int
+    val maxWords: Int,
+    val charCeiling: Int,
+    val maxTokens: Int,
+    val promptInstruction: String
 ) {
-    VERY_SHORT("Very Short", "1 - 5 words", "~10-30 chars", 5),
-    SHORT("Short", "1 concise sentence", "~30-80 chars", 14),
-    NORMAL("Normal", "1 - 2 sentences", "~80-160 chars", 28),
-    LONG("Detailed", "Complete explanation", "~160-320 chars", 55)
+    VERY_SHORT(
+        title = "Very Short",
+        shortLabel = "Very Short",
+        subtitle = "1 - 5 words",
+        approxChars = "~10-30 chars",
+        maxWords = 5,
+        charCeiling = 35,
+        maxTokens = 60,
+        promptInstruction = "CRITICAL LENGTH CONSTRAINT: Provide ultra-short replies strictly between 1 and 5 words total (maximum 5 words / ~30 characters). Do NOT output complete long sentences or polite conversational filler. Examples: 'Yes, confirmed.', 'At 3:30 PM.', 'Sounds great!', 'Alexander Graham Bell.', 'i² = -1'."
+    ),
+    SHORT(
+        title = "Short",
+        shortLabel = "Short",
+        subtitle = "1 concise sentence",
+        approxChars = "~30-80 chars",
+        maxWords = 14,
+        charCeiling = 85,
+        maxTokens = 120,
+        promptInstruction = "CRITICAL LENGTH CONSTRAINT: Provide short replies consisting of exactly 1 concise, direct sentence (maximum 14 words / ~80 characters). Example: 'Alexander Graham Bell invented the telephone in 1876.'"
+    ),
+    NORMAL(
+        title = "Normal",
+        shortLabel = "Normal",
+        subtitle = "1 - 2 sentences",
+        approxChars = "~80-160 chars",
+        maxWords = 28,
+        charCeiling = 170,
+        maxTokens = 250,
+        promptInstruction = "CRITICAL LENGTH CONSTRAINT: Provide normal-length replies of 1 to 2 standard sentences giving clear context and balanced explanation (around 15 to 28 words / ~140 characters). Example: 'Alexander Graham Bell invented the telephone in 1876, receiving the first official US patent for electromagnetic voice transmission.'"
+    ),
+    LONG(
+        title = "Detailed",
+        shortLabel = "Detailed",
+        subtitle = "Complete explanation",
+        approxChars = "~160-320 chars",
+        maxWords = 65,
+        charCeiling = 350,
+        maxTokens = 500,
+        promptInstruction = "CRITICAL LENGTH CONSTRAINT: Provide detailed, comprehensive replies of 2 to 4 thorough sentences providing full background context, reasoning, and clear explanation (around 35 to 65 words / ~250 characters). Example: 'Alexander Graham Bell was awarded the first U.S. patent for the telephone on March 7, 1876 (Patent No. 174,465). His breakthrough enabled real-time acoustic speech transmission over electrical telegraph wires, transforming modern telecommunications.'"
+    )
 }
 
 enum class UnderstandingSummaryLength(

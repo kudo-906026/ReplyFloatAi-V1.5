@@ -460,7 +460,7 @@ private fun MainBarExpanded(
                             border = BorderStroke(0.5.dp, if (isSelected) CrimsonLight else DarkCardBorder)
                         ) {
                             Text(
-                                text = preset.title.take(5),
+                                text = preset.shortLabel,
                                 fontSize = 8.5.sp,
                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                                 color = if (isSelected) TextWhite else TextSecondary,

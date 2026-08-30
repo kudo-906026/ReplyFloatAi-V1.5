@@ -82,4 +82,107 @@ class AiFallbackEngineTest {
         assertTrue(resultWithoutKey.isFailure)
         assertTrue(resultWithoutKey.exceptionOrNull()?.message?.contains("Groq API Key is missing") == true)
     }
+
+    @Test
+    fun testResponseLengthPresetsScaling() = runBlocking {
+        val question = "Who invented the telephone?"
+        
+        val veryShortSettings = ReplySettings(responseLengthPreset = com.example.model.ResponseLengthPreset.VERY_SHORT)
+        val shortSettings = ReplySettings(responseLengthPreset = com.example.model.ResponseLengthPreset.SHORT)
+        val normalSettings = ReplySettings(responseLengthPreset = com.example.model.ResponseLengthPreset.NORMAL)
+        val longSettings = ReplySettings(responseLengthPreset = com.example.model.ResponseLengthPreset.LONG)
+
+        val veryShortResult = AiFallbackEngine.generateRepliesWithFallback(question, veryShortSettings)
+        val shortResult = AiFallbackEngine.generateRepliesWithFallback(question, shortSettings)
+        val normalResult = AiFallbackEngine.generateRepliesWithFallback(question, normalSettings)
+        val longResult = AiFallbackEngine.generateRepliesWithFallback(question, longSettings)
+
+        val vShortLen = veryShortResult.replies.first().text.length
+        val shortLen = shortResult.replies.first().text.length
+        val normalLen = normalResult.replies.first().text.length
+        val longLen = longResult.replies.first().text.length
+
+        assertTrue("Expected very short length ($vShortLen) <= short length ($shortLen)", vShortLen <= shortLen)
+        assertTrue("Expected short length ($shortLen) <= normal length ($normalLen)", shortLen <= normalLen)
+        assertTrue("Expected normal length ($normalLen) <= long length ($longLen)", normalLen <= longLen)
+        assertTrue("Expected very short to be under 35 chars, was $vShortLen", vShortLen <= 35)
+        assertTrue("Expected long to be over 100 chars, was $longLen", longLen >= 100)
+    }
+
+    @Test
+    fun testGroqReasoningJsonExtraction() {
+        // 1. Standard choices[0].message.content
+        val standardJson = org.json.JSONObject("""
+            {
+                "choices": [
+                    {
+                        "message": {
+                            "role": "assistant",
+                            "content": "[\"Reply A\", \"Reply B\"]"
+                        }
+                    }
+                ]
+            }
+        """.trimIndent())
+        assertEquals("[\"Reply A\", \"Reply B\"]", AiFallbackEngine.extractContentFromOpenAiJson(standardJson))
+
+        // 2. Reasoning model choices[0].message.reasoning (when content is empty)
+        val reasoningJson = org.json.JSONObject("""
+            {
+                "choices": [
+                    {
+                        "message": {
+                            "role": "assistant",
+                            "content": "",
+                            "reasoning": "[\"Reasoned 1\", \"Reasoned 2\"]"
+                        }
+                    }
+                ]
+            }
+        """.trimIndent())
+        assertEquals("[\"Reasoned 1\", \"Reasoned 2\"]", AiFallbackEngine.extractContentFromOpenAiJson(reasoningJson))
+
+        // 3. Reasoning model choices[0].message.reasoning_content
+        val reasoningContentJson = org.json.JSONObject("""
+            {
+                "choices": [
+                    {
+                        "message": {
+                            "role": "assistant",
+                            "content": null,
+                            "reasoning_content": "[\"Deep reply 1\", \"Deep reply 2\"]"
+                        }
+                    }
+                ]
+            }
+        """.trimIndent())
+        assertEquals("[\"Deep reply 1\", \"Deep reply 2\"]", AiFallbackEngine.extractContentFromOpenAiJson(reasoningContentJson))
+    }
+
+    @Test
+    fun testTrashTalkToneOption() = runBlocking {
+        val trashTalkTone = ReplyTone.TRASH_TALK
+        assertEquals("Trash Talk", trashTalkTone.label)
+        assertEquals("Savage, witty, competitive banter — playful roasting, not genuinely abusive.", trashTalkTone.description)
+        assertTrue(trashTalkTone.systemPromptHint.contains("HARD SAFETY RULE"))
+        assertTrue(trashTalkTone.exampleReply.isNotBlank())
+
+        val settings = ReplySettings(tone = ReplyTone.TRASH_TALK)
+        val result = AiFallbackEngine.generateRepliesWithFallback("What do you think of my idea?", settings)
+        assertTrue(result.replies.isNotEmpty())
+        val reply = result.replies.first().text
+        assertTrue("Expected playful roast or witty comeback in reply, was: $reply", reply.isNotEmpty())
+    }
+
+    @Test
+    fun testTrashTalkHinglishLanguageMode() = runBlocking {
+        val settings = ReplySettings(tone = ReplyTone.TRASH_TALK, understandingMode = true)
+        val result = AiFallbackEngine.generateRepliesWithFallback("bhai kaisa laga mera plan?", settings)
+        assertTrue(result.replies.isNotEmpty())
+        val reply = result.replies.first().text
+        assertTrue(
+            "Expected Hinglish banter in reply, was: $reply",
+            reply.contains("Bhai", ignoreCase = true) || reply.contains("logic", ignoreCase = true) || reply.contains("WhatsApp", ignoreCase = true) || reply.contains("chai", ignoreCase = true)
+        )
+    }
 }
