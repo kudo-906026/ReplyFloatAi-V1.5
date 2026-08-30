@@ -901,7 +901,7 @@ object AiFallbackEngine {
                 "Generate ${settings.count} distinct quick reply options that directly answer this inquiry.\n" +
                 "Respond ONLY with a JSON array of strings: [\"reply 1\", \"reply 2\"]"
 
-        val defaultModel = if (provider.type == AiProviderType.GROQ) "llama-3.3-70b-versatile" else "gpt-4o-mini"
+        val defaultModel = if (provider.type == AiProviderType.GROQ) "openai/gpt-oss-120b" else "gpt-4o-mini"
         val body = JSONObject().apply {
             put("model", provider.modelName.ifBlank { defaultModel })
             put("messages", JSONArray().apply {

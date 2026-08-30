@@ -63,4 +63,23 @@ class AiFallbackEngineTest {
             replyText.contains("Canberra")
         )
     }
+
+    @Test
+    fun testGroqProviderConfigurationAndModel() {
+        val groqProvider = com.example.model.defaultBuiltInProviders().first { it.id == "groq" }
+        assertEquals(com.example.model.AiProviderType.GROQ, groqProvider.type)
+        assertEquals("openai/gpt-oss-120b", groqProvider.modelName)
+        assertEquals("https://api.groq.com/openai/v1/chat/completions", groqProvider.customEndpoint)
+    }
+
+    @Test
+    fun testGroqProviderTestConnectionValidation() = runBlocking {
+        val groqProvider = com.example.model.defaultBuiltInProviders().first { it.id == "groq" }
+        val settings = ReplySettings()
+        
+        // Without API key
+        val resultWithoutKey = AiFallbackEngine.testProviderConnection(groqProvider, settings)
+        assertTrue(resultWithoutKey.isFailure)
+        assertTrue(resultWithoutKey.exceptionOrNull()?.message?.contains("Groq API Key is missing") == true)
+    }
 }
