@@ -209,24 +209,97 @@ fun SimulatorTab(
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 12.dp, vertical = 10.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        // Section Header
+        // Section Header & Batch Runner
         item {
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                ControlPanelSectionHeader(
-                    title = "OVERLAY PIPELINE SIMULATOR & DRY RUN",
-                    icon = Icons.Default.Speed,
-                    accentColor = CrimsonPrimary,
-                    badgeText = "VIRTUAL VM",
-                    badgeColor = TechBlue
-                )
-                Text(
-                    text = "Test accessibility capture events, On-Device ML Kit OCR fallback, LLM synthesis latency, and real-time scanner diagnostics without needing an external app.",
-                    fontSize = 12.sp,
-                    color = TextSecondary
-                )
+            ControlPanelCard(
+                modifier = Modifier.fillMaxWidth(),
+                shapeRadius = 14.dp
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(Icons.Default.Speed, contentDescription = null, tint = CrimsonPrimary, modifier = Modifier.size(16.dp))
+                            Text(
+                                text = "OVERLAY PIPELINE SIMULATOR",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp,
+                                fontFamily = FontFamily.Monospace,
+                                color = TextWhite
+                            )
+                        }
+                        Surface(
+                            shape = RoundedCornerShape(4.dp),
+                            color = TechBlue.copy(alpha = 0.15f),
+                            border = BorderStroke(1.dp, TechBlue.copy(alpha = 0.4f))
+                        ) {
+                            Text(
+                                text = "VIRTUAL VM",
+                                fontSize = 9.sp,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold,
+                                color = TechBlue,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+
+                    Button(
+                        onClick = {
+                            if (!isRunningBatchSuite) {
+                                isRunningBatchSuite = true
+                                coroutineScope.launch {
+                                    for (scenario in testScenarios) {
+                                        customInput = scenario.sampleText
+                                        if (scenario.isOcrScenario) {
+                                            onSimulateOcrQuestion(scenario.sampleText, "Canvas App (OCR Fallback)")
+                                        } else {
+                                            onSimulateQuestion(scenario.sampleText, "Accessibility Test Runner")
+                                        }
+                                        delay(900)
+                                    }
+                                    isRunningBatchSuite = false
+                                }
+                            }
+                        },
+                        shape = RoundedCornerShape(8.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = CrimsonPrimary),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(38.dp)
+                    ) {
+                        if (isRunningBatchSuite) {
+                            CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp, color = TextWhite)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Running All 9 Test Scenarios...", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TextWhite)
+                        } else {
+                            Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "Run All 9 Verification Scenarios",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = TextWhite,
+                                softWrap = false,
+                                maxLines = 1
+                            )
+                        }
+                    }
+                }
             }
         }
 
@@ -239,60 +312,16 @@ fun SimulatorTab(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(14.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                        .padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "VERIFICATION TEST SCENARIOS",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 11.5.sp,
-                            fontFamily = FontFamily.Monospace,
-                            color = TextWhite,
-                            modifier = Modifier.weight(1f, fill = false).padding(end = 8.dp),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-
-                        OutlinedButton(
-                            onClick = {
-                                if (!isRunningBatchSuite) {
-                                    isRunningBatchSuite = true
-                                    coroutineScope.launch {
-                                        for (scenario in testScenarios) {
-                                            customInput = scenario.sampleText
-                                            if (scenario.isOcrScenario) {
-                                                onSimulateOcrQuestion(scenario.sampleText, "Canvas App (OCR Fallback)")
-                                            } else {
-                                                onSimulateQuestion(scenario.sampleText, "Accessibility Test Runner")
-                                            }
-                                            delay(900)
-                                        }
-                                        isRunningBatchSuite = false
-                                    }
-                                }
-                            },
-                            shape = RoundedCornerShape(8.dp),
-                            border = BorderStroke(1.dp, CrimsonPrimary),
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = CrimsonLight),
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
-                            modifier = Modifier.height(32.dp)
-                        ) {
-                            Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(13.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = if (isRunningBatchSuite) "Running Suite..." else "Run All 5 Scenarios",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                softWrap = false,
-                                maxLines = 1
-                            )
-                        }
-                    }
+                    Text(
+                        text = "SELECT INDIVIDUAL SCENARIOS TO TEST",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 11.sp,
+                        fontFamily = FontFamily.Monospace,
+                        color = TextSecondary
+                    )
 
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         testScenarios.forEach { scenario ->

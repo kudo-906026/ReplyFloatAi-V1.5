@@ -34,7 +34,9 @@ import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.windowInsetsTopHeight
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -158,13 +160,14 @@ fun MainScreen() {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .statusBarsPadding()
+                        .windowInsetsPadding(WindowInsets.statusBars)
                 ) {
+                    Spacer(modifier = Modifier.height(4.dp))
                     // Top Header Bar
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                            .padding(horizontal = 14.dp, vertical = 6.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -387,6 +390,7 @@ fun MainScreen() {
                         onMoveFallbackOrder = { from, to -> AppStateManager.moveProviderInFallbackOrder(from, to) },
                         onSetPrimaryFallback = { AppStateManager.setPrimaryFallbackProvider(it) },
                         onUpdateApiKey = { provider, key -> AppStateManager.updateProviderApiKey(provider, key) },
+                        onUpdateModel = { provider, model -> AppStateManager.updateProviderModel(provider, model) },
                         onAddCustomProvider = { name, model, endpoint, key ->
                             AppStateManager.addCustomProvider(name, model, endpoint, key)
                         },

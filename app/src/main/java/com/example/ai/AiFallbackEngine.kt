@@ -284,21 +284,24 @@ object AiFallbackEngine {
                         Result.failure(Exception(err))
                     } else {
                         // Execute EXACT same request format, endpoint, model, and JSON body as real generation
-                        val replies = callOpenAiCompatibleRest(provider, testQuestion, settings, qId)
+                        val (replies, rawResponse) = callOpenAiCompatibleRestWithRaw(provider, testQuestion, settings, qId)
                         val latency = System.currentTimeMillis() - startTime
                         if (replies.isNotEmpty()) {
                             val sample = replies.first().text
+                            val displayReplies = replies.mapIndexed { idx, r -> "  ${idx + 1}. \"${r.text}\"" }.joinToString("\n")
+                            val rawPreview = if (rawResponse.length > 500) rawResponse.take(500) + "\n... (truncated)" else rawResponse
                             onLog?.invoke(
                                 provider.displayName,
                                 testQuestion,
                                 DetectionResultType.MATCHED,
                                 "TEST_CONNECTION_SUCCESS",
-                                "[Test Connection Passed]: Verified HTTP 200 via model '${provider.modelName}' (${latency}ms). Sample reply: \"$sample\"",
+                                "[Test Connection Passed]: Verified HTTP 200 via model '${provider.modelName}' (${latency}ms).\n\nReplies:\n$displayReplies\n\nRaw Response:\n$rawResponse",
                                 latency
                             )
-                            Result.success("Success: Verified OpenAI '${provider.modelName}' (${latency}ms)\nSample: \"$sample\"")
+                            Result.success("Success: Verified '${provider.modelName}' (${latency}ms)\n\nSample Reply: \"$sample\"\n\nRaw JSON Response:\n$rawPreview")
                         } else {
-                            val err = "API returned empty response choices."
+                            val rawPreview = if (rawResponse.isNotBlank()) rawResponse else "(empty response body)"
+                            val err = "API returned HTTP 200, but no reply text could be extracted.\n\nRaw JSON Response:\n$rawPreview"
                             onLog?.invoke(
                                 provider.displayName,
                                 testQuestion,
@@ -343,21 +346,24 @@ object AiFallbackEngine {
                         )
                         Result.failure(Exception(err))
                     } else {
-                        val replies = callOpenAiCompatibleRest(provider, testQuestion, settings, qId)
+                        val (replies, rawResponse) = callOpenAiCompatibleRestWithRaw(provider, testQuestion, settings, qId)
                         val latency = System.currentTimeMillis() - startTime
                         if (replies.isNotEmpty()) {
                             val sample = replies.first().text
+                            val displayReplies = replies.mapIndexed { idx, r -> "  ${idx + 1}. \"${r.text}\"" }.joinToString("\n")
+                            val rawPreview = if (rawResponse.length > 500) rawResponse.take(500) + "\n... (truncated)" else rawResponse
                             onLog?.invoke(
                                 provider.displayName,
                                 testQuestion,
                                 DetectionResultType.MATCHED,
                                 "TEST_CONNECTION_SUCCESS",
-                                "[Test Connection Passed]: Verified Groq '${provider.modelName}' (${latency}ms). Sample reply: \"$sample\"",
+                                "[Test Connection Passed]: Verified Groq '${provider.modelName}' (${latency}ms).\n\nReplies:\n$displayReplies\n\nRaw Response:\n$rawResponse",
                                 latency
                             )
-                            Result.success("Success: Verified Groq '${provider.modelName}' (${latency}ms)\nSample: \"$sample\"")
+                            Result.success("Success: Verified Groq '${provider.modelName}' (${latency}ms)\n\nSample Reply: \"$sample\"\n\nRaw JSON Response:\n$rawPreview")
                         } else {
-                            val err = "Groq API returned empty response choices."
+                            val rawPreview = if (rawResponse.isNotBlank()) rawResponse else "(empty response body)"
+                            val err = "Groq API returned HTTP 200, but no reply text could be extracted from choices.\n\nRaw JSON Response:\n$rawPreview"
                             onLog?.invoke(
                                 provider.displayName,
                                 testQuestion,
@@ -861,12 +867,91 @@ object AiFallbackEngine {
         return emptyList()
     }
 
-    private fun callOpenAiCompatibleRest(
+    fun extractContentFromOpenAiJson(root: JSONObject): String {
+        val choices = root.optJSONArray("choices")
+        if (choices != null && choices.length() > 0) {
+            val firstChoice = choices.optJSONObject(0)
+            if (firstChoice != null) {
+                // 1. Check choice-level text (e.g. legacy completions)
+                val directText = firstChoice.optString("text")
+                if (directText.isNotBlank() && directText != "null") {
+                    return directText
+                }
+
+                val message = firstChoice.optJSONObject("message")
+                if (message != null) {
+                    // 2. Direct message content
+                    val contentObj = message.opt("content")
+                    if (contentObj is String && contentObj.isNotBlank() && contentObj != "null") {
+                        return contentObj
+                    } else if (contentObj is JSONArray && contentObj.length() > 0) {
+                        val sb = StringBuilder()
+                        for (i in 0 until contentObj.length()) {
+                            val part = contentObj.opt(i)
+                            if (part is JSONObject) {
+                                val t = part.optString("text").ifBlank { part.optString("content") }
+                                if (t.isNotBlank() && t != "null") sb.append(t).append("\n")
+                            } else if (part is String && part.isNotBlank() && part != "null") {
+                                sb.append(part).append("\n")
+                            }
+                        }
+                        if (sb.isNotBlank()) return sb.toString().trim()
+                    } else if (contentObj is JSONObject) {
+                        val t = contentObj.optString("text").ifBlank { contentObj.optString("content") }
+                        if (t.isNotBlank() && t != "null") return t
+                    }
+
+                    // 3. Reasoning / Thought fields in reasoning models (DeepSeek R1, GPT-OSS 120b, QwQ, etc.)
+                    val reasoningContent = message.optString("reasoning_content")
+                    if (reasoningContent.isNotBlank() && reasoningContent != "null") {
+                        return reasoningContent
+                    }
+                    val reasoning = message.optString("reasoning")
+                    if (reasoning.isNotBlank() && reasoning != "null") {
+                        return reasoning
+                    }
+                    val thought = message.optString("thought").ifBlank { message.optString("thoughts") }
+                    if (thought.isNotBlank() && thought != "null") {
+                        return thought
+                    }
+
+                    // 4. Any other non-role string property
+                    val keys = message.keys()
+                    while (keys.hasNext()) {
+                        val key = keys.next()
+                        if (key != "role" && key != "tool_calls") {
+                            val v = message.opt(key)
+                            if (v is String && v.isNotBlank() && v != "null") {
+                                return v
+                            }
+                        }
+                    }
+                }
+
+                // 5. Choice-level reasoning fallback
+                val choiceReasoning = firstChoice.optString("reasoning").ifBlank { firstChoice.optString("reasoning_content") }
+                if (choiceReasoning.isNotBlank() && choiceReasoning != "null") {
+                    return choiceReasoning
+                }
+            }
+        }
+
+        // 6. Root-level fallbacks (output, response, result, generated_text, text, answer)
+        val rootFallbacks = listOf("output", "response", "result", "generated_text", "text", "answer", "message")
+        for (field in rootFallbacks) {
+            val v = root.optString(field)
+            if (v.isNotBlank() && v != "null") return v
+        }
+
+        return ""
+    }
+
+    private fun callOpenAiCompatibleRestWithRaw(
         provider: AiProvider,
         question: String,
         settings: ReplySettings,
         questionId: String
-    ): List<ReplyItem> {
+    ): Pair<List<ReplyItem>, String> {
         val defaultEndpoint = if (provider.type == AiProviderType.GROQ) {
             "https://api.groq.com/openai/v1/chat/completions"
         } else {
@@ -923,11 +1008,9 @@ object AiFallbackEngine {
         if (conn.responseCode in 200..299) {
             val resp = BufferedReader(InputStreamReader(conn.inputStream)).use { it.readText() }
             val root = JSONObject(resp)
-            val choices = root.optJSONArray("choices")
-            if (choices != null && choices.length() > 0) {
-                val content = choices.getJSONObject(0).getJSONObject("message").getString("content")
-                return parseJsonArrayReplies(content, questionId, settings.tone, provider)
-            }
+            val extractedContent = extractContentFromOpenAiJson(root)
+            val replies = parseJsonArrayReplies(extractedContent, questionId, settings.tone, provider)
+            return Pair(replies, resp)
         } else {
             val rawErrorText = try {
                 BufferedReader(InputStreamReader(conn.errorStream ?: conn.inputStream)).use { it.readText() }
@@ -957,7 +1040,15 @@ object AiFallbackEngine {
             }
             throw java.io.IOException(formattedReason)
         }
-        return emptyList()
+    }
+
+    private fun callOpenAiCompatibleRest(
+        provider: AiProvider,
+        question: String,
+        settings: ReplySettings,
+        questionId: String
+    ): List<ReplyItem> {
+        return callOpenAiCompatibleRestWithRaw(provider, question, settings, questionId).first
     }
 
     private fun callAnthropicRest(
@@ -1011,14 +1102,30 @@ object AiFallbackEngine {
         return emptyList()
     }
 
-    private fun parseJsonArrayReplies(
+    fun parseJsonArrayReplies(
         rawText: String,
         questionId: String,
         tone: ReplyTone,
         provider: AiProvider
     ): List<ReplyItem> {
+        if (rawText.isBlank() || rawText == "null") return emptyList()
+
+        // 1. Strip think blocks from reasoning models (e.g. DeepSeek R1, GPT-OSS)
+        var clean = rawText
+        if (clean.contains("</think>")) {
+            val afterThink = clean.substringAfter("</think>").trim()
+            clean = if (afterThink.isNotBlank()) {
+                afterThink
+            } else {
+                clean.replace(Regex("<think>[\\s\\S]*?</think>"), "").trim()
+            }
+        }
+
+        // Clean markdown fences
+        clean = clean.replace("```json", "").replace("```JSON", "").replace("```", "").trim()
+
+        // 2. Try JSON Array parsing
         try {
-            val clean = rawText.replace("```json", "").replace("```", "").trim()
             val startIndex = clean.indexOf('[')
             val endIndex = clean.lastIndexOf(']')
             if (startIndex != -1 && endIndex != -1 && endIndex > startIndex) {
@@ -1026,8 +1133,8 @@ object AiFallbackEngine {
                 val jsonArr = JSONArray(jsonSub)
                 val list = mutableListOf<ReplyItem>()
                 for (i in 0 until jsonArr.length()) {
-                    val str = jsonArr.getString(i).trim()
-                    if (str.isNotBlank()) {
+                    val str = jsonArr.optString(i, "").trim()
+                    if (str.isNotBlank() && str != "null") {
                         list.add(
                             ReplyItem(
                                 questionId = questionId,
@@ -1042,10 +1149,39 @@ object AiFallbackEngine {
             }
         } catch (_: Exception) {}
 
-        // Fallback split by lines
-        val lines = rawText.lines()
-            .map { it.replace(Regex("^[-*0-9.]+\\s*"), "").replace("\"", "").trim() }
-            .filter { it.isNotBlank() }
+        // 3. Try JSON Object with replies / options / choices key
+        try {
+            val startIndex = clean.indexOf('{')
+            val endIndex = clean.lastIndexOf('}')
+            if (startIndex != -1 && endIndex != -1 && endIndex > startIndex) {
+                val jsonObj = JSONObject(clean.substring(startIndex, endIndex + 1))
+                val arrayKey = listOf("replies", "options", "choices", "suggestions", "answers", "items")
+                    .firstOrNull { jsonObj.has(it) && jsonObj.optJSONArray(it) != null }
+                if (arrayKey != null) {
+                    val jsonArr = jsonObj.getJSONArray(arrayKey)
+                    val list = mutableListOf<ReplyItem>()
+                    for (i in 0 until jsonArr.length()) {
+                        val str = jsonArr.optString(i, "").trim()
+                        if (str.isNotBlank() && str != "null") {
+                            list.add(
+                                ReplyItem(
+                                    questionId = questionId,
+                                    text = str,
+                                    tone = tone,
+                                    generatedByProvider = provider
+                                )
+                            )
+                        }
+                    }
+                    if (list.isNotEmpty()) return list
+                }
+            }
+        } catch (_: Exception) {}
+
+        // 4. Fallback split by lines (bullet points, numbered lists, quotes)
+        val lines = clean.lines()
+            .map { it.replace(Regex("^[-*•0-9.)\\]]+\\s*"), "").replace("\"", "").replace("'", "").trim() }
+            .filter { it.isNotBlank() && !it.startsWith("<") && !it.endsWith(">") }
 
         if (lines.isNotEmpty()) {
             return lines.take(3).map {

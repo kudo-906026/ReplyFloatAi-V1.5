@@ -66,6 +66,14 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
+import android.content.ClipData
+import android.content.ClipboardManager
 import com.example.ai.AiFallbackEngine
 import com.example.model.AiModelTier
 import com.example.model.AiProvider
@@ -102,6 +110,7 @@ fun ProvidersTab(
     onMoveFallbackOrder: (fromIndex: Int, toIndex: Int) -> Unit = { _, _ -> },
     onSetPrimaryFallback: (String) -> Unit = {},
     onUpdateApiKey: (AiProvider, String) -> Unit,
+    onUpdateModel: (AiProvider, String) -> Unit = { _, _ -> },
     onAddCustomProvider: (String, String, String, String) -> Unit,
     onDeleteCustomProvider: (String) -> Unit
 ) {
@@ -144,8 +153,8 @@ fun ProvidersTab(
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 12.dp, vertical = 10.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         // Section Header
         item {
@@ -462,6 +471,119 @@ fun ProvidersTab(
                         }
                     }
 
+                    // Model Selector & Preset Chips
+                    if (!provider.isBuiltIn) {
+                        var isEditingModel by remember(provider.id) { mutableStateOf(false) }
+                        var customModelInput by remember(provider.id, provider.modelName) { mutableStateOf(provider.modelName) }
+
+                        val presetModels = when (provider.type) {
+                            AiProviderType.GROQ -> listOf("openai/gpt-oss-120b", "groq/compound", "llama-3.3-70b-versatile", "llama-3.1-8b-instant", "mixtral-8x7b-32768")
+                            AiProviderType.OPENAI -> listOf("gpt-4o-mini", "gpt-4o", "gpt-4-turbo", "gpt-3.5-turbo")
+                            AiProviderType.GEMINI_API -> listOf("gemini-3.1-flash-lite", "gemini-2.5-flash", "gemini-1.5-flash")
+                            AiProviderType.ANTHROPIC -> listOf("claude-3-5-haiku-20241022", "claude-3-5-sonnet-20241022", "claude-3-haiku-20240307")
+                            else -> emptyList()
+                        }
+
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "Model: ${provider.modelName}",
+                                    fontSize = 11.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    color = TechBlue,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                TextButton(
+                                    onClick = { isEditingModel = !isEditingModel },
+                                    modifier = Modifier.height(26.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Edit,
+                                        contentDescription = "Edit Model",
+                                        tint = TextMuted,
+                                        modifier = Modifier.size(12.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(if (isEditingModel) "Done" else "Custom Model", fontSize = 10.sp, color = TextMuted)
+                                }
+                            }
+
+                            if (presetModels.isNotEmpty()) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .horizontalScroll(rememberScrollState()),
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    presetModels.forEach { modelPreset ->
+                                        val isSelected = provider.modelName == modelPreset
+                                        Surface(
+                                            shape = RoundedCornerShape(12.dp),
+                                            color = if (isSelected) TechBlue.copy(alpha = 0.2f) else DarkSurfaceVariant,
+                                            border = BorderStroke(1.dp, if (isSelected) TechBlue else DarkCardBorder),
+                                            modifier = Modifier.clickable {
+                                                onUpdateModel(provider, modelPreset)
+                                                Toast.makeText(context, "Model switched to: $modelPreset", Toast.LENGTH_SHORT).show()
+                                            }
+                                        ) {
+                                            Text(
+                                                text = modelPreset,
+                                                fontSize = 10.sp,
+                                                fontFamily = FontFamily.Monospace,
+                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                                color = if (isSelected) TechBlue else TextMuted,
+                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
+                            if (isEditingModel) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    OutlinedTextField(
+                                        value = customModelInput,
+                                        onValueChange = { customModelInput = it },
+                                        placeholder = { Text("Enter custom model ID...", fontSize = 10.5.sp, color = TextMuted) },
+                                        singleLine = true,
+                                        modifier = Modifier.weight(1f),
+                                        shape = RoundedCornerShape(6.dp),
+                                        colors = OutlinedTextFieldDefaults.colors(
+                                            focusedBorderColor = TechBlue,
+                                            unfocusedBorderColor = DarkCardBorder,
+                                            focusedTextColor = TextWhite,
+                                            unfocusedTextColor = TextWhite,
+                                            focusedContainerColor = DarkSurfaceVariant,
+                                            unfocusedContainerColor = DarkSurfaceVariant
+                                        )
+                                    )
+                                    Button(
+                                        onClick = {
+                                            if (customModelInput.isNotBlank()) {
+                                                onUpdateModel(provider, customModelInput.trim())
+                                                isEditingModel = false
+                                                Toast.makeText(context, "Model updated: ${customModelInput.trim()}", Toast.LENGTH_SHORT).show()
+                                            }
+                                        },
+                                        shape = RoundedCornerShape(6.dp),
+                                        colors = ButtonDefaults.buttonColors(containerColor = TechBlue),
+                                        modifier = Modifier.height(38.dp)
+                                    ) {
+                                        Text("Set", fontSize = 11.sp, color = TextWhite)
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     // Key Status Notice
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -586,7 +708,7 @@ fun ProvidersTab(
                         }
                     }
 
-                    // Rich Verified / Error Status Box
+                    // Rich Verified / Error Status Box with Raw Response & Copy
                     val testResult = testResultsMap[provider.id]
                     if (testResult != null) {
                         val isOk = testResult.first
@@ -597,31 +719,64 @@ fun ProvidersTab(
                             border = BorderStroke(1.dp, if (isOk) TechGreen.copy(alpha = 0.45f) else CrimsonPrimary.copy(alpha = 0.45f)),
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Row(
+                            Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(horizontal = 10.dp, vertical = 8.dp),
-                                verticalAlignment = Alignment.Top,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                verticalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
-                                Icon(
-                                    imageVector = if (isOk) Icons.Default.CheckCircle else Icons.Default.ErrorOutline,
-                                    contentDescription = null,
-                                    tint = if (isOk) TechGreen else CrimsonLight,
-                                    modifier = Modifier.size(16.dp).padding(top = 2.dp)
-                                )
-                                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                    Text(
-                                        text = if (isOk) "Real Generation Verified (Exact POST & Model)" else "Generation Check Failed",
-                                        fontSize = 11.5.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = if (isOk) TechGreen else CrimsonLight
-                                    )
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = if (isOk) Icons.Default.CheckCircle else Icons.Default.ErrorOutline,
+                                            contentDescription = null,
+                                            tint = if (isOk) TechGreen else CrimsonLight,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Text(
+                                            text = if (isOk) "Real Generation Verified (Exact POST & Model)" else "Generation Check Failed",
+                                            fontSize = 11.5.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (isOk) TechGreen else CrimsonLight
+                                        )
+                                    }
+
+                                    IconButton(
+                                        onClick = {
+                                            val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                            clipboard.setPrimaryClip(ClipData.newPlainText("API Response", resultText))
+                                            Toast.makeText(context, "Copied response to clipboard", Toast.LENGTH_SHORT).show()
+                                        },
+                                        modifier = Modifier.size(24.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.ContentCopy,
+                                            contentDescription = "Copy Response",
+                                            tint = TextMuted,
+                                            modifier = Modifier.size(14.dp)
+                                        )
+                                    }
+                                }
+
+                                Surface(
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = DarkSurfaceVariant,
+                                    border = BorderStroke(0.5.dp, DarkCardBorder),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
                                     Text(
                                         text = resultText,
                                         fontSize = 10.5.sp,
                                         fontFamily = FontFamily.Monospace,
-                                        color = if (isOk) TextPrimary else CrimsonLight.copy(alpha = 0.95f)
+                                        color = if (isOk) TextPrimary else CrimsonLight.copy(alpha = 0.95f),
+                                        modifier = Modifier.padding(8.dp)
                                     )
                                 }
                             }

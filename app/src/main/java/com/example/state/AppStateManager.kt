@@ -246,6 +246,30 @@ object AppStateManager {
         saveCurrentSettings()
     }
 
+    fun updateProviderModel(provider: AiProvider, newModel: String) {
+        val updatedModels = _settings.value.providerModelOverrides.toMutableMap()
+        updatedModels[provider.id] = newModel
+
+        if (provider.isCustom) {
+            val updated = _settings.value.customProviders.map {
+                if (it.id == provider.id) it.copy(modelName = newModel) else it
+            }
+            _settings.value = _settings.value.copy(
+                customProviders = updated,
+                providerModelOverrides = updatedModels
+            )
+        } else {
+            _settings.value = _settings.value.copy(providerModelOverrides = updatedModels)
+        }
+
+        if (_settings.value.preferredProvider.id == provider.id) {
+            val updatedPref = _settings.value.preferredProvider.copy(modelName = newModel)
+            _settings.value = _settings.value.copy(preferredProvider = updatedPref)
+            _activeProvider.value = updatedPref
+        }
+        saveCurrentSettings()
+    }
+
     fun addCustomProvider(name: String, model: String, endpoint: String, apiKey: String) {
         val id = UUID.randomUUID().toString()
         val newProvider = AiProvider(

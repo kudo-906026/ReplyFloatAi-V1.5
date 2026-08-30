@@ -61,6 +61,11 @@ object SettingsStorage {
         settings.providerApiKeys.forEach { (k, v) -> keysObj.put(k, v) }
         root.put("providerApiKeys", keysObj)
 
+        // 3b. Provider Model Overrides
+        val modelsObj = JSONObject()
+        settings.providerModelOverrides.forEach { (k, v) -> modelsObj.put(k, v) }
+        root.put("providerModelOverrides", modelsObj)
+
         // 4. Custom Providers
         val customArray = JSONArray()
         settings.customProviders.forEach { cp ->
@@ -186,6 +191,17 @@ object SettingsStorage {
             }
         }
 
+        // 2b. Model Overrides
+        val providerModelOverrides = mutableMapOf<String, String>()
+        if (root.has("providerModelOverrides")) {
+            val modelsObj = root.getJSONObject("providerModelOverrides")
+            val modelsIter = modelsObj.keys()
+            while (modelsIter.hasNext()) {
+                val k = modelsIter.next()
+                providerModelOverrides[k] = modelsObj.getString(k)
+            }
+        }
+
         // 3. Fallback Order
         val fallbackOrder = mutableListOf<String>()
         if (root.has("fallbackOrder")) {
@@ -195,10 +211,14 @@ object SettingsStorage {
             }
         }
 
-        // 4. Map all available providers with their updated API keys
+        // 4. Map all available providers with their updated API keys and model overrides
         val allBuiltIn = defaultBuiltInProviders().map { bp ->
             val key = providerApiKeys[bp.id]
-            if (!key.isNullOrBlank()) bp.copy(apiKey = key) else bp
+            val model = providerModelOverrides[bp.id]
+            var updated = bp
+            if (!key.isNullOrBlank()) updated = updated.copy(apiKey = key)
+            if (!model.isNullOrBlank()) updated = updated.copy(modelName = model)
+            updated
         }
         val allProvidersMap = (allBuiltIn + customProviders).associateBy { it.id }.toMutableMap()
 
@@ -288,6 +308,7 @@ object SettingsStorage {
             preferredProvider = preferredProvider,
             fallbackOrder = finalFallbackOrder,
             providerApiKeys = providerApiKeys,
+            providerModelOverrides = providerModelOverrides,
             tone = tone,
             count = root.optInt("count", 3),
             autoGenerate = root.optBoolean("autoGenerate", true),

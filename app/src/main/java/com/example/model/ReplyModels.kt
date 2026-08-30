@@ -153,6 +153,7 @@ data class ReplySettings(
     val preferredProvider: AiProvider = defaultBuiltInProviders()[0],
     val fallbackOrder: List<String> = listOf("openai", "gemini-api", "gemini-builtin", "anthropic", "groq"),
     val providerApiKeys: Map<String, String> = emptyMap(),
+    val providerModelOverrides: Map<String, String> = emptyMap(),
     val tone: ReplyTone = ReplyTone.CASUAL,
     val count: Int = 3,
     val autoGenerate: Boolean = true,
