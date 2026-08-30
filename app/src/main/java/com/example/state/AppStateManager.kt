@@ -439,6 +439,36 @@ object AppStateManager {
     fun setContinuousScreenAnalysis(enabled: Boolean) {
         _settings.value = _settings.value.copy(continuousScreenAnalysis = enabled)
         saveCurrentSettings()
+
+        // Fully reset the background scanning listener state
+        com.example.service.QuestionDetectorAccessibilityService.resetScanningState()
+
+        if (enabled) {
+            // Remove suppression for current question so it immediately re-scans & detects
+            _currentQuestion.value?.text?.let { curText ->
+                processedQuestionsCache.remove(normalizeQuestionText(curText))
+            }
+            // Trigger an immediate scan of the active window
+            com.example.service.QuestionDetectorAccessibilityService.triggerImmediateRescan()
+
+            addDiagnosticLog(
+                source = "Continuous Analysis Controller",
+                rawText = "[Scanner Re-initialized]",
+                result = DetectionResultType.MATCHED,
+                category = "ANALYSIS_RESUMED",
+                reason = "Continuous Screen Analyze resumed. Background scanning listener fully re-initialized and active.",
+                detectionMethod = DetectionMethod.ACCESSIBILITY
+            )
+        } else {
+            addDiagnosticLog(
+                source = "Continuous Analysis Controller",
+                rawText = "[Scanner Paused]",
+                result = DetectionResultType.REJECTED,
+                category = "ANALYSIS_PAUSED",
+                reason = "Continuous Screen Analyze paused. Background scanning listener suspended.",
+                detectionMethod = DetectionMethod.ACCESSIBILITY
+            )
+        }
     }
 
     fun setRealTimeNodeTracking(enabled: Boolean) {
@@ -563,6 +593,11 @@ object AppStateManager {
     ) {
         val cleanText = text.trim()
         if (cleanText.isBlank()) return
+
+        // If Continuous Screen Analysis is disabled and not forced manual simulation, ignore
+        if (!_settings.value.continuousScreenAnalysis && !forcedBypass) {
+            return
+        }
 
         // Deduplication check: Do not re-trigger if already seen, answered, or currently active
         if (!forcedBypass && isQuestionAlreadyProcessed(cleanText)) {

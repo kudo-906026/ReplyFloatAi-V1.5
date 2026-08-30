@@ -32,7 +32,15 @@ class QuestionDetectorAccessibilityService : AccessibilityService() {
         private var instance: QuestionDetectorAccessibilityService? = null
 
         fun resetLastProcessedText() {
-            instance?.lastProcessedText = ""
+            instance?.resetState()
+        }
+
+        fun resetScanningState() {
+            instance?.resetState()
+        }
+
+        fun triggerImmediateRescan() {
+            instance?.scanActiveWindowNow()
         }
     }
 
@@ -40,6 +48,13 @@ class QuestionDetectorAccessibilityService : AccessibilityService() {
     private var lastProcessedTime: Long = 0L
     private var lastOcrScanTime: Long = 0L
     private var isOcrProcessing: Boolean = false
+
+    private fun resetState() {
+        lastProcessedText = ""
+        lastProcessedTime = 0L
+        lastOcrScanTime = 0L
+        isOcrProcessing = false
+    }
 
     // Background coroutine scope ensuring zero UI/main thread blocking
     private val serviceScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
@@ -51,8 +66,75 @@ class QuestionDetectorAccessibilityService : AccessibilityService() {
         AppStateManager.setAccessibilityRunning(true)
     }
 
+    fun scanActiveWindowNow() {
+        serviceScope.launch(Dispatchers.Main) {
+            try {
+                val settings = AppStateManager.settings.value
+                if (!settings.continuousScreenAnalysis) return@launch
+
+                val rootNode = try { rootInActiveWindow } catch (_: Exception) { null } ?: return@launch
+                val pkgName = rootNode.packageName?.toString() ?: return@launch
+                if (pkgName == applicationContext.packageName || isSystemOrKeyboardPackage(pkgName)) return@launch
+
+                val whitelistedApp = settings.appsWhitelist.find { it.packageName == pkgName && it.isEnabled } ?: return@launch
+                val appName = whitelistedApp.appName
+
+                val displayMetrics = resources.displayMetrics
+                val screenWidth = displayMetrics.widthPixels
+                val screenHeight = displayMetrics.heightPixels
+
+                val visibleNodes = mutableListOf<VisibleScannedNode>()
+                collectVisibleTextNodesSafely(
+                    node = rootNode,
+                    outList = visibleNodes,
+                    screenWidth = screenWidth,
+                    screenHeight = screenHeight,
+                    currentDepth = 0,
+                    maxDepth = 10,
+                    maxNodes = 60
+                )
+
+                if (visibleNodes.isNotEmpty()) {
+                    val distinctNodes = visibleNodes
+                        .groupBy { it.text }
+                        .map { (_, nodes) -> nodes.maxByOrNull { it.bottomY } ?: nodes.first() }
+                    val sortedNodes = distinctNodes.sortedByDescending { it.bottomY }
+                    val lowestValidQuestionNode = sortedNodes.firstOrNull { node ->
+                        val candidateText = node.text.trim()
+                        if (candidateText.length < 3) return@firstOrNull false
+                        val analysis = QuestionDetectionEngine.analyze(candidateText, settings.detectQuestionsOnly)
+                        val hasQuestionMark = candidateText.contains("?") || candidateText.contains("？") || candidateText.contains("¿")
+                        analysis.isQuestion && (hasQuestionMark || !settings.detectQuestionsOnly)
+                    }
+
+                    if (lowestValidQuestionNode != null) {
+                        val candidateText = lowestValidQuestionNode.text.trim()
+                        lastProcessedText = candidateText
+                        lastProcessedTime = System.currentTimeMillis()
+
+                        AppStateManager.onQuestionDetected(
+                            context = this@QuestionDetectorAccessibilityService,
+                            text = candidateText,
+                            sourceApp = appName,
+                            packageName = pkgName,
+                            forcedBypass = true,
+                            detectionMethod = DetectionMethod.ACCESSIBILITY
+                        )
+                    }
+                }
+            } catch (_: Exception) {
+            }
+        }
+    }
+
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event == null) return
+
+        // 1. Verify Continuous Screen Analysis is active
+        val settings = AppStateManager.settings.value
+        if (!settings.continuousScreenAnalysis) {
+            return
+        }
 
         val pkgName = event.packageName?.toString() ?: return
 
@@ -67,7 +149,6 @@ class QuestionDetectorAccessibilityService : AccessibilityService() {
         }
 
         // Check if package is whitelisted
-        val settings = AppStateManager.settings.value
         val whitelistedApp = settings.appsWhitelist.find { it.packageName == pkgName && it.isEnabled }
         if (whitelistedApp == null) return
 

@@ -138,6 +138,7 @@ fun FloatingOverlayView(
         when (currentMode) {
             OverlayBarMode.SMALL_PILL -> {
                 SmallBarPill(
+                    settings = settings,
                     hasContent = hasContent,
                     isGenerating = isGenerating,
                     currentQuestion = currentQuestion,
@@ -176,6 +177,7 @@ fun FloatingOverlayView(
 // -------------------------------------------------------------
 @Composable
 private fun SmallBarPill(
+    settings: ReplySettings,
     hasContent: Boolean,
     isGenerating: Boolean,
     currentQuestion: DetectedQuestion?,
@@ -188,7 +190,7 @@ private fun SmallBarPill(
             .clickable { onExpandMain() }
             .padding(horizontal = 6.dp, vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp)
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         Icon(
             imageVector = Icons.Default.DragHandle,
@@ -235,6 +237,35 @@ private fun SmallBarPill(
             }
         }
 
+        // Quick Analyze Toggle
+        IconButton(
+            onClick = {
+                AppStateManager.setContinuousScreenAnalysis(!settings.continuousScreenAnalysis)
+            },
+            modifier = Modifier
+                .size(20.dp)
+                .testTag("small_pill_quick_analyze_toggle")
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = Icons.Default.ScreenSearchDesktop,
+                    contentDescription = if (settings.continuousScreenAnalysis) "Analyze ON (Tap to pause)" else "Analyze OFF (Tap to resume)",
+                    tint = if (settings.continuousScreenAnalysis) TechGreen else TextMuted,
+                    modifier = Modifier.size(13.dp)
+                )
+                if (settings.continuousScreenAnalysis) {
+                    Box(
+                        modifier = Modifier
+                            .size(3.5.dp)
+                            .align(Alignment.TopEnd)
+                            .clip(CircleShape)
+                            .background(TechGreen)
+                    )
+                }
+            }
+        }
+
+        // Lang Bar switcher icon
         IconButton(
             onClick = onOpenLang,
             modifier = Modifier.size(20.dp)
@@ -242,7 +273,7 @@ private fun SmallBarPill(
             Icon(
                 imageVector = Icons.Default.Language,
                 contentDescription = "Open Lang Bar",
-                tint = TechBlue,
+                tint = if (settings.understandingMode) TechBlue else TextMuted,
                 modifier = Modifier.size(13.dp)
             )
         }
@@ -328,10 +359,40 @@ private fun MainBarExpanded(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(2.dp)
             ) {
+                // Quick Analyze Toggle Button (next to Lang globe icon)
+                IconButton(
+                    onClick = {
+                        AppStateManager.setContinuousScreenAnalysis(!settings.continuousScreenAnalysis)
+                    },
+                    modifier = Modifier
+                        .size(22.dp)
+                        .testTag("quick_analyze_toggle")
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Default.ScreenSearchDesktop,
+                            contentDescription = if (settings.continuousScreenAnalysis) "Analyze ON (Tap to pause)" else "Analyze OFF (Tap to resume)",
+                            tint = if (settings.continuousScreenAnalysis) TechGreen else TextMuted,
+                            modifier = Modifier.size(14.dp)
+                        )
+                        if (settings.continuousScreenAnalysis) {
+                            Box(
+                                modifier = Modifier
+                                    .size(4.dp)
+                                    .align(Alignment.TopEnd)
+                                    .clip(CircleShape)
+                                    .background(TechGreen)
+                            )
+                        }
+                    }
+                }
+
                 // Lang Bar switcher icon
                 IconButton(
                     onClick = onOpenLang,
-                    modifier = Modifier.size(22.dp)
+                    modifier = Modifier
+                        .size(22.dp)
+                        .testTag("quick_lang_bar_button")
                 ) {
                     Icon(
                         imageVector = Icons.Default.Language,

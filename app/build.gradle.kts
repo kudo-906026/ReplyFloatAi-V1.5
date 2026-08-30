@@ -1,3 +1,5 @@
+import java.util.Base64
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -17,6 +19,27 @@ android {
 
         vectorDrawables {
             useSupportLibrary = true
+        }
+    }
+
+    signingConfigs {
+        getByName("debug") {
+            val rootKeystore = rootProject.file("debug.keystore")
+            val base64Keystore = rootProject.file("debug.keystore.base64")
+            if (!rootKeystore.exists() && base64Keystore.exists()) {
+                try {
+                    val decoded = Base64.getDecoder().decode(base64Keystore.readText().trim())
+                    rootKeystore.writeBytes(decoded)
+                } catch (e: Exception) {
+                    // Fallback to existing
+                }
+            }
+            if (rootKeystore.exists()) {
+                storeFile = rootKeystore
+                storePassword = "android"
+                keyAlias = "androiddebugkey"
+                keyPassword = "android"
+            }
         }
     }
 
