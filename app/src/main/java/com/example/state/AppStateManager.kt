@@ -784,10 +784,11 @@ object AppStateManager {
             }
 
             // On matched question from OCR fallback
+            val questionText = if (analysis.extractedQuestionText.isNotBlank()) analysis.extractedQuestionText else ocrResult.rawText
             launch(Dispatchers.Main) {
                 onQuestionDetected(
                     context = context,
-                    text = ocrResult.rawText,
+                    text = questionText,
                     sourceApp = sourceApp,
                     forcedBypass = true,
                     detectionMethod = DetectionMethod.MLKIT_OCR,

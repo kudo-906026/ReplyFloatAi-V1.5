@@ -295,7 +295,11 @@ fun defaultWhitelistedApps(): List<WhitelistedApp> = listOf(
     WhitelistedApp("com.microsoft.teams", "Microsoft Teams", "Workplace", true),
     WhitelistedApp("com.twitter.android", "X (Twitter DMs)", "Social", true),
     WhitelistedApp("com.linkedin.android", "LinkedIn Messaging", "Professional", true),
-    WhitelistedApp("com.reddit.frontpage", "Reddit Chat", "Social", true)
+    WhitelistedApp("com.reddit.frontpage", "Reddit Chat", "Social", true),
+    WhitelistedApp("com.je.supersus", "Super Sus (Who Is The Impostor)", "Gaming / Custom Canvas", true),
+    WhitelistedApp("com.piogame.supersus", "Super Sus (Global)", "Gaming / Custom Canvas", true),
+    WhitelistedApp("com.innersloth.spacemafia", "Among Us", "Gaming / Custom Canvas", true),
+    WhitelistedApp("com.roblox.client", "Roblox Chat", "Gaming / Custom Canvas", true)
 )
 
 enum class DetectionMethod(val label: String, val shortBadge: String) {

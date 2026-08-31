@@ -103,6 +103,8 @@ enum class DiagnosticFilter(val label: String) {
     ALL("All Events"),
     FAILOVERS("Failovers & Errors"),
     MATCHED("Matched Questions"),
+    OCR_FALLBACK("OCR Fallback (Games)"),
+    ACCESSIBILITY("Accessibility (Fast)"),
     REJECTED("Filtered Noise")
 }
 
@@ -228,6 +230,8 @@ fun DiagnosticsTab(
             DiagnosticFilter.ALL -> diagnosticLogs
             DiagnosticFilter.FAILOVERS -> diagnosticLogs.filter { it.category in listOf("AUTH_FAILURE", "QUOTA_EXCEEDED", "NO_API_KEY", "PROVIDER_ERROR", "BAD_REQUEST", "MODEL_NOT_FOUND", "EMPTY_RESPONSE", "FAILOVER") || it.reason.contains("fallback", ignoreCase = true) || it.reason.contains("fail", ignoreCase = true) }
             DiagnosticFilter.MATCHED -> diagnosticLogs.filter { it.result == DetectionResultType.MATCHED }
+            DiagnosticFilter.OCR_FALLBACK -> diagnosticLogs.filter { it.detectionMethod == DetectionMethod.MLKIT_OCR }
+            DiagnosticFilter.ACCESSIBILITY -> diagnosticLogs.filter { it.detectionMethod == DetectionMethod.ACCESSIBILITY }
             DiagnosticFilter.REJECTED -> diagnosticLogs.filter { it.result == DetectionResultType.REJECTED }
         }
     }
@@ -629,6 +633,40 @@ fun DiagnosticsTab(
                                     modifier = Modifier.size(16.dp)
                                 )
                             }
+                        }
+                    }
+
+                    // Detection Path Explanation Info Banner
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = DarkSurfaceVariant,
+                        border = BorderStroke(1.dp, DarkCardBorder)
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(10.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Icon(Icons.Default.Speed, contentDescription = null, tint = TechGreen, modifier = Modifier.size(14.dp))
+                                Text(
+                                    text = "DETECTION PATHS & LATENCY EXPLANATION",
+                                    fontSize = 10.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontWeight = FontWeight.Bold,
+                                    color = TechGreen
+                                )
+                            }
+                            Text(
+                                text = "• Fast Primary (Accessibility): Instant (~3-5ms) node scan used across standard apps (WhatsApp, Telegram, SMS, Browsers).\n• OCR Fallback (ML Kit On-Device): Runs on background thread (~35-80ms) ONLY when apps render 0 text nodes (e.g. Super Sus, custom game canvases). Slower latency in games is expected behavior and not a bug; the screen stays 100% interactive.",
+                                fontSize = 10.5.sp,
+                                color = TextSecondary,
+                                lineHeight = 14.5.sp
+                            )
                         }
                     }
 

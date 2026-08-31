@@ -16,9 +16,9 @@ import kotlin.coroutines.resume
 
 data class OcrRecognitionResult(
     val rawText: String,
-    val lineCount: Int,
-    val latencyMs: Long,
-    val isSuccess: Boolean,
+    val lineCount: Int = 0,
+    val latencyMs: Long = 0L,
+    val isSuccess: Boolean = true,
     val errorMessage: String? = null,
     val detectedBlocks: List<String> = emptyList()
 )
@@ -122,7 +122,8 @@ object OcrRecognitionEngine {
     }
 
     /**
-     * Analyzes OCR-extracted text blocks to find actionable questions or calculations
+     * Analyzes OCR-extracted text blocks and lines to find actionable questions or calculations,
+     * prioritizing the latest question block/line when gaming HUD or multiple overlay text elements are present.
      */
     fun analyzeOcrOutput(ocrResult: OcrRecognitionResult, detectQuestionsOnly: Boolean): DetectionAnalysisResult {
         if (!ocrResult.isSuccess || ocrResult.rawText.isBlank()) {
@@ -134,20 +135,41 @@ object OcrRecognitionEngine {
             )
         }
 
-        // Analyze full combined text first
-        val fullAnalysis = QuestionDetectionEngine.analyze(ocrResult.rawText, detectQuestionsOnly)
-        if (fullAnalysis.isQuestion) {
-            return fullAnalysis
-        }
-
-        // If not found in full block, check individual detected text blocks
+        // 1. First, check individual detected blocks and lines from bottom to top (most recent in game chat / conversation)
+        val allCandidates = mutableListOf<String>()
+        
+        // Add detected blocks
         for (block in ocrResult.detectedBlocks) {
-            val blockAnalysis = QuestionDetectionEngine.analyze(block, detectQuestionsOnly)
-            if (blockAnalysis.isQuestion) {
-                return blockAnalysis
+            val lines = block.split("\n").map { it.trim() }.filter { it.length >= 3 }
+            allCandidates.addAll(lines)
+            if (lines.size > 1) {
+                allCandidates.add(block)
+            }
+        }
+        
+        // Also split rawText by newline to ensure any unblocked lines are checked
+        val rawLines = ocrResult.rawText.split("\n").map { it.trim() }.filter { it.length >= 3 }
+        allCandidates.addAll(rawLines)
+
+        // Prioritize candidates with question marks
+        val questionMarkCandidates = allCandidates.filter { it.contains("?") || it.contains("？") || it.contains("¿") }
+        for (candidate in questionMarkCandidates.asReversed()) {
+            val analysis = QuestionDetectionEngine.analyze(candidate, detectQuestionsOnly)
+            if (analysis.isQuestion) {
+                return analysis.copy(extractedQuestionText = candidate)
             }
         }
 
+        // Check remaining candidates if detectQuestionsOnly is false or for math/intent expressions
+        for (candidate in allCandidates.asReversed()) {
+            val analysis = QuestionDetectionEngine.analyze(candidate, detectQuestionsOnly)
+            if (analysis.isQuestion) {
+                return analysis.copy(extractedQuestionText = candidate)
+            }
+        }
+
+        // Fallback: Analyze full combined text
+        val fullAnalysis = QuestionDetectionEngine.analyze(ocrResult.rawText, detectQuestionsOnly)
         return fullAnalysis
     }
 }

@@ -357,14 +357,15 @@ class QuestionDetectorAccessibilityService : AccessibilityService() {
         val ocrResult = OcrRecognitionEngine.recognizeTextFromBitmap(bitmap)
         val settings = AppStateManager.settings.value
         val analysis = OcrRecognitionEngine.analyzeOcrOutput(ocrResult, settings.detectQuestionsOnly)
-        val hasQuestionMark = ocrResult.rawText.contains("?") || ocrResult.rawText.contains("？") || ocrResult.rawText.contains("¿")
+        val detectedQuestionText = if (analysis.extractedQuestionText.isNotBlank()) analysis.extractedQuestionText else ocrResult.rawText
+        val hasQuestionMark = detectedQuestionText.contains("?") || detectedQuestionText.contains("？") || detectedQuestionText.contains("¿")
 
-        if (analysis.isQuestion && (hasQuestionMark || !settings.detectQuestionsOnly) && ocrResult.rawText.isNotBlank()) {
-            if (ocrResult.rawText != lastProcessedText) {
-                lastProcessedText = ocrResult.rawText
+        if (analysis.isQuestion && (hasQuestionMark || !settings.detectQuestionsOnly) && detectedQuestionText.isNotBlank()) {
+            if (detectedQuestionText != lastProcessedText) {
+                lastProcessedText = detectedQuestionText
                 AppStateManager.onQuestionDetected(
                     context = this@QuestionDetectorAccessibilityService,
-                    text = ocrResult.rawText,
+                    text = detectedQuestionText,
                     sourceApp = appName,
                     packageName = pkgName,
                     forcedBypass = false,

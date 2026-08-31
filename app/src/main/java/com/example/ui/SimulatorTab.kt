@@ -198,10 +198,19 @@ fun SimulatorTab(
             iconColor = TextMuted
         ),
         TestCaseScenario(
-            title = "9. Unreadable Canvas / WebView (OCR Fallback)",
-            description = "Custom graphic canvas / game UI with 0 text nodes — triggers background On-Device ML Kit OCR fallback",
-            sampleText = "What is the capital of Australia?",
-            expectedOutcome = "MATCHED via On-Device ML Kit OCR Fallback (Non-blocking background inference)",
+            title = "9. Super Sus In-Game Chat (Game OCR Fallback)",
+            description = "Custom OpenGL/Unity game UI with 0 text nodes — runs On-Device ML Kit OCR on background thread",
+            sampleText = "Red: Where were you when the body was found in Electrical?",
+            expectedOutcome = "MATCHED via On-Device ML Kit OCR Fallback (Non-blocking background thread inference)",
+            categoryIcon = Icons.Default.CameraAlt,
+            iconColor = AccentPurple,
+            isOcrScenario = true
+        ),
+        TestCaseScenario(
+            title = "10. Game HUD & Task Question (OCR Fallback)",
+            description = "In-game voting question: 'Blue: Who is the imposter among us?'",
+            sampleText = "Blue: Who is the imposter among us?",
+            expectedOutcome = "MATCHED via On-Device ML Kit OCR Fallback",
             categoryIcon = Icons.Default.CameraAlt,
             iconColor = AccentGreen,
             isOcrScenario = true
@@ -588,6 +597,176 @@ fun SimulatorTab(
                             softWrap = false,
                             overflow = TextOverflow.Ellipsis
                         )
+                    }
+                }
+            }
+        }
+
+        // Dedicated Super Sus & Custom Game UI Simulator (MANDATORY REQUIREMENT)
+        item {
+            ControlPanelCard(
+                modifier = Modifier.fillMaxWidth(),
+                shapeRadius = 14.dp
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(Icons.Default.CameraAlt, contentDescription = null, tint = AccentPurple, modifier = Modifier.size(16.dp))
+                            Text(
+                                text = "CUSTOM GAME UI (SUPER SUS OCR TEST)",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp,
+                                fontFamily = FontFamily.Monospace,
+                                color = AccentPurple
+                            )
+                        }
+                        Surface(
+                            shape = RoundedCornerShape(4.dp),
+                            color = AccentPurple.copy(alpha = 0.2f),
+                            border = BorderStroke(1.dp, AccentPurple.copy(alpha = 0.5f))
+                        ) {
+                            Text(
+                                text = "0 NODES -> OCR FALLBACK",
+                                fontSize = 9.sp,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold,
+                                color = AccentPurple,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+
+                    Text(
+                        text = "Games like Super Sus, Among Us, and Unity/OpenGL apps render pixels directly to a SurfaceView with zero accessibility text nodes. When the accessibility scan returns 0 nodes, ReplyFloat seamlessly triggers On-Device Google ML Kit OCR entirely on a background thread. Slower detections in games (~40-80ms) are logged in Diagnostics as expected behavior, while normal apps stay instantaneous (~3-5ms).",
+                        fontSize = 11.5.sp,
+                        color = TextSecondary,
+                        lineHeight = 15.sp
+                    )
+
+                    // Simulated Super Sus In-Game Meeting & Voting Box
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(Color(0xFF141722))
+                            .border(1.dp, AccentPurple.copy(alpha = 0.4f), RoundedCornerShape(10.dp))
+                            .padding(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("SUPER SUS: EMERGENCY MEETING (CANVAS)", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = CrimsonLight)
+                            Text("VOTING: 00:24", fontSize = 10.sp, fontFamily = FontFamily.Monospace, color = AccentYellow)
+                        }
+
+                        val superSusMessages = listOf(
+                            Triple("Red Player", "Where were you when the body was found in Electrical?", true),
+                            Triple("Blue Player", "Can you prove you did the visual scan task in MedBay?", true),
+                            Triple("Yellow Player", "Who is the imposter among us?", true),
+                            Triple("System Host", "Discussion timer ends in 15 seconds.", false)
+                        )
+
+                        superSusMessages.forEach { (player, msg, isQuestion) ->
+                            Surface(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .clickable {
+                                        customInput = msg
+                                        onSimulateOcrQuestion(msg, "Super Sus (Custom Canvas UI)")
+                                    },
+                                shape = RoundedCornerShape(8.dp),
+                                color = DarkCardElevated,
+                                border = BorderStroke(1.dp, if (isQuestion) AccentPurple.copy(alpha = 0.4f) else DarkCardBorder)
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 10.dp, vertical = 8.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                        Text(player, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = AccentPurple)
+                                        Text("\"$msg\"", fontSize = 12.sp, color = TextWhite)
+                                    }
+
+                                    Button(
+                                        onClick = {
+                                            customInput = msg
+                                            onSimulateOcrQuestion(msg, "Super Sus (Custom Canvas UI)")
+                                        },
+                                        shape = RoundedCornerShape(6.dp),
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = AccentPurple.copy(alpha = 0.25f),
+                                            contentColor = AccentPurple
+                                        ),
+                                        border = BorderStroke(1.dp, AccentPurple.copy(alpha = 0.5f)),
+                                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                                        modifier = Modifier.height(28.dp)
+                                    ) {
+                                        Text(if (isQuestion) "Test Game OCR" else "Test Filter", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Side by Side Comparison Buttons
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = {
+                                val gameQuestion = "Red: Where were you when the body was found in Electrical?"
+                                customInput = gameQuestion
+                                onSimulateOcrQuestion(gameQuestion, "Super Sus (Custom Canvas UI)")
+                            },
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(38.dp),
+                            shape = RoundedCornerShape(8.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = AccentPurple.copy(alpha = 0.25f), contentColor = AccentPurple),
+                            border = BorderStroke(1.dp, AccentPurple.copy(alpha = 0.6f))
+                        ) {
+                            Icon(Icons.Default.CameraAlt, contentDescription = null, modifier = Modifier.size(13.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Simulate Super Sus (OCR)", fontSize = 10.5.sp, fontWeight = FontWeight.Bold)
+                        }
+
+                        Button(
+                            onClick = {
+                                val normalQuestion = "Are you free for lunch tomorrow at 1 PM?"
+                                customInput = normalQuestion
+                                onSimulateQuestion(normalQuestion, "WhatsApp (Accessibility Scan)")
+                            },
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(38.dp),
+                            shape = RoundedCornerShape(8.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = TechGreen.copy(alpha = 0.2f), contentColor = TechGreen),
+                            border = BorderStroke(1.dp, TechGreen.copy(alpha = 0.6f))
+                        ) {
+                            Icon(Icons.Default.Speed, contentDescription = null, modifier = Modifier.size(13.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Simulate WhatsApp (Fast)", fontSize = 10.5.sp, fontWeight = FontWeight.Bold)
+                        }
                     }
                 }
             }

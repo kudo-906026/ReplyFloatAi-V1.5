@@ -254,7 +254,13 @@ object SettingsStorage {
                 )
             }
         }
-        val finalApps = if (appsWhitelist.isNotEmpty()) appsWhitelist else defaultWhitelistedApps()
+        val finalApps = if (appsWhitelist.isNotEmpty()) {
+            val existingPackages = appsWhitelist.map { it.packageName }.toSet()
+            val missingDefaults = defaultWhitelistedApps().filter { it.packageName !in existingPackages }
+            appsWhitelist + missingDefaults
+        } else {
+            defaultWhitelistedApps()
+        }
 
         // 8. Saved Overlay Positions
         val savedPositions = mutableListOf<SavedOverlayPosition>()
