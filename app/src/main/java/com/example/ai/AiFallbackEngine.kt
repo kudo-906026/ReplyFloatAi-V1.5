@@ -43,14 +43,22 @@ object AiFallbackEngine {
             generateUnderstanding(question, settings.understandingSummaryLength)
         } else null
 
-        // 1. Build the map of all registered providers with their stored API keys
+        // 1. Build the map of all registered providers with their stored API keys and model overrides
         val allMap = (defaultBuiltInProviders() + settings.customProviders).associateBy { it.id }.toMutableMap()
         settings.providerApiKeys.forEach { (id, key) ->
             allMap[id]?.let { allMap[id] = it.copy(apiKey = key) }
         }
+        settings.providerModelOverrides.forEach { (id, model) ->
+            allMap[id]?.let { allMap[id] = it.copy(modelName = model) }
+        }
         if (settings.preferredProvider.apiKey.isNotBlank()) {
             allMap[settings.preferredProvider.id]?.let {
                 allMap[settings.preferredProvider.id] = it.copy(apiKey = settings.preferredProvider.apiKey)
+            }
+        }
+        if (settings.preferredProvider.modelName.isNotBlank()) {
+            allMap[settings.preferredProvider.id]?.let {
+                allMap[settings.preferredProvider.id] = it.copy(modelName = settings.preferredProvider.modelName)
             }
         }
 

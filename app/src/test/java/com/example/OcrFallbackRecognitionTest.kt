@@ -48,6 +48,51 @@ class OcrFallbackRecognitionTest {
     }
 
     @Test
+    fun testOcrAnalyzer_HandlesGameChatWithPlayerAndRoleTags() {
+        val chatOcrResult = OcrRecognitionResult(
+            rawText = "[Doctor] Cyan: Did anyone see who killed Blue?\nYellow: I was in Medbay scanning\nEmergency Meeting in Progress",
+            lineCount = 3,
+            detectedBlocks = listOf(
+                "[Doctor] Cyan: Did anyone see who killed Blue?",
+                "Yellow: I was in Medbay scanning",
+                "Emergency Meeting in Progress"
+            ),
+            latencyMs = 48L,
+            isSuccess = true
+        )
+
+        val analysis = OcrRecognitionEngine.analyzeOcrOutput(chatOcrResult, detectQuestionsOnly = true)
+        assertTrue("Chat with role prefix and question mark must be detected", analysis.isQuestion)
+        assertTrue(
+            "Extracted question should contain interrogative clause",
+            analysis.extractedQuestionText.contains("Did anyone see who killed Blue", ignoreCase = true)
+        )
+    }
+
+    @Test
+    fun testModelSelector_OverridesUpdateProviderModelVisualState() {
+        val defaultGemini = com.example.model.defaultBuiltInProviders().first { it.id == "gemini-api" }
+        assertEquals("gemini-3.1-flash-lite", defaultGemini.modelName)
+
+        // Select a different model preset (e.g. gemini-2.5-pro)
+        AppStateManager.updateProviderModel(defaultGemini, "gemini-2.5-pro")
+
+        val settings = AppStateManager.settings.value
+        assertEquals("gemini-2.5-pro", settings.providerModelOverrides["gemini-api"])
+
+        // Simulate provider mapping as performed in ProvidersTab and AiFallbackEngine
+        val baseBuiltIn = com.example.model.defaultBuiltInProviders()
+        val allProvidersMap = (baseBuiltIn + settings.customProviders).associateBy { it.id }.toMutableMap()
+        settings.providerModelOverrides.forEach { (id, model) ->
+            allProvidersMap[id]?.let { allProvidersMap[id] = it.copy(modelName = model) }
+        }
+
+        val mappedGemini = allProvidersMap["gemini-api"]
+        assertNotNull(mappedGemini)
+        assertEquals("gemini-2.5-pro", mappedGemini?.modelName)
+    }
+
+    @Test
     fun testOcrAnalyzer_RejectsGameScreenWithoutQuestion() {
         val nonQuestionGameOcr = OcrRecognitionResult(
             rawText = "SUPER SUS\nROUND 1 / 5\nPlayer Blue completed task in Shields.\nDiscussion time ends.",

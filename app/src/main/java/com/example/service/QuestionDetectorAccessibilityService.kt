@@ -16,7 +16,10 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 data class VisibleScannedNode(
     val text: String,
@@ -58,116 +61,85 @@ class QuestionDetectorAccessibilityService : AccessibilityService() {
 
     // Background coroutine scope ensuring zero UI/main thread blocking
     private val serviceScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
+    private var continuousScanJob: kotlinx.coroutines.Job? = null
 
     override fun onServiceConnected() {
         super.onServiceConnected()
         instance = this
         AppStateManager.init(this)
         AppStateManager.setAccessibilityRunning(true)
+        startContinuousScanLoop()
+    }
+
+    private fun startContinuousScanLoop() {
+        continuousScanJob?.cancel()
+        continuousScanJob = serviceScope.launch {
+            while (isActive) {
+                try {
+                    val settings = AppStateManager.settings.value
+                    if (settings.continuousScreenAnalysis) {
+                        withContext(Dispatchers.Main) {
+                            performWindowScan(isContinuousTick = true, forcedBypass = false)
+                        }
+                    }
+                } catch (_: Exception) {
+                }
+                delay(1500L)
+            }
+        }
     }
 
     fun scanActiveWindowNow() {
         serviceScope.launch(Dispatchers.Main) {
-            try {
-                val settings = AppStateManager.settings.value
-                if (!settings.continuousScreenAnalysis) return@launch
-
-                val rootNode = try { rootInActiveWindow } catch (_: Exception) { null } ?: return@launch
-                val pkgName = rootNode.packageName?.toString() ?: return@launch
-                if (pkgName == applicationContext.packageName || isSystemOrKeyboardPackage(pkgName)) return@launch
-
-                val whitelistedApp = settings.appsWhitelist.find { it.packageName == pkgName && it.isEnabled } ?: return@launch
-                val appName = whitelistedApp.appName
-
-                val displayMetrics = resources.displayMetrics
-                val screenWidth = displayMetrics.widthPixels
-                val screenHeight = displayMetrics.heightPixels
-
-                val visibleNodes = mutableListOf<VisibleScannedNode>()
-                collectVisibleTextNodesSafely(
-                    node = rootNode,
-                    outList = visibleNodes,
-                    screenWidth = screenWidth,
-                    screenHeight = screenHeight,
-                    currentDepth = 0,
-                    maxDepth = 10,
-                    maxNodes = 60
-                )
-
-                if (visibleNodes.isNotEmpty()) {
-                    val distinctNodes = visibleNodes
-                        .groupBy { it.text }
-                        .map { (_, nodes) -> nodes.maxByOrNull { it.bottomY } ?: nodes.first() }
-                    val sortedNodes = distinctNodes.sortedByDescending { it.bottomY }
-                    val lowestValidQuestionNode = sortedNodes.firstOrNull { node ->
-                        val candidateText = node.text.trim()
-                        if (candidateText.length < 3) return@firstOrNull false
-                        val analysis = QuestionDetectionEngine.analyze(candidateText, settings.detectQuestionsOnly)
-                        val hasQuestionMark = candidateText.contains("?") || candidateText.contains("？") || candidateText.contains("¿")
-                        analysis.isQuestion && (hasQuestionMark || !settings.detectQuestionsOnly)
-                    }
-
-                    if (lowestValidQuestionNode != null) {
-                        val candidateText = lowestValidQuestionNode.text.trim()
-                        lastProcessedText = candidateText
-                        lastProcessedTime = System.currentTimeMillis()
-
-                        AppStateManager.onQuestionDetected(
-                            context = this@QuestionDetectorAccessibilityService,
-                            text = candidateText,
-                            sourceApp = appName,
-                            packageName = pkgName,
-                            forcedBypass = true,
-                            detectionMethod = DetectionMethod.ACCESSIBILITY
-                        )
-                    }
-                }
-            } catch (_: Exception) {
-            }
+            performWindowScan(isContinuousTick = false, forcedBypass = true)
         }
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event == null) return
+        performWindowScan(isContinuousTick = false, forcedBypass = false, event = event)
+    }
 
-        // 1. Verify Continuous Screen Analysis is active
+    private fun performWindowScan(
+        isContinuousTick: Boolean,
+        forcedBypass: Boolean = false,
+        event: AccessibilityEvent? = null
+    ) {
         val settings = AppStateManager.settings.value
-        if (!settings.continuousScreenAnalysis) {
+        if (!settings.continuousScreenAnalysis && !forcedBypass) {
             return
         }
 
-        val pkgName = event.packageName?.toString() ?: return
+        val rootNode = try { rootInActiveWindow } catch (_: Exception) { null }
+        var pkgName = rootNode?.packageName?.toString() ?: event?.packageName?.toString()
 
-        // CRITICAL FIX: Never scan ReplyFloat's own app windows/screens as inbound third-party chat messages!
-        if (pkgName == applicationContext.packageName) {
+        if (pkgName == null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            try {
+                val activeWindow = windows.firstOrNull { it.isActive || it.isFocused } ?: windows.firstOrNull()
+                pkgName = activeWindow?.root?.packageName?.toString()
+            } catch (_: Exception) {
+            }
+        }
+
+        if (pkgName == null || pkgName == applicationContext.packageName || isSystemOrKeyboardPackage(pkgName)) {
             return
         }
 
-        // Ignore System UI and Virtual Keyboards / IMEs
-        if (isSystemOrKeyboardPackage(pkgName)) {
-            return
-        }
-
-        // Check if package is whitelisted
-        val whitelistedApp = settings.appsWhitelist.find { it.packageName == pkgName && it.isEnabled }
-        if (whitelistedApp == null) return
+        val whitelistedApp = settings.appsWhitelist.find { it.packageName == pkgName && it.isEnabled } ?: return
+        val appName = whitelistedApp.appName
 
         val now = System.currentTimeMillis()
-        if (now - lastProcessedTime < settings.smartDebounceMs) {
-            // Debounce active
+        if (!forcedBypass && (now - lastProcessedTime < settings.smartDebounceMs)) {
             return
         }
 
-        val appName = whitelistedApp.appName
         val displayMetrics = resources.displayMetrics
         val screenWidth = displayMetrics.widthPixels
         val screenHeight = displayMetrics.heightPixels
 
         val visibleNodes = mutableListOf<VisibleScannedNode>()
-
-        // 1. PRIMARY SCAN: Traverse active window node hierarchy strictly inside visible screen viewport
         var foundAnyReadableNodes = false
-        val rootNode = try { rootInActiveWindow } catch (_: Exception) { null }
+
         if (rootNode != null) {
             collectVisibleTextNodesSafely(
                 node = rootNode,
@@ -180,8 +152,7 @@ class QuestionDetectorAccessibilityService : AccessibilityService() {
             )
         }
 
-        // If rootInActiveWindow yielded no nodes, try event.source with visible viewport constraints
-        if (visibleNodes.isEmpty()) {
+        if (visibleNodes.isEmpty() && event != null) {
             val sourceNode = try { event.source } catch (_: Exception) { null }
             if (sourceNode != null) {
                 collectVisibleTextNodesSafely(
@@ -196,8 +167,7 @@ class QuestionDetectorAccessibilityService : AccessibilityService() {
             }
         }
 
-        // Also check direct event text list if visible nodes were empty
-        if (visibleNodes.isEmpty()) {
+        if (visibleNodes.isEmpty() && event != null) {
             val eventTexts = event.text.mapNotNull { it?.toString()?.trim() }.filter { it.length >= 3 && !isIgnoredUiString(it) }
             for (raw in eventTexts) {
                 visibleNodes.add(
@@ -219,10 +189,8 @@ class QuestionDetectorAccessibilityService : AccessibilityService() {
                 .groupBy { it.text }
                 .map { (_, nodes) -> nodes.maxByOrNull { it.bottomY } ?: nodes.first() }
 
-            // CRITICAL REQUIREMENT: Prioritize the one that is visually lowest/most recent on screen (highest bottomY)
             val sortedNodes = distinctNodes.sortedByDescending { it.bottomY }
 
-            // 1. Identify the single lowest/most recent valid question currently on screen
             val lowestValidQuestionNode = sortedNodes.firstOrNull { node ->
                 val candidateText = node.text.trim()
                 if (candidateText.length < 3) return@firstOrNull false
@@ -234,12 +202,10 @@ class QuestionDetectorAccessibilityService : AccessibilityService() {
             if (lowestValidQuestionNode != null) {
                 val candidateText = lowestValidQuestionNode.text.trim()
 
-                // If the most recent question on screen is identical to the one currently displayed or processed, do not re-trigger or search older scrollback
-                if (candidateText == lastProcessedText || candidateText == AppStateManager.currentQuestion.value?.text) {
+                if (candidateText == lastProcessedText || (!forcedBypass && candidateText == AppStateManager.currentQuestion.value?.text)) {
                     return
                 }
 
-                // Genuinely fresh new question detected! Clear old state and process fresh question immediately.
                 lastProcessedText = candidateText
                 lastProcessedTime = now
 
@@ -248,31 +214,32 @@ class QuestionDetectorAccessibilityService : AccessibilityService() {
                     text = candidateText,
                     sourceApp = appName,
                     packageName = pkgName,
-                    forcedBypass = false,
+                    forcedBypass = forcedBypass,
                     detectionMethod = DetectionMethod.ACCESSIBILITY
                 )
                 return
             }
 
-            // If no visible node met the question criteria, do NOT fall back to older questions!
-            // Log rejection diagnostic for the lowest visible message
-            val lowestNode = sortedNodes.firstOrNull()
-            if (lowestNode != null && lowestNode.text != lastProcessedText) {
-                val lowestAnalysis = QuestionDetectionEngine.analyze(lowestNode.text, settings.detectQuestionsOnly)
-                AppStateManager.addDiagnosticLog(
-                    source = "$appName (Visible Screen Node)",
-                    rawText = lowestNode.text,
-                    result = DetectionResultType.REJECTED,
-                    category = lowestAnalysis.category,
-                    reason = lowestAnalysis.reason,
-                    detectionMethod = DetectionMethod.ACCESSIBILITY
-                )
+            // If no valid question node found, log rejection diagnostic if not a tick loop
+            if (!isContinuousTick) {
+                val lowestNode = sortedNodes.firstOrNull()
+                if (lowestNode != null && lowestNode.text != lastProcessedText) {
+                    val lowestAnalysis = QuestionDetectionEngine.analyze(lowestNode.text, settings.detectQuestionsOnly)
+                    AppStateManager.addDiagnosticLog(
+                        source = "$appName (Visible Screen Node)",
+                        rawText = lowestNode.text,
+                        result = DetectionResultType.REJECTED,
+                        category = lowestAnalysis.category,
+                        reason = lowestAnalysis.reason,
+                        detectionMethod = DetectionMethod.ACCESSIBILITY
+                    )
+                }
             }
         }
 
-        // 2. OCR FALLBACK: Trigger on-device ML Kit OCR ONLY when accessibility found NO readable visible text
+        // 2. OCR FALLBACK: Trigger on-device ML Kit OCR when accessibility found NO readable visible text (e.g. Super Sus, custom canvas games)
         if (!foundAnyReadableNodes && settings.enableOcrFallback) {
-            triggerOcrFallbackIfEligible(appName, pkgName, now, settings.ocrDebounceMs)
+            triggerOcrFallbackIfEligible(appName, pkgName, now, if (forcedBypass) 0 else settings.ocrDebounceMs)
         }
     }
 

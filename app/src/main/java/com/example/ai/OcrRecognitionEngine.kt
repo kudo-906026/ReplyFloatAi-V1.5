@@ -135,41 +135,80 @@ object OcrRecognitionEngine {
             )
         }
 
-        // 1. First, check individual detected blocks and lines from bottom to top (most recent in game chat / conversation)
         val allCandidates = mutableListOf<String>()
-        
-        // Add detected blocks
+
+        // 1. First, collect individual detected blocks and lines
         for (block in ocrResult.detectedBlocks) {
             val lines = block.split("\n").map { it.trim() }.filter { it.length >= 3 }
             allCandidates.addAll(lines)
             if (lines.size > 1) {
-                allCandidates.add(block)
+                allCandidates.add(block.trim())
             }
         }
-        
-        // Also split rawText by newline to ensure any unblocked lines are checked
+
         val rawLines = ocrResult.rawText.split("\n").map { it.trim() }.filter { it.length >= 3 }
         allCandidates.addAll(rawLines)
 
-        // Prioritize candidates with question marks
-        val questionMarkCandidates = allCandidates.filter { it.contains("?") || it.contains("？") || it.contains("¿") }
+        // Deduplicate preserving chronological/visual scanning order
+        val distinctCandidates = allCandidates.distinct()
+
+        // 1. Prioritize candidates with question marks (from bottom to top, most recent first)
+        val questionMarkCandidates = distinctCandidates.filter {
+            it.contains("?") || it.contains("？") || it.contains("¿")
+        }
+
         for (candidate in questionMarkCandidates.asReversed()) {
-            val analysis = QuestionDetectionEngine.analyze(candidate, detectQuestionsOnly)
-            if (analysis.isQuestion) {
-                return analysis.copy(extractedQuestionText = candidate)
+            val rawAnalysis = QuestionDetectionEngine.analyze(candidate, detectQuestionsOnly)
+            if (rawAnalysis.isQuestion) {
+                return rawAnalysis.copy(extractedQuestionText = candidate)
+            }
+
+            // Also check stripped message (e.g. "Red (Detective): Who killed Blue?" -> "Who killed Blue?")
+            val stripped = stripChatSenderPrefix(candidate)
+            if (stripped != candidate && stripped.length >= 3) {
+                val strippedAnalysis = QuestionDetectionEngine.analyze(stripped, detectQuestionsOnly)
+                if (strippedAnalysis.isQuestion) {
+                    return strippedAnalysis.copy(extractedQuestionText = candidate)
+                }
             }
         }
 
-        // Check remaining candidates if detectQuestionsOnly is false or for math/intent expressions
-        for (candidate in allCandidates.asReversed()) {
-            val analysis = QuestionDetectionEngine.analyze(candidate, detectQuestionsOnly)
-            if (analysis.isQuestion) {
-                return analysis.copy(extractedQuestionText = candidate)
+        // 2. Check remaining candidates for math/intent expressions or general messages
+        for (candidate in distinctCandidates.asReversed()) {
+            val rawAnalysis = QuestionDetectionEngine.analyze(candidate, detectQuestionsOnly)
+            if (rawAnalysis.isQuestion) {
+                return rawAnalysis.copy(extractedQuestionText = candidate)
+            }
+
+            val stripped = stripChatSenderPrefix(candidate)
+            if (stripped != candidate && stripped.length >= 3) {
+                val strippedAnalysis = QuestionDetectionEngine.analyze(stripped, detectQuestionsOnly)
+                if (strippedAnalysis.isQuestion) {
+                    return strippedAnalysis.copy(extractedQuestionText = candidate)
+                }
             }
         }
 
         // Fallback: Analyze full combined text
-        val fullAnalysis = QuestionDetectionEngine.analyze(ocrResult.rawText, detectQuestionsOnly)
-        return fullAnalysis
+        return QuestionDetectionEngine.analyze(ocrResult.rawText, detectQuestionsOnly)
+    }
+
+    private fun stripChatSenderPrefix(text: String): String {
+        // Handle "Player: message", "[Player]: message", "(Role) Name: message"
+        if (text.contains(":")) {
+            val afterColon = text.substringAfter(":").trim()
+            if (afterColon.isNotBlank()) return afterColon
+        }
+        // Handle "[Player] message"
+        if (text.startsWith("[") && text.contains("]")) {
+            val afterBracket = text.substringAfter("]").trim()
+            if (afterBracket.isNotBlank()) return afterBracket
+        }
+        // Handle "(Player) message"
+        if (text.startsWith("(") && text.contains(")")) {
+            val afterParen = text.substringAfter(")").trim()
+            if (afterParen.isNotBlank()) return afterParen
+        }
+        return text
     }
 }

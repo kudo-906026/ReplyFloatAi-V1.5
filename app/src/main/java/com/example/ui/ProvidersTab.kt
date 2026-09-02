@@ -133,9 +133,18 @@ fun ProvidersTab(
     settings.providerApiKeys.forEach { (id, key) ->
         allProvidersMap[id]?.let { allProvidersMap[id] = it.copy(apiKey = key) }
     }
+    // Sync saved model overrides into provider objects
+    settings.providerModelOverrides.forEach { (id, model) ->
+        allProvidersMap[id]?.let { allProvidersMap[id] = it.copy(modelName = model) }
+    }
     if (settings.preferredProvider.apiKey.isNotBlank()) {
         allProvidersMap[settings.preferredProvider.id]?.let {
             allProvidersMap[settings.preferredProvider.id] = it.copy(apiKey = settings.preferredProvider.apiKey)
+        }
+    }
+    if (settings.preferredProvider.modelName.isNotBlank()) {
+        allProvidersMap[settings.preferredProvider.id]?.let {
+            allProvidersMap[settings.preferredProvider.id] = it.copy(modelName = settings.preferredProvider.modelName)
         }
     }
 
