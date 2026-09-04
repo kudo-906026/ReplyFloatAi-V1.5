@@ -344,6 +344,12 @@ data class DiagnosticLogEntry(
     val category: String,
     val reason: String,
     val detectionMethod: DetectionMethod = DetectionMethod.ACCESSIBILITY,
-    val latencyMs: Long? = null
+    val latencyMs: Long? = null,
+    // Explicit Screenshot & On-Device OCR Telemetry Fields
+    val screenshotCaptured: Boolean? = null,
+    val imageDimensions: String? = null,
+    val isImageBlank: Boolean? = null,
+    val ocrRawOutput: String? = null,
+    val ocrError: String? = null
 )
 

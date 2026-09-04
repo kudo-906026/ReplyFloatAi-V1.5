@@ -145,7 +145,12 @@ object AppStateManager {
         category: String,
         reason: String,
         detectionMethod: DetectionMethod = DetectionMethod.ACCESSIBILITY,
-        latencyMs: Long? = null
+        latencyMs: Long? = null,
+        screenshotCaptured: Boolean? = null,
+        imageDimensions: String? = null,
+        isImageBlank: Boolean? = null,
+        ocrRawOutput: String? = null,
+        ocrError: String? = null
     ) {
         val entry = DiagnosticLogEntry(
             source = source,
@@ -154,7 +159,12 @@ object AppStateManager {
             category = category,
             reason = reason,
             detectionMethod = detectionMethod,
-            latencyMs = latencyMs
+            latencyMs = latencyMs,
+            screenshotCaptured = screenshotCaptured,
+            imageDimensions = imageDimensions,
+            isImageBlank = isImageBlank,
+            ocrRawOutput = ocrRawOutput,
+            ocrError = ocrError
         )
         _diagnosticLogs.value = listOf(entry) + _diagnosticLogs.value.take(49)
     }
@@ -756,6 +766,7 @@ object AppStateManager {
         scope.launch(Dispatchers.Default) {
             val ocrResult = OcrRecognitionEngine.simulateCustomCanvasOcr(renderedText)
             val analysis = OcrRecognitionEngine.analyzeOcrOutput(ocrResult, _settings.value.detectQuestionsOnly)
+            val canvasDims = "900x450"
 
             if (!ocrResult.isSuccess || ocrResult.rawText.isBlank()) {
                 addDiagnosticLog(
@@ -763,9 +774,14 @@ object AppStateManager {
                     rawText = renderedText,
                     result = DetectionResultType.REJECTED,
                     category = "OCR_EMPTY",
-                    reason = "On-Device ML Kit OCR completed in ${ocrResult.latencyMs}ms but detected no readable text on screen. UI was never blocked.",
+                    reason = "Screenshot captured ($canvasDims, active canvas). On-Device ML Kit OCR completed in ${ocrResult.latencyMs}ms but detected 0 text blocks.",
                     detectionMethod = DetectionMethod.MLKIT_OCR,
-                    latencyMs = ocrResult.latencyMs
+                    latencyMs = ocrResult.latencyMs,
+                    screenshotCaptured = true,
+                    imageDimensions = canvasDims,
+                    isImageBlank = false,
+                    ocrRawOutput = if (ocrResult.rawText.isNotBlank()) ocrResult.rawText else "[Empty / 0 Blocks]",
+                    ocrError = ocrResult.errorMessage ?: "ML Kit extracted 0 text blocks from rendered canvas"
                 )
                 return@launch
             }
@@ -776,15 +792,34 @@ object AppStateManager {
                     rawText = ocrResult.rawText,
                     result = DetectionResultType.REJECTED,
                     category = analysis.category,
-                    reason = "On-Device ML Kit OCR extracted text in ${ocrResult.latencyMs}ms: ${analysis.reason}",
+                    reason = "Screenshot captured ($canvasDims). ML Kit extracted text in ${ocrResult.latencyMs}ms, but rejected by filter: ${analysis.reason}",
                     detectionMethod = DetectionMethod.MLKIT_OCR,
-                    latencyMs = ocrResult.latencyMs
+                    latencyMs = ocrResult.latencyMs,
+                    screenshotCaptured = true,
+                    imageDimensions = canvasDims,
+                    isImageBlank = false,
+                    ocrRawOutput = ocrResult.rawText,
+                    ocrError = null
                 )
                 return@launch
             }
 
             // On matched question from OCR fallback
             val questionText = if (analysis.extractedQuestionText.isNotBlank()) analysis.extractedQuestionText else ocrResult.rawText
+            addDiagnosticLog(
+                source = sourceApp,
+                rawText = questionText,
+                result = DetectionResultType.MATCHED,
+                category = analysis.category,
+                reason = "Screenshot captured ($canvasDims). ML Kit extracted ${ocrResult.detectedBlocks.size} blocks in ${ocrResult.latencyMs}ms. Question pattern matched.",
+                detectionMethod = DetectionMethod.MLKIT_OCR,
+                latencyMs = ocrResult.latencyMs,
+                screenshotCaptured = true,
+                imageDimensions = canvasDims,
+                isImageBlank = false,
+                ocrRawOutput = ocrResult.rawText,
+                ocrError = null
+            )
             launch(Dispatchers.Main) {
                 onQuestionDetected(
                     context = context,
@@ -805,11 +840,16 @@ object AppStateManager {
     fun simulateFlagSecureBlock(sourceApp: String = "Virtual Machine / Super Sus") {
         addDiagnosticLog(
             source = "$sourceApp (Screen Capture)",
-            rawText = "[Blank/Black Content]",
+            rawText = "[Blank/Black Content: 1080x2400]",
             result = DetectionResultType.REJECTED,
             category = "FLAG_SECURE_BLOCKED",
-            reason = "Screen capture blocked by target app (FLAG_SECURE) — OCR unavailable for this app",
-            detectionMethod = DetectionMethod.MLKIT_OCR
+            reason = "Screenshot captured (1080x2400), but frame buffer contains 100% black pixels (#FF000000). Target app enforces FLAG_SECURE window masking.",
+            detectionMethod = DetectionMethod.MLKIT_OCR,
+            screenshotCaptured = true,
+            imageDimensions = "1080x2400",
+            isImageBlank = true,
+            ocrRawOutput = "[Blank Screen - ML Kit bypassed]",
+            ocrError = "FLAG_SECURE window policy enforced by target app. Android OS masks window pixels with pure black dummy buffer."
         )
     }
 }

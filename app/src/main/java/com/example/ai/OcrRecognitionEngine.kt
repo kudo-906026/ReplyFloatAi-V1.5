@@ -23,6 +23,15 @@ data class OcrRecognitionResult(
     val detectedBlocks: List<String> = emptyList()
 )
 
+data class BitmapAnalysisResult(
+    val isBlankOrBlack: Boolean,
+    val width: Int,
+    val height: Int,
+    val samplePixelCount: Int,
+    val hasVisibleColor: Boolean,
+    val details: String
+)
+
 object OcrRecognitionEngine {
 
     // Lazy initialization of the on-device ML Kit text recognizer client (Latin script)
@@ -31,15 +40,24 @@ object OcrRecognitionEngine {
     }
 
     /**
-     * Evaluates a sampled array of ARGB_8888 pixel values to detect whether screen capture returned
-     * pure black, uniform, or blank content characteristic of FLAG_SECURE window protection.
+     * Analyzes a sample pixel buffer and returns structured inspection telemetry.
      */
-    fun isPixelArrayBlankOrBlack(pixels: IntArray): Boolean {
-        if (pixels.isEmpty()) return true
+    fun analyzePixelArray(pixels: IntArray, width: Int = 0, height: Int = 0): BitmapAnalysisResult {
+        if (pixels.isEmpty()) {
+            return BitmapAnalysisResult(
+                isBlankOrBlack = true,
+                width = width,
+                height = height,
+                samplePixelCount = 0,
+                hasVisibleColor = false,
+                details = "Sample buffer is empty (0 pixels)"
+            )
+        }
 
         val firstPixel = pixels[0]
         var allIdentical = true
         var hasVisibleColor = false
+        var coloredPixelCount = 0
 
         for (pixel in pixels) {
             if (pixel != firstPixel) {
@@ -53,20 +71,57 @@ object OcrRecognitionEngine {
             // A pixel has visible non-black content if it is sufficiently opaque and has visible luminance/color
             if (alpha > 15 && (red > 15 || green > 15 || blue > 15)) {
                 hasVisibleColor = true
+                coloredPixelCount++
             }
         }
 
-        return allIdentical || !hasVisibleColor
+        val isBlank = allIdentical || !hasVisibleColor
+        val details = if (isBlank) {
+            if (allIdentical) {
+                val hex = String.format("#%08X", firstPixel)
+                "${width}x${height} px: 100% solid uniform color ($hex). FLAG_SECURE window masking active."
+            } else {
+                "${width}x${height} px: Completely black frame (0 colored pixels). FLAG_SECURE window masking active."
+            }
+        } else {
+            "${width}x${height} px: Active game graphics ($coloredPixelCount/${pixels.size} colored sample pixels)."
+        }
+
+        return BitmapAnalysisResult(
+            isBlankOrBlack = isBlank,
+            width = width,
+            height = height,
+            samplePixelCount = pixels.size,
+            hasVisibleColor = hasVisibleColor,
+            details = details
+        )
     }
 
     /**
-     * Checks whether a screenshot bitmap contains blank, completely black, or uniform protected content,
-     * which is the characteristic behavior of Android's FLAG_SECURE window protection or blank SurfaceViews.
+     * Evaluates a sampled array of ARGB_8888 pixel values to detect whether screen capture returned
+     * pure black, uniform, or blank content characteristic of FLAG_SECURE window protection.
      */
-    fun isBitmapBlankOrBlack(bitmap: Bitmap): Boolean {
+    fun isPixelArrayBlankOrBlack(pixels: IntArray): Boolean {
+        return analyzePixelArray(pixels).isBlankOrBlack
+    }
+
+    /**
+     * Performs in-depth pixel telemetry analysis on the captured screenshot bitmap,
+     * diagnosing whether the buffer contains real game graphics or an OS-masked FLAG_SECURE frame.
+     */
+    fun analyzeBitmapContent(bitmap: Bitmap): BitmapAnalysisResult {
         val width = try { bitmap.width } catch (_: Exception) { 0 }
         val height = try { bitmap.height } catch (_: Exception) { 0 }
-        if (width <= 0 || height <= 0) return true
+        if (width <= 0 || height <= 0) {
+            return BitmapAnalysisResult(
+                isBlankOrBlack = true,
+                width = 0,
+                height = 0,
+                samplePixelCount = 0,
+                hasVisibleColor = false,
+                details = "Invalid bitmap dimensions (${width}x${height})"
+            )
+        }
 
         return try {
             val sampleSize = 64
@@ -75,10 +130,25 @@ object OcrRecognitionEngine {
             thumb.getPixels(pixels, 0, sampleSize, 0, 0, sampleSize, sampleSize)
             thumb.recycle()
 
-            isPixelArrayBlankOrBlack(pixels)
-        } catch (_: Exception) {
-            true
+            analyzePixelArray(pixels, width, height)
+        } catch (e: Exception) {
+            BitmapAnalysisResult(
+                isBlankOrBlack = true,
+                width = width,
+                height = height,
+                samplePixelCount = 0,
+                hasVisibleColor = false,
+                details = "Error sampling bitmap pixels: ${e.message ?: "unknown"}"
+            )
         }
+    }
+
+    /**
+     * Checks whether a screenshot bitmap contains blank, completely black, or uniform protected content,
+     * which is the characteristic behavior of Android's FLAG_SECURE window protection or blank SurfaceViews.
+     */
+    fun isBitmapBlankOrBlack(bitmap: Bitmap): Boolean {
+        return analyzeBitmapContent(bitmap).isBlankOrBlack
     }
 
     /**

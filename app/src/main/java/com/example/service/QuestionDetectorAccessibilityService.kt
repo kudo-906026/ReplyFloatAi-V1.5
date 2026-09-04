@@ -261,6 +261,9 @@ class QuestionDetectorAccessibilityService : AccessibilityService() {
                         override fun onSuccess(screenshotResult: ScreenshotResult) {
                             val hardwareBuffer = screenshotResult.hardwareBuffer
                             val colorSpace = screenshotResult.colorSpace
+                            val bufferWidth = try { hardwareBuffer.width } catch (_: Exception) { 0 }
+                            val bufferHeight = try { hardwareBuffer.height } catch (_: Exception) { 0 }
+
                             val bitmap = try {
                                 Bitmap.wrapHardwareBuffer(hardwareBuffer, colorSpace)
                             } catch (_: Exception) {
@@ -277,53 +280,97 @@ class QuestionDetectorAccessibilityService : AccessibilityService() {
                                 }
 
                                 if (softwareCopy != null) {
+                                    val bitmapAnalysis = OcrRecognitionEngine.analyzeBitmapContent(softwareCopy)
+                                    val dims = "${bitmapAnalysis.width}x${bitmapAnalysis.height}"
+
                                     // Check if screenshot returned blank/black content consistent with FLAG_SECURE blocking
-                                    if (OcrRecognitionEngine.isBitmapBlankOrBlack(softwareCopy)) {
+                                    if (bitmapAnalysis.isBlankOrBlack) {
                                         isOcrProcessing = false
                                         AppStateManager.addDiagnosticLog(
                                             source = "$appName (Screen Capture)",
-                                            rawText = "[Blank/Black Content]",
+                                            rawText = "[Blank/Black Content: $dims]",
                                             result = DetectionResultType.REJECTED,
                                             category = "FLAG_SECURE_BLOCKED",
-                                            reason = "Screen capture blocked by target app (FLAG_SECURE) — OCR unavailable for this app",
-                                            detectionMethod = DetectionMethod.MLKIT_OCR
+                                            reason = "Screenshot captured successfully ($dims), but frame buffer is blank/black. ${bitmapAnalysis.details}",
+                                            detectionMethod = DetectionMethod.MLKIT_OCR,
+                                            screenshotCaptured = true,
+                                            imageDimensions = dims,
+                                            isImageBlank = true,
+                                            ocrRawOutput = "[Blank Screen - ML Kit bypassed]",
+                                            ocrError = "FLAG_SECURE window protection detected. Android WindowManager masked game surface with solid black/uniform dummy buffer."
                                         )
                                         return
                                     }
 
-                                    // Process entirely on background coroutine
+                                    // Screenshot captured with real graphics! Process entirely on background coroutine
                                     serviceScope.launch(Dispatchers.Default) {
                                         try {
-                                            runOcrProcessingOnBackground(softwareCopy, appName, pkgName)
+                                            runOcrProcessingOnBackground(softwareCopy, appName, pkgName, bitmapAnalysis)
                                         } finally {
                                             isOcrProcessing = false
                                         }
                                     }
                                     return
+                                } else {
+                                    isOcrProcessing = false
+                                    AppStateManager.addDiagnosticLog(
+                                        source = "$appName (Screen Capture)",
+                                        rawText = "[Hardware Bitmap Copy Failed: ${bufferWidth}x${bufferHeight}]",
+                                        result = DetectionResultType.REJECTED,
+                                        category = "BITMAP_CONVERT_FAILED",
+                                        reason = "Screenshot captured (${bufferWidth}x${bufferHeight} px), but software ARGB_8888 copy failed.",
+                                        detectionMethod = DetectionMethod.MLKIT_OCR,
+                                        screenshotCaptured = true,
+                                        imageDimensions = "${bufferWidth}x${bufferHeight}",
+                                        isImageBlank = null,
+                                        ocrRawOutput = null,
+                                        ocrError = "Bitmap.copy(ARGB_8888) returned null"
+                                    )
+                                    return
                                 }
                             }
 
-                            // Null content returned from hardware buffer (consistent with FLAG_SECURE blocking)
+                            // Null content returned from hardware buffer
                             isOcrProcessing = false
                             AppStateManager.addDiagnosticLog(
                                 source = "$appName (Screen Capture)",
-                                rawText = "[Null Content]",
+                                rawText = "[Null Bitmap from Hardware Buffer]",
                                 result = DetectionResultType.REJECTED,
-                                category = "FLAG_SECURE_BLOCKED",
-                                reason = "Screen capture blocked by target app (FLAG_SECURE) — OCR unavailable for this app",
-                                detectionMethod = DetectionMethod.MLKIT_OCR
+                                category = "HARDWARE_BUFFER_NULL",
+                                reason = "Screenshot returned hardware buffer (${bufferWidth}x${bufferHeight} px), but wrapping into Bitmap returned null.",
+                                detectionMethod = DetectionMethod.MLKIT_OCR,
+                                screenshotCaptured = false,
+                                imageDimensions = if (bufferWidth > 0) "${bufferWidth}x${bufferHeight}" else null,
+                                isImageBlank = null,
+                                ocrRawOutput = null,
+                                ocrError = "Bitmap.wrapHardwareBuffer failed"
                             )
                         }
 
                         override fun onFailure(errorCode: Int) {
                             isOcrProcessing = false
+                            val (errorName, errorExplanation) = when (errorCode) {
+                                1 -> "INTERNAL_ERROR (1)" to "Android OS internal failure or driver restriction."
+                                2 -> "NO_ACCESSIBILITY_ACCESS (2)" to "Screen capture denied by Android WindowManager (target app enforces FLAG_SECURE or lacks capture permission)."
+                                3 -> "INTERVAL_TIME_SHORT (3)" to "Screenshots requested too rapidly (throttled by system rate-limiter)."
+                                4 -> "INVALID_DISPLAY (4)" to "Default display ID is invalid or not available."
+                                5 -> "INVALID_WINDOW (5)" to "Target window detached or secured."
+                                else -> "ERROR_CODE_$errorCode" to "Unknown capture failure code."
+                            }
+
+                            val isFlagSecure = errorCode == 2
                             AppStateManager.addDiagnosticLog(
                                 source = "$appName (Screen Capture)",
-                                rawText = "[Capture Code: $errorCode]",
+                                rawText = "[Capture Failed: $errorName]",
                                 result = DetectionResultType.REJECTED,
-                                category = "FLAG_SECURE_BLOCKED",
-                                reason = "Screen capture blocked by target app (FLAG_SECURE) — OCR unavailable for this app",
-                                detectionMethod = DetectionMethod.MLKIT_OCR
+                                category = if (isFlagSecure) "FLAG_SECURE_BLOCKED" else "SCREENSHOT_FAILED",
+                                reason = "AccessibilityService.takeScreenshot failed ($errorName): $errorExplanation",
+                                detectionMethod = DetectionMethod.MLKIT_OCR,
+                                screenshotCaptured = false,
+                                imageDimensions = null,
+                                isImageBlank = null,
+                                ocrRawOutput = null,
+                                ocrError = "takeScreenshot onFailure($errorCode): $errorExplanation"
                             )
                         }
                     }
@@ -332,11 +379,16 @@ class QuestionDetectorAccessibilityService : AccessibilityService() {
                 isOcrProcessing = false
                 AppStateManager.addDiagnosticLog(
                     source = "$appName (Screen Capture)",
-                    rawText = "[Capture Exception: ${e.message ?: "error"}]",
+                    rawText = "[Capture Exception: ${e.javaClass.simpleName}]",
                     result = DetectionResultType.REJECTED,
-                    category = "FLAG_SECURE_BLOCKED",
-                    reason = "Screen capture blocked by target app (FLAG_SECURE) — OCR unavailable for this app",
-                    detectionMethod = DetectionMethod.MLKIT_OCR
+                    category = "SCREENSHOT_EXCEPTION",
+                    reason = "takeScreenshot threw exception: ${e.localizedMessage ?: e.message ?: "Unknown error"}",
+                    detectionMethod = DetectionMethod.MLKIT_OCR,
+                    screenshotCaptured = false,
+                    imageDimensions = null,
+                    isImageBlank = null,
+                    ocrRawOutput = null,
+                    ocrError = "${e.javaClass.name}: ${e.message}"
                 )
             }
         } else {
@@ -352,12 +404,19 @@ class QuestionDetectorAccessibilityService : AccessibilityService() {
         }
     }
 
-    private suspend fun runOcrProcessingOnBackground(bitmap: Bitmap, appName: String, pkgName: String) {
+    private suspend fun runOcrProcessingOnBackground(
+        bitmap: Bitmap,
+        appName: String,
+        pkgName: String,
+        bitmapAnalysis: com.example.ai.BitmapAnalysisResult
+    ) {
+        val dimensions = "${bitmapAnalysis.width}x${bitmapAnalysis.height}"
         val ocrResult = OcrRecognitionEngine.recognizeTextFromBitmap(bitmap)
         val settings = AppStateManager.settings.value
         val analysis = OcrRecognitionEngine.analyzeOcrOutput(ocrResult, settings.detectQuestionsOnly)
         val detectedQuestionText = if (analysis.extractedQuestionText.isNotBlank()) analysis.extractedQuestionText else ocrResult.rawText
         val hasQuestionMark = detectedQuestionText.contains("?") || detectedQuestionText.contains("？") || detectedQuestionText.contains("¿")
+        val hasExtractedText = ocrResult.rawText.isNotBlank()
 
         if (analysis.isQuestion && (hasQuestionMark || !settings.detectQuestionsOnly) && detectedQuestionText.isNotBlank()) {
             if (detectedQuestionText != lastProcessedText) {
@@ -372,20 +431,49 @@ class QuestionDetectorAccessibilityService : AccessibilityService() {
                     ocrLatencyMs = ocrResult.latencyMs
                 )
             }
-        } else {
-            // Log rejection diagnostic clearly identifying ML Kit OCR Fallback
             AppStateManager.addDiagnosticLog(
-                source = "$appName (ML Kit OCR Fallback)",
-                rawText = if (ocrResult.rawText.isNotBlank()) ocrResult.rawText else "[No OCR Text in Image]",
-                result = DetectionResultType.REJECTED,
+                source = "$appName (ML Kit OCR)",
+                rawText = detectedQuestionText,
+                result = DetectionResultType.MATCHED,
                 category = analysis.category,
-                reason = if (ocrResult.rawText.isBlank()) {
-                    "Accessibility returned 0 nodes. ML Kit OCR scanned screen in ${ocrResult.latencyMs}ms but found no readable text."
-                } else {
-                    "Accessibility returned 0 nodes. ML Kit OCR extracted text in ${ocrResult.latencyMs}ms: ${analysis.reason}"
-                },
+                reason = "Screenshot captured ($dimensions, ${bitmapAnalysis.details}). ML Kit extracted ${ocrResult.detectedBlocks.size} blocks (${ocrResult.rawText.length} chars) in ${ocrResult.latencyMs}ms. Question pattern matched.",
                 detectionMethod = DetectionMethod.MLKIT_OCR,
-                latencyMs = ocrResult.latencyMs
+                latencyMs = ocrResult.latencyMs,
+                screenshotCaptured = true,
+                imageDimensions = dimensions,
+                isImageBlank = false,
+                ocrRawOutput = ocrResult.rawText,
+                ocrError = null
+            )
+        } else {
+            val category = when {
+                !ocrResult.isSuccess -> "OCR_EXTRACTION_ERROR"
+                !hasExtractedText -> "OCR_ZERO_TEXT_DETECTED"
+                else -> analysis.category
+            }
+
+            val reason = when {
+                !ocrResult.isSuccess ->
+                    "Screenshot captured ($dimensions), but ML Kit TextRecognition failed in ${ocrResult.latencyMs}ms: ${ocrResult.errorMessage ?: "Unknown error"}"
+                !hasExtractedText ->
+                    "Screenshot captured ($dimensions, active game graphics), but ML Kit recognized 0 text blocks in ${ocrResult.latencyMs}ms. The game screen has no machine-readable Latin text glyphs."
+                else ->
+                    "Screenshot captured ($dimensions). ML Kit successfully extracted ${ocrResult.detectedBlocks.size} blocks (${ocrResult.rawText.length} chars) in ${ocrResult.latencyMs}ms, but text was rejected: ${analysis.reason}"
+            }
+
+            AppStateManager.addDiagnosticLog(
+                source = "$appName (ML Kit OCR)",
+                rawText = if (hasExtractedText) ocrResult.rawText else "[0 text blocks extracted]",
+                result = DetectionResultType.REJECTED,
+                category = category,
+                reason = reason,
+                detectionMethod = DetectionMethod.MLKIT_OCR,
+                latencyMs = ocrResult.latencyMs,
+                screenshotCaptured = true,
+                imageDimensions = dimensions,
+                isImageBlank = false,
+                ocrRawOutput = if (hasExtractedText) ocrResult.rawText else "[Empty / 0 Blocks]",
+                ocrError = if (!ocrResult.isSuccess) ocrResult.errorMessage else if (!hasExtractedText) "ML Kit returned 0 text blocks on active game canvas" else null
             )
         }
     }

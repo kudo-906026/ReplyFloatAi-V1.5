@@ -216,13 +216,28 @@ fun DiagnosticsTab(
     // Check for FLAG_SECURE window blocking (e.g. Virtual Machine or protected game)
     val recentFlagSecure = diagnosticLogs.firstOrNull { it.category == "FLAG_SECURE_BLOCKED" }
     if (recentFlagSecure != null) {
+        val dims = recentFlagSecure.imageDimensions ?: "captured frame"
         detectedIssues.add(
             SystemIssueInfo(
                 component = "Target Window (${recentFlagSecure.source})",
                 statusCode = "FLAG_SECURE_BLOCKED",
                 isCritical = false,
-                explanation = "Screen capture blocked by target app (FLAG_SECURE) — OCR unavailable for this app.",
+                explanation = "Screen capture blocked by target app (FLAG_SECURE). OS returned blank/black $dims frame buffer.",
                 suggestedFix = "Target app/VM enforces Android's FLAG_SECURE window policy. Screen capture returns black/null pixels at the OS level; this is an Android platform security limitation, not an app bug."
+            )
+        )
+    }
+
+    // Check for ML Kit extraction errors
+    val recentOcrError = diagnosticLogs.firstOrNull { it.category == "OCR_EXTRACTION_ERROR" }
+    if (recentOcrError != null) {
+        detectedIssues.add(
+            SystemIssueInfo(
+                component = "On-Device ML Kit OCR",
+                statusCode = "EXTRACTION_ERROR",
+                isCritical = true,
+                explanation = "ML Kit text recognition failed: ${recentOcrError.ocrError ?: recentOcrError.reason}",
+                suggestedFix = "Check on-device ML Kit model initialization or bitmap format compatibility."
             )
         )
     }
@@ -242,7 +257,7 @@ fun DiagnosticsTab(
     val filteredLogs = remember(diagnosticLogs, selectedFilter) {
         when (selectedFilter) {
             DiagnosticFilter.ALL -> diagnosticLogs
-            DiagnosticFilter.FAILOVERS -> diagnosticLogs.filter { it.category in listOf("AUTH_FAILURE", "QUOTA_EXCEEDED", "NO_API_KEY", "PROVIDER_ERROR", "BAD_REQUEST", "MODEL_NOT_FOUND", "EMPTY_RESPONSE", "FAILOVER", "FLAG_SECURE_BLOCKED") || it.reason.contains("fallback", ignoreCase = true) || it.reason.contains("fail", ignoreCase = true) || it.reason.contains("FLAG_SECURE", ignoreCase = true) }
+            DiagnosticFilter.FAILOVERS -> diagnosticLogs.filter { it.category in listOf("AUTH_FAILURE", "QUOTA_EXCEEDED", "NO_API_KEY", "PROVIDER_ERROR", "BAD_REQUEST", "MODEL_NOT_FOUND", "EMPTY_RESPONSE", "FAILOVER", "FLAG_SECURE_BLOCKED", "SCREENSHOT_FAILED", "OCR_EXTRACTION_ERROR", "OCR_ZERO_TEXT_DETECTED") || it.reason.contains("fallback", ignoreCase = true) || it.reason.contains("fail", ignoreCase = true) || it.reason.contains("FLAG_SECURE", ignoreCase = true) || it.reason.contains("blocked", ignoreCase = true) }
             DiagnosticFilter.MATCHED -> diagnosticLogs.filter { it.result == DetectionResultType.MATCHED }
             DiagnosticFilter.OCR_FALLBACK -> diagnosticLogs.filter { it.detectionMethod == DetectionMethod.MLKIT_OCR }
             DiagnosticFilter.ACCESSIBILITY -> diagnosticLogs.filter { it.detectionMethod == DetectionMethod.ACCESSIBILITY }
@@ -844,7 +859,7 @@ fun DiagnosticsTab(
                                             modifier = Modifier.fillMaxWidth()
                                         )
 
-                                        Text(
+                                         Text(
                                             text = if (isError) "Diagnostic: ${log.reason}" else "Reason: ${log.reason}",
                                             fontSize = 10.5.sp,
                                             fontWeight = if (isError) FontWeight.SemiBold else FontWeight.Normal,
@@ -858,6 +873,181 @@ fun DiagnosticsTab(
                                             overflow = TextOverflow.Ellipsis,
                                             modifier = Modifier.fillMaxWidth()
                                         )
+
+                                        // Explicit OCR & Screen Capture Telemetry Inspector Box
+                                        if (log.detectionMethod == DetectionMethod.MLKIT_OCR || log.screenshotCaptured != null) {
+                                            Surface(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .clip(RoundedCornerShape(6.dp)),
+                                                shape = RoundedCornerShape(6.dp),
+                                                color = DarkBg,
+                                                border = BorderStroke(
+                                                    1.dp,
+                                                    when {
+                                                        log.isImageBlank == true || log.category == "FLAG_SECURE_BLOCKED" -> CrimsonPrimary.copy(alpha = 0.6f)
+                                                        log.ocrError != null -> CrimsonPrimary.copy(alpha = 0.5f)
+                                                        log.result == DetectionResultType.MATCHED -> TechGreen.copy(alpha = 0.5f)
+                                                        else -> AccentPurple.copy(alpha = 0.35f)
+                                                    }
+                                                )
+                                            ) {
+                                                Column(
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .padding(8.dp),
+                                                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                                                ) {
+                                                    Row(
+                                                        verticalAlignment = Alignment.CenterVertically,
+                                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                                    ) {
+                                                        Icon(
+                                                            imageVector = Icons.Default.CameraAlt,
+                                                            contentDescription = null,
+                                                            modifier = Modifier.size(13.dp),
+                                                            tint = when {
+                                                                log.isImageBlank == true || log.category == "FLAG_SECURE_BLOCKED" -> CrimsonLight
+                                                                log.screenshotCaptured == true -> TechGreen
+                                                                else -> AccentYellow
+                                                            }
+                                                        )
+                                                        Text(
+                                                            text = "OCR ATTEMPT TELEMETRY",
+                                                            fontFamily = FontFamily.Monospace,
+                                                            fontSize = 9.5.sp,
+                                                            fontWeight = FontWeight.Bold,
+                                                            letterSpacing = 0.5.sp,
+                                                            color = when {
+                                                                log.isImageBlank == true || log.category == "FLAG_SECURE_BLOCKED" -> CrimsonLight
+                                                                log.screenshotCaptured == true -> TechGreen
+                                                                else -> AccentYellow
+                                                            }
+                                                        )
+                                                    }
+
+                                                    HorizontalDivider(
+                                                        color = DarkCardBorder,
+                                                        thickness = 0.5.dp,
+                                                        modifier = Modifier.padding(vertical = 2.dp)
+                                                    )
+
+                                                    // 1) Screenshot Captured & Dimensions
+                                                    Row(
+                                                        modifier = Modifier.fillMaxWidth(),
+                                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                                        verticalAlignment = Alignment.CenterVertically
+                                                    ) {
+                                                        Text(
+                                                            text = "1. Screenshot Captured:",
+                                                            fontSize = 10.sp,
+                                                            fontFamily = FontFamily.Monospace,
+                                                            fontWeight = FontWeight.SemiBold,
+                                                            color = TextSecondary
+                                                        )
+                                                        Text(
+                                                            text = when (log.screenshotCaptured) {
+                                                                true -> "YES (${log.imageDimensions ?: "active px"})"
+                                                                false -> "FAILED"
+                                                                null -> "N/A"
+                                                            },
+                                                            fontSize = 10.sp,
+                                                            fontFamily = FontFamily.Monospace,
+                                                            fontWeight = FontWeight.Bold,
+                                                            color = if (log.screenshotCaptured == true) TechGreen else CrimsonPrimary
+                                                        )
+                                                    }
+
+                                                    // Blank / Black frame status (FLAG_SECURE check)
+                                                    Row(
+                                                        modifier = Modifier.fillMaxWidth(),
+                                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                                        verticalAlignment = Alignment.CenterVertically
+                                                    ) {
+                                                        Text(
+                                                            text = "   Blank / Black Frame:",
+                                                            fontSize = 10.sp,
+                                                            fontFamily = FontFamily.Monospace,
+                                                            color = TextSecondary
+                                                        )
+                                                        Text(
+                                                            text = when (log.isImageBlank) {
+                                                                true -> "YES (FLAG_SECURE Masking)"
+                                                                false -> "NO (Active Game Pixels)"
+                                                                null -> if (log.screenshotCaptured == false) "N/A (No Frame)" else "Unknown"
+                                                            },
+                                                            fontSize = 10.sp,
+                                                            fontFamily = FontFamily.Monospace,
+                                                            fontWeight = FontWeight.Bold,
+                                                            color = when (log.isImageBlank) {
+                                                                true -> CrimsonPrimary
+                                                                false -> TechGreen
+                                                                null -> TextMuted
+                                                            }
+                                                        )
+                                                    }
+
+                                                    // 2) ML Kit Raw Extracted Text
+                                                    Column(
+                                                        modifier = Modifier
+                                                            .fillMaxWidth()
+                                                            .padding(top = 2.dp),
+                                                        verticalArrangement = Arrangement.spacedBy(2.dp)
+                                                    ) {
+                                                        Text(
+                                                            text = "2. ML Kit Raw Extracted Text:",
+                                                            fontSize = 10.sp,
+                                                            fontFamily = FontFamily.Monospace,
+                                                            fontWeight = FontWeight.SemiBold,
+                                                            color = AccentPurple
+                                                        )
+                                                        Surface(
+                                                            modifier = Modifier
+                                                                .fillMaxWidth()
+                                                                .clip(RoundedCornerShape(4.dp)),
+                                                            shape = RoundedCornerShape(4.dp),
+                                                            color = DarkSurfaceVariant,
+                                                            border = BorderStroke(0.5.dp, DarkCardBorder)
+                                                        ) {
+                                                            Text(
+                                                                text = if (!log.ocrRawOutput.isNullOrBlank()) log.ocrRawOutput else "[No text extracted by ML Kit]",
+                                                                fontSize = 10.sp,
+                                                                fontFamily = FontFamily.Monospace,
+                                                                color = if (!log.ocrRawOutput.isNullOrBlank()) TextWhite else TextMuted,
+                                                                maxLines = 5,
+                                                                overflow = TextOverflow.Ellipsis,
+                                                                modifier = Modifier.padding(6.dp)
+                                                            )
+                                                        }
+                                                    }
+
+                                                    // 3) Error / Specific Extraction Failure
+                                                    if (!log.ocrError.isNullOrBlank()) {
+                                                        Column(
+                                                            modifier = Modifier
+                                                                .fillMaxWidth()
+                                                                .padding(top = 2.dp),
+                                                            verticalArrangement = Arrangement.spacedBy(2.dp)
+                                                        ) {
+                                                            Text(
+                                                                text = "3. Failure / Extraction Issue:",
+                                                                fontSize = 10.sp,
+                                                                fontFamily = FontFamily.Monospace,
+                                                                fontWeight = FontWeight.SemiBold,
+                                                                color = CrimsonLight
+                                                            )
+                                                            Text(
+                                                                text = log.ocrError,
+                                                                fontSize = 9.5.sp,
+                                                                fontFamily = FontFamily.Monospace,
+                                                                color = CrimsonLight,
+                                                                lineHeight = 13.sp
+                                                            )
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
                                     }
                                 }
                             }
