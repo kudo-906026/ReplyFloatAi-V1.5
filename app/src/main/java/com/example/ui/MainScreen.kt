@@ -199,14 +199,27 @@ fun MainScreen() {
                                     color = TextWhite,
                                     letterSpacing = 0.5.sp
                                 )
-                                Text(
-                                    text = "INTELLIGENT OVERLAY DAEMON",
-                                    fontFamily = FontFamily.Monospace,
-                                    fontSize = 8.5.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = TextSecondary,
-                                    letterSpacing = 0.8.sp
-                                )
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Text(
+                                        text = "INTELLIGENT OVERLAY DAEMON",
+                                        fontFamily = FontFamily.Monospace,
+                                        fontSize = 8.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = TextSecondary,
+                                        letterSpacing = 0.6.sp
+                                    )
+                                    Text(
+                                        text = "by Kudo_",
+                                        fontFamily = FontFamily.Monospace,
+                                        fontSize = 8.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = CrimsonLight,
+                                        letterSpacing = 0.4.sp
+                                    )
+                                }
                             }
                         }
 
