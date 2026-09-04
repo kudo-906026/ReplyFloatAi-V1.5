@@ -797,4 +797,19 @@ object AppStateManager {
             }
         }
     }
+
+    /**
+     * Simulates an Android FLAG_SECURE window restriction (e.g. VM container or anti-cheat protected game)
+     * where screen capture returns black/blank/null buffer.
+     */
+    fun simulateFlagSecureBlock(sourceApp: String = "Virtual Machine / Super Sus") {
+        addDiagnosticLog(
+            source = "$sourceApp (Screen Capture)",
+            rawText = "[Blank/Black Content]",
+            result = DetectionResultType.REJECTED,
+            category = "FLAG_SECURE_BLOCKED",
+            reason = "Screen capture blocked by target app (FLAG_SECURE) — OCR unavailable for this app",
+            detectionMethod = DetectionMethod.MLKIT_OCR
+        )
+    }
 }

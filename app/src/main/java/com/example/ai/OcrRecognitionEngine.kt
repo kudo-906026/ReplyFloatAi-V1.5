@@ -31,6 +31,57 @@ object OcrRecognitionEngine {
     }
 
     /**
+     * Evaluates a sampled array of ARGB_8888 pixel values to detect whether screen capture returned
+     * pure black, uniform, or blank content characteristic of FLAG_SECURE window protection.
+     */
+    fun isPixelArrayBlankOrBlack(pixels: IntArray): Boolean {
+        if (pixels.isEmpty()) return true
+
+        val firstPixel = pixels[0]
+        var allIdentical = true
+        var hasVisibleColor = false
+
+        for (pixel in pixels) {
+            if (pixel != firstPixel) {
+                allIdentical = false
+            }
+            val alpha = (pixel ushr 24) and 0xFF
+            val red = (pixel ushr 16) and 0xFF
+            val green = (pixel ushr 8) and 0xFF
+            val blue = pixel and 0xFF
+
+            // A pixel has visible non-black content if it is sufficiently opaque and has visible luminance/color
+            if (alpha > 15 && (red > 15 || green > 15 || blue > 15)) {
+                hasVisibleColor = true
+            }
+        }
+
+        return allIdentical || !hasVisibleColor
+    }
+
+    /**
+     * Checks whether a screenshot bitmap contains blank, completely black, or uniform protected content,
+     * which is the characteristic behavior of Android's FLAG_SECURE window protection or blank SurfaceViews.
+     */
+    fun isBitmapBlankOrBlack(bitmap: Bitmap): Boolean {
+        val width = try { bitmap.width } catch (_: Exception) { 0 }
+        val height = try { bitmap.height } catch (_: Exception) { 0 }
+        if (width <= 0 || height <= 0) return true
+
+        return try {
+            val sampleSize = 64
+            val thumb = Bitmap.createScaledBitmap(bitmap, sampleSize, sampleSize, false)
+            val pixels = IntArray(sampleSize * sampleSize)
+            thumb.getPixels(pixels, 0, sampleSize, 0, 0, sampleSize, sampleSize)
+            thumb.recycle()
+
+            isPixelArrayBlankOrBlack(pixels)
+        } catch (_: Exception) {
+            true
+        }
+    }
+
+    /**
      * Executes On-Device ML Kit Text Recognition entirely on a background coroutine thread (Dispatchers.Default).
      * This guarantees that screen rendering and UI interaction are NEVER blocked.
      */

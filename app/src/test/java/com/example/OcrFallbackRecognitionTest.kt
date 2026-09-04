@@ -160,4 +160,44 @@ class OcrFallbackRecognitionTest {
         assertNotNull("Super Sus Global (com.piogame.supersus) must be included in default whitelisted apps", superSusGlobal)
         assertTrue("Super Sus Global (com.piogame.supersus) must be enabled by default", superSusGlobal?.isEnabled == true)
     }
+
+    @Test
+    fun testOcrEngine_DetectsBlankOrBlackProtectedPixels() {
+        // 1. Completely blank/black pixel buffer (such as returned when FLAG_SECURE blanks out window content)
+        val blackPixels = IntArray(64 * 64) { 0 }
+        val isBlackProtected = OcrRecognitionEngine.isPixelArrayBlankOrBlack(blackPixels)
+        assertTrue("Completely black/blank pixel buffer must be identified as blank/protected content", isBlackProtected)
+
+        // 2. Uniform solid color pixel buffer (all identical pixels)
+        val solidPixels = IntArray(64 * 64) { -1 } // 0xFFFFFFFF
+        val isSolidProtected = OcrRecognitionEngine.isPixelArrayBlankOrBlack(solidPixels)
+        assertTrue("Uniform solid non-content pixel buffer must be identified as blank/protected", isSolidProtected)
+
+        // 3. Normal pixel buffer with contrast, colored text or shapes
+        val activePixels = IntArray(64 * 64) { 0xFF141820.toInt() }
+        // Introduce visible text/shape foreground pixels
+        for (i in 100..150) {
+            activePixels[i] = 0xFF00E5FF.toInt() // Bright cyan text pixel
+        }
+        val isActiveProtected = OcrRecognitionEngine.isPixelArrayBlankOrBlack(activePixels)
+        assertFalse("Pixel buffer with visible text/contrast must not be treated as blank", isActiveProtected)
+    }
+
+    @Test
+    fun testDiagnosticLogging_FlagSecureLogsClearAppLevelRestrictionReason() {
+        AppStateManager.clearDiagnosticLogs()
+
+        AppStateManager.simulateFlagSecureBlock("Super Sus (VM Container)")
+
+        val logs = AppStateManager.diagnosticLogs.value
+        assertEquals(1, logs.size)
+
+        val log = logs.first()
+        assertEquals("FLAG_SECURE_BLOCKED", log.category)
+        assertEquals(DetectionResultType.REJECTED, log.result)
+        assertEquals(
+            "Screen capture blocked by target app (FLAG_SECURE) — OCR unavailable for this app",
+            log.reason
+        )
+    }
 }

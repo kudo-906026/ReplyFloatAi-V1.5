@@ -213,6 +213,20 @@ fun DiagnosticsTab(
         )
     }
 
+    // Check for FLAG_SECURE window blocking (e.g. Virtual Machine or protected game)
+    val recentFlagSecure = diagnosticLogs.firstOrNull { it.category == "FLAG_SECURE_BLOCKED" }
+    if (recentFlagSecure != null) {
+        detectedIssues.add(
+            SystemIssueInfo(
+                component = "Target Window (${recentFlagSecure.source})",
+                statusCode = "FLAG_SECURE_BLOCKED",
+                isCritical = false,
+                explanation = "Screen capture blocked by target app (FLAG_SECURE) — OCR unavailable for this app.",
+                suggestedFix = "Target app/VM enforces Android's FLAG_SECURE window policy. Screen capture returns black/null pixels at the OS level; this is an Android platform security limitation, not an app bug."
+            )
+        )
+    }
+
     val systemHealthStatus = when {
         detectedIssues.any { it.isCritical } -> "ACTION REQUIRED"
         detectedIssues.isNotEmpty() -> "DEGRADED (FAILOVER ACTIVE)"
@@ -228,7 +242,7 @@ fun DiagnosticsTab(
     val filteredLogs = remember(diagnosticLogs, selectedFilter) {
         when (selectedFilter) {
             DiagnosticFilter.ALL -> diagnosticLogs
-            DiagnosticFilter.FAILOVERS -> diagnosticLogs.filter { it.category in listOf("AUTH_FAILURE", "QUOTA_EXCEEDED", "NO_API_KEY", "PROVIDER_ERROR", "BAD_REQUEST", "MODEL_NOT_FOUND", "EMPTY_RESPONSE", "FAILOVER") || it.reason.contains("fallback", ignoreCase = true) || it.reason.contains("fail", ignoreCase = true) }
+            DiagnosticFilter.FAILOVERS -> diagnosticLogs.filter { it.category in listOf("AUTH_FAILURE", "QUOTA_EXCEEDED", "NO_API_KEY", "PROVIDER_ERROR", "BAD_REQUEST", "MODEL_NOT_FOUND", "EMPTY_RESPONSE", "FAILOVER", "FLAG_SECURE_BLOCKED") || it.reason.contains("fallback", ignoreCase = true) || it.reason.contains("fail", ignoreCase = true) || it.reason.contains("FLAG_SECURE", ignoreCase = true) }
             DiagnosticFilter.MATCHED -> diagnosticLogs.filter { it.result == DetectionResultType.MATCHED }
             DiagnosticFilter.OCR_FALLBACK -> diagnosticLogs.filter { it.detectionMethod == DetectionMethod.MLKIT_OCR }
             DiagnosticFilter.ACCESSIBILITY -> diagnosticLogs.filter { it.detectionMethod == DetectionMethod.ACCESSIBILITY }
@@ -662,7 +676,7 @@ fun DiagnosticsTab(
                                 )
                             }
                             Text(
-                                text = "• Fast Primary (Accessibility): Instant (~3-5ms) node scan used across standard apps (WhatsApp, Telegram, SMS, Browsers).\n• OCR Fallback (ML Kit On-Device): Runs on background thread (~35-80ms) ONLY when apps render 0 text nodes (e.g. Super Sus, custom game canvases). Slower latency in games is expected behavior and not a bug; the screen stays 100% interactive.",
+                                text = "• Fast Primary (Accessibility): Instant (~3-5ms) node scan used across standard apps (WhatsApp, Telegram, SMS, Browsers).\n• OCR Fallback (ML Kit On-Device): Runs on background thread (~35-80ms) ONLY when apps render 0 text nodes (e.g. Super Sus, custom game canvases). Slower latency in games is expected behavior and not a bug; the screen stays 100% interactive.\n• FLAG_SECURE Protection: If target app/VM blocks screen capture via Android's FLAG_SECURE, screenshot returns blank/null content (ErrorCode 2). This is an Android OS security boundary, not an app bug.",
                                 fontSize = 10.5.sp,
                                 color = TextSecondary,
                                 lineHeight = 14.5.sp
@@ -718,7 +732,7 @@ fun DiagnosticsTab(
                             filteredLogs.take(25).forEach { log ->
                                 val isMatched = log.result == DetectionResultType.MATCHED
                                 val isOcr = log.detectionMethod == DetectionMethod.MLKIT_OCR
-                                val isError = log.category in listOf("AUTH_FAILURE", "QUOTA_EXCEEDED", "NO_API_KEY", "PROVIDER_ERROR", "BAD_REQUEST", "MODEL_NOT_FOUND", "EMPTY_RESPONSE", "FAILOVER")
+                                val isError = log.category in listOf("AUTH_FAILURE", "QUOTA_EXCEEDED", "NO_API_KEY", "PROVIDER_ERROR", "BAD_REQUEST", "MODEL_NOT_FOUND", "EMPTY_RESPONSE", "FAILOVER", "FLAG_SECURE_BLOCKED")
 
                                 val borderColor = when {
                                     isError -> CrimsonPrimary.copy(alpha = 0.6f)

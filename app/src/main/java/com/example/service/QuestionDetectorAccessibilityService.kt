@@ -277,6 +277,20 @@ class QuestionDetectorAccessibilityService : AccessibilityService() {
                                 }
 
                                 if (softwareCopy != null) {
+                                    // Check if screenshot returned blank/black content consistent with FLAG_SECURE blocking
+                                    if (OcrRecognitionEngine.isBitmapBlankOrBlack(softwareCopy)) {
+                                        isOcrProcessing = false
+                                        AppStateManager.addDiagnosticLog(
+                                            source = "$appName (Screen Capture)",
+                                            rawText = "[Blank/Black Content]",
+                                            result = DetectionResultType.REJECTED,
+                                            category = "FLAG_SECURE_BLOCKED",
+                                            reason = "Screen capture blocked by target app (FLAG_SECURE) — OCR unavailable for this app",
+                                            detectionMethod = DetectionMethod.MLKIT_OCR
+                                        )
+                                        return
+                                    }
+
                                     // Process entirely on background coroutine
                                     serviceScope.launch(Dispatchers.Default) {
                                         try {
@@ -288,17 +302,27 @@ class QuestionDetectorAccessibilityService : AccessibilityService() {
                                     return
                                 }
                             }
+
+                            // Null content returned from hardware buffer (consistent with FLAG_SECURE blocking)
                             isOcrProcessing = false
+                            AppStateManager.addDiagnosticLog(
+                                source = "$appName (Screen Capture)",
+                                rawText = "[Null Content]",
+                                result = DetectionResultType.REJECTED,
+                                category = "FLAG_SECURE_BLOCKED",
+                                reason = "Screen capture blocked by target app (FLAG_SECURE) — OCR unavailable for this app",
+                                detectionMethod = DetectionMethod.MLKIT_OCR
+                            )
                         }
 
                         override fun onFailure(errorCode: Int) {
                             isOcrProcessing = false
                             AppStateManager.addDiagnosticLog(
                                 source = "$appName (Screen Capture)",
-                                rawText = "[No Accessibility Text]",
+                                rawText = "[Capture Code: $errorCode]",
                                 result = DetectionResultType.REJECTED,
-                                category = "SCREENSHOT_UNAVAILABLE",
-                                reason = "Screen capture failed with error code $errorCode. Window is protected or uncapturable.",
+                                category = "FLAG_SECURE_BLOCKED",
+                                reason = "Screen capture blocked by target app (FLAG_SECURE) — OCR unavailable for this app",
                                 detectionMethod = DetectionMethod.MLKIT_OCR
                             )
                         }
@@ -306,6 +330,14 @@ class QuestionDetectorAccessibilityService : AccessibilityService() {
                 )
             } catch (e: Exception) {
                 isOcrProcessing = false
+                AppStateManager.addDiagnosticLog(
+                    source = "$appName (Screen Capture)",
+                    rawText = "[Capture Exception: ${e.message ?: "error"}]",
+                    result = DetectionResultType.REJECTED,
+                    category = "FLAG_SECURE_BLOCKED",
+                    reason = "Screen capture blocked by target app (FLAG_SECURE) — OCR unavailable for this app",
+                    detectionMethod = DetectionMethod.MLKIT_OCR
+                )
             }
         } else {
             // Android API < 30

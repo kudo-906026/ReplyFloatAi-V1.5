@@ -768,6 +768,23 @@ fun SimulatorTab(
                             Text("Simulate WhatsApp (Fast)", fontSize = 10.5.sp, fontWeight = FontWeight.Bold)
                         }
                     }
+
+                    // Simulate FLAG_SECURE Window Protection
+                    Button(
+                        onClick = {
+                            AppStateManager.simulateFlagSecureBlock("VM / Super Sus (Protected Window)")
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(36.dp),
+                        shape = RoundedCornerShape(8.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = CrimsonPrimary.copy(alpha = 0.2f), contentColor = CrimsonLight),
+                        border = BorderStroke(1.dp, CrimsonPrimary.copy(alpha = 0.5f))
+                    ) {
+                        Icon(Icons.Default.ReportProblem, contentDescription = null, modifier = Modifier.size(13.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Simulate FLAG_SECURE Block (VM / Protected Window)", fontSize = 10.5.sp, fontWeight = FontWeight.Bold)
+                    }
                 }
             }
         }
