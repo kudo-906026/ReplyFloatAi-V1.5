@@ -213,17 +213,20 @@ fun DiagnosticsTab(
         )
     }
 
-    // Check for FLAG_SECURE window blocking (e.g. Virtual Machine or protected game)
-    val recentFlagSecure = diagnosticLogs.firstOrNull { it.category == "FLAG_SECURE_BLOCKED" }
-    if (recentFlagSecure != null) {
-        val dims = recentFlagSecure.imageDimensions ?: "captured frame"
+    // Check for Screen Capture / Permission failures (e.g. NO_ACCESSIBILITY_ACCESS)
+    val recentCaptureError = diagnosticLogs.firstOrNull { it.category in listOf("SCREENSHOT_FAILED", "BITMAP_CONVERT_FAILED") }
+    if (recentCaptureError != null) {
+        val dims = recentCaptureError.imageDimensions ?: "screen frame"
         detectedIssues.add(
             SystemIssueInfo(
-                component = "Target Window (${recentFlagSecure.source})",
-                statusCode = "FLAG_SECURE_BLOCKED",
-                isCritical = false,
-                explanation = "Screen capture blocked by target app (FLAG_SECURE). OS returned blank/black $dims frame buffer.",
-                suggestedFix = "Target app/VM enforces Android's FLAG_SECURE window policy. Screen capture returns black/null pixels at the OS level; this is an Android platform security limitation, not an app bug."
+                component = "Screen Capture (${recentCaptureError.source})",
+                statusCode = recentCaptureError.category,
+                isCritical = true,
+                explanation = recentCaptureError.reason,
+                suggestedFix = if (recentCaptureError.ocrError?.contains("NO_ACCESSIBILITY_ACCESS") == true)
+                    "Ensure ReplyFloat's Accessibility Service is enabled in Android System Settings and 'canTakeScreenshot' is granted."
+                else
+                    "Check target app compatibility or restart Accessibility Service."
             )
         )
     }
@@ -257,7 +260,7 @@ fun DiagnosticsTab(
     val filteredLogs = remember(diagnosticLogs, selectedFilter) {
         when (selectedFilter) {
             DiagnosticFilter.ALL -> diagnosticLogs
-            DiagnosticFilter.FAILOVERS -> diagnosticLogs.filter { it.category in listOf("AUTH_FAILURE", "QUOTA_EXCEEDED", "NO_API_KEY", "PROVIDER_ERROR", "BAD_REQUEST", "MODEL_NOT_FOUND", "EMPTY_RESPONSE", "FAILOVER", "FLAG_SECURE_BLOCKED", "SCREENSHOT_FAILED", "OCR_EXTRACTION_ERROR", "OCR_ZERO_TEXT_DETECTED") || it.reason.contains("fallback", ignoreCase = true) || it.reason.contains("fail", ignoreCase = true) || it.reason.contains("FLAG_SECURE", ignoreCase = true) || it.reason.contains("blocked", ignoreCase = true) }
+            DiagnosticFilter.FAILOVERS -> diagnosticLogs.filter { it.category in listOf("AUTH_FAILURE", "QUOTA_EXCEEDED", "NO_API_KEY", "PROVIDER_ERROR", "BAD_REQUEST", "MODEL_NOT_FOUND", "EMPTY_RESPONSE", "FAILOVER", "SCREENSHOT_FAILED", "BITMAP_CONVERT_FAILED", "OCR_EXTRACTION_ERROR", "OCR_ZERO_TEXT_DETECTED") || it.reason.contains("fallback", ignoreCase = true) || it.reason.contains("fail", ignoreCase = true) || it.reason.contains("error", ignoreCase = true) || it.reason.contains("rejected", ignoreCase = true) }
             DiagnosticFilter.MATCHED -> diagnosticLogs.filter { it.result == DetectionResultType.MATCHED }
             DiagnosticFilter.OCR_FALLBACK -> diagnosticLogs.filter { it.detectionMethod == DetectionMethod.MLKIT_OCR }
             DiagnosticFilter.ACCESSIBILITY -> diagnosticLogs.filter { it.detectionMethod == DetectionMethod.ACCESSIBILITY }
@@ -691,7 +694,7 @@ fun DiagnosticsTab(
                                 )
                             }
                             Text(
-                                text = "• Fast Primary (Accessibility): Instant (~3-5ms) node scan used across standard apps (WhatsApp, Telegram, SMS, Browsers).\n• OCR Fallback (ML Kit On-Device): Runs on background thread (~35-80ms) ONLY when apps render 0 text nodes (e.g. Super Sus, custom game canvases). Slower latency in games is expected behavior and not a bug; the screen stays 100% interactive.\n• FLAG_SECURE Protection: If target app/VM blocks screen capture via Android's FLAG_SECURE, screenshot returns blank/null content (ErrorCode 2). This is an Android OS security boundary, not an app bug.",
+                                text = "• Fast Primary (Accessibility): Instant (~3-5ms) node scan used across standard apps (WhatsApp, Telegram, SMS, Browsers).\n• OCR Fallback (ML Kit On-Device): Runs on background thread (~35-80ms) ONLY when apps render 0 text nodes (e.g. Super Sus, custom game canvases). The screen stays 100% interactive.\n• Screen Capture Access: Requires Android 11+ and accessibility permission. If denied by OS, diagnostics records exact error codes and buffer details without guessing.",
                                 fontSize = 10.5.sp,
                                 color = TextSecondary,
                                 lineHeight = 14.5.sp
@@ -747,7 +750,7 @@ fun DiagnosticsTab(
                             filteredLogs.take(25).forEach { log ->
                                 val isMatched = log.result == DetectionResultType.MATCHED
                                 val isOcr = log.detectionMethod == DetectionMethod.MLKIT_OCR
-                                val isError = log.category in listOf("AUTH_FAILURE", "QUOTA_EXCEEDED", "NO_API_KEY", "PROVIDER_ERROR", "BAD_REQUEST", "MODEL_NOT_FOUND", "EMPTY_RESPONSE", "FAILOVER", "FLAG_SECURE_BLOCKED")
+                                val isError = log.category in listOf("AUTH_FAILURE", "QUOTA_EXCEEDED", "NO_API_KEY", "PROVIDER_ERROR", "BAD_REQUEST", "MODEL_NOT_FOUND", "EMPTY_RESPONSE", "FAILOVER", "SCREENSHOT_FAILED", "BITMAP_CONVERT_FAILED", "OCR_EXTRACTION_ERROR")
 
                                 val borderColor = when {
                                     isError -> CrimsonPrimary.copy(alpha = 0.6f)
@@ -885,8 +888,8 @@ fun DiagnosticsTab(
                                                 border = BorderStroke(
                                                     1.dp,
                                                     when {
-                                                        log.isImageBlank == true || log.category == "FLAG_SECURE_BLOCKED" -> CrimsonPrimary.copy(alpha = 0.6f)
-                                                        log.ocrError != null -> CrimsonPrimary.copy(alpha = 0.5f)
+                                                        log.screenshotCaptured == false || log.category in listOf("SCREENSHOT_FAILED", "BITMAP_CONVERT_FAILED", "OCR_EXTRACTION_ERROR") -> CrimsonPrimary.copy(alpha = 0.6f)
+                                                        log.ocrError != null -> AccentYellow.copy(alpha = 0.5f)
                                                         log.result == DetectionResultType.MATCHED -> TechGreen.copy(alpha = 0.5f)
                                                         else -> AccentPurple.copy(alpha = 0.35f)
                                                     }
@@ -907,7 +910,7 @@ fun DiagnosticsTab(
                                                             contentDescription = null,
                                                             modifier = Modifier.size(13.dp),
                                                             tint = when {
-                                                                log.isImageBlank == true || log.category == "FLAG_SECURE_BLOCKED" -> CrimsonLight
+                                                                log.screenshotCaptured == false || log.category in listOf("SCREENSHOT_FAILED", "BITMAP_CONVERT_FAILED", "OCR_EXTRACTION_ERROR") -> CrimsonLight
                                                                 log.screenshotCaptured == true -> TechGreen
                                                                 else -> AccentYellow
                                                             }
@@ -919,7 +922,7 @@ fun DiagnosticsTab(
                                                             fontWeight = FontWeight.Bold,
                                                             letterSpacing = 0.5.sp,
                                                             color = when {
-                                                                log.isImageBlank == true || log.category == "FLAG_SECURE_BLOCKED" -> CrimsonLight
+                                                                log.screenshotCaptured == false || log.category in listOf("SCREENSHOT_FAILED", "BITMAP_CONVERT_FAILED", "OCR_EXTRACTION_ERROR") -> CrimsonLight
                                                                 log.screenshotCaptured == true -> TechGreen
                                                                 else -> AccentYellow
                                                             }
@@ -958,29 +961,29 @@ fun DiagnosticsTab(
                                                         )
                                                     }
 
-                                                    // Blank / Black frame status (FLAG_SECURE check)
+                                                    // Frame Buffer Status
                                                     Row(
                                                         modifier = Modifier.fillMaxWidth(),
                                                         horizontalArrangement = Arrangement.SpaceBetween,
                                                         verticalAlignment = Alignment.CenterVertically
                                                     ) {
                                                         Text(
-                                                            text = "   Blank / Black Frame:",
+                                                            text = "   Frame Buffer Analysis:",
                                                             fontSize = 10.sp,
                                                             fontFamily = FontFamily.Monospace,
                                                             color = TextSecondary
                                                         )
                                                         Text(
                                                             text = when (log.isImageBlank) {
-                                                                true -> "YES (FLAG_SECURE Masking)"
-                                                                false -> "NO (Active Game Pixels)"
+                                                                true -> "Solid / Dark Pixels"
+                                                                false -> "Active Content Pixels"
                                                                 null -> if (log.screenshotCaptured == false) "N/A (No Frame)" else "Unknown"
                                                             },
                                                             fontSize = 10.sp,
                                                             fontFamily = FontFamily.Monospace,
                                                             fontWeight = FontWeight.Bold,
                                                             color = when (log.isImageBlank) {
-                                                                true -> CrimsonPrimary
+                                                                true -> AccentYellow
                                                                 false -> TechGreen
                                                                 null -> TextMuted
                                                             }

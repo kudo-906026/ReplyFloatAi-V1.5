@@ -298,8 +298,19 @@ fun defaultWhitelistedApps(): List<WhitelistedApp> = listOf(
     WhitelistedApp("com.reddit.frontpage", "Reddit Chat", "Social", true),
     WhitelistedApp("com.je.supersus", "Super Sus (Who Is The Impostor)", "Gaming / Custom Canvas", true),
     WhitelistedApp("com.piogame.supersus", "Super Sus (Global)", "Gaming / Custom Canvas", true),
+    WhitelistedApp("com.netease.g104na", "Super Sus (NA)", "Gaming / Custom Canvas", true),
+    WhitelistedApp("com.supersus.game", "Super Sus", "Gaming / Custom Canvas", true),
     WhitelistedApp("com.innersloth.spacemafia", "Among Us", "Gaming / Custom Canvas", true),
-    WhitelistedApp("com.roblox.client", "Roblox Chat", "Gaming / Custom Canvas", true)
+    WhitelistedApp("com.roblox.client", "Roblox Chat", "Gaming / Custom Canvas", true),
+    WhitelistedApp("com.vmos.pro", "VMOS Pro", "Virtual Machine", true),
+    WhitelistedApp("com.vmos.glb", "VMOS Global", "Virtual Machine", true),
+    WhitelistedApp("com.vmos.app", "VMOS", "Virtual Machine", true),
+    WhitelistedApp("com.vphonegaga.titan", "VPhoneGaGa", "Virtual Machine", true),
+    WhitelistedApp("com.vphonegaga.glb", "VPhoneGaGa Global", "Virtual Machine", true),
+    WhitelistedApp("com.f1player", "F1 VM", "Virtual Machine", true),
+    WhitelistedApp("com.twoyi", "TwoYi", "Virtual Machine", true),
+    WhitelistedApp("com.x8zs.sandbox", "X8 Sandbox", "Virtual Machine", true),
+    WhitelistedApp("com.shouji.virtual", "Virtual Android", "Virtual Machine", true)
 )
 
 enum class DetectionMethod(val label: String, val shortBadge: String) {

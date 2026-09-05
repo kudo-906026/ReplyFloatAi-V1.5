@@ -79,12 +79,12 @@ object OcrRecognitionEngine {
         val details = if (isBlank) {
             if (allIdentical) {
                 val hex = String.format("#%08X", firstPixel)
-                "${width}x${height} px: 100% solid uniform color ($hex). FLAG_SECURE window masking active."
+                "${width}x${height} px: 100% solid uniform color ($hex)."
             } else {
-                "${width}x${height} px: Completely black frame (0 colored pixels). FLAG_SECURE window masking active."
+                "${width}x${height} px: Solid dark buffer ($coloredPixelCount/${pixels.size} colored sample pixels)."
             }
         } else {
-            "${width}x${height} px: Active game graphics ($coloredPixelCount/${pixels.size} colored sample pixels)."
+            "${width}x${height} px: Active screen graphics ($coloredPixelCount/${pixels.size} colored sample pixels)."
         }
 
         return BitmapAnalysisResult(

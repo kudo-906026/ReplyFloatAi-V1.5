@@ -1,7 +1,10 @@
 package com.example.service
 
 import android.accessibilityservice.AccessibilityService
+import android.accessibilityservice.AccessibilityServiceInfo
 import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Paint
 import android.graphics.Rect
 import android.os.Build
 import android.view.Display
@@ -68,6 +71,17 @@ class QuestionDetectorAccessibilityService : AccessibilityService() {
         instance = this
         AppStateManager.init(this)
         AppStateManager.setAccessibilityRunning(true)
+
+        try {
+            val info = serviceInfo ?: AccessibilityServiceInfo()
+            info.flags = info.flags or
+                AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS or
+                AccessibilityServiceInfo.FLAG_REPORT_VIEW_IDS or
+                AccessibilityServiceInfo.FLAG_INCLUDE_NOT_IMPORTANT_VIEWS
+            serviceInfo = info
+        } catch (_: Exception) {
+        }
+
         startContinuousScanLoop()
     }
 
@@ -125,8 +139,12 @@ class QuestionDetectorAccessibilityService : AccessibilityService() {
             return
         }
 
-        val whitelistedApp = settings.appsWhitelist.find { it.packageName == pkgName && it.isEnabled } ?: return
-        val appName = whitelistedApp.appName
+        val whitelistedApp = settings.appsWhitelist.find { it.packageName == pkgName && it.isEnabled }
+        val appName = whitelistedApp?.appName ?: getAppNameFromPackage(pkgName)
+
+        if (whitelistedApp == null && !forcedBypass) {
+            return
+        }
 
         val now = System.currentTimeMillis()
         if (!forcedBypass && (now - lastProcessedTime < settings.smartDebounceMs)) {
@@ -263,114 +281,114 @@ class QuestionDetectorAccessibilityService : AccessibilityService() {
                             val colorSpace = screenshotResult.colorSpace
                             val bufferWidth = try { hardwareBuffer.width } catch (_: Exception) { 0 }
                             val bufferHeight = try { hardwareBuffer.height } catch (_: Exception) { 0 }
+                            val bufferFormat = try { hardwareBuffer.format } catch (_: Exception) { -1 }
 
-                            val bitmap = try {
-                                Bitmap.wrapHardwareBuffer(hardwareBuffer, colorSpace)
-                            } catch (_: Exception) {
-                                null
-                            } finally {
-                                hardwareBuffer.close()
-                            }
+                            var softwareBitmap: Bitmap? = null
+                            var conversionNotes = ""
 
-                            if (bitmap != null) {
-                                val softwareCopy = try {
-                                    bitmap.copy(Bitmap.Config.ARGB_8888, false)
-                                } catch (_: Exception) {
-                                    null
-                                }
-
-                                if (softwareCopy != null) {
-                                    val bitmapAnalysis = OcrRecognitionEngine.analyzeBitmapContent(softwareCopy)
-                                    val dims = "${bitmapAnalysis.width}x${bitmapAnalysis.height}"
-
-                                    // Check if screenshot returned blank/black content consistent with FLAG_SECURE blocking
-                                    if (bitmapAnalysis.isBlankOrBlack) {
-                                        isOcrProcessing = false
-                                        AppStateManager.addDiagnosticLog(
-                                            source = "$appName (Screen Capture)",
-                                            rawText = "[Blank/Black Content: $dims]",
-                                            result = DetectionResultType.REJECTED,
-                                            category = "FLAG_SECURE_BLOCKED",
-                                            reason = "Screenshot captured successfully ($dims), but frame buffer is blank/black. ${bitmapAnalysis.details}",
-                                            detectionMethod = DetectionMethod.MLKIT_OCR,
-                                            screenshotCaptured = true,
-                                            imageDimensions = dims,
-                                            isImageBlank = true,
-                                            ocrRawOutput = "[Blank Screen - ML Kit bypassed]",
-                                            ocrError = "FLAG_SECURE window protection detected. Android WindowManager masked game surface with solid black/uniform dummy buffer."
-                                        )
-                                        return
+                            try {
+                                val hwBitmap = Bitmap.wrapHardwareBuffer(hardwareBuffer, colorSpace)
+                                if (hwBitmap != null) {
+                                    // Primary attempt: copy to software ARGB_8888 bitmap
+                                    try {
+                                        softwareBitmap = hwBitmap.copy(Bitmap.Config.ARGB_8888, false)
+                                        if (softwareBitmap != null) {
+                                            conversionNotes = "hwBitmap.copy(ARGB_8888) successful"
+                                        }
+                                    } catch (e: Exception) {
+                                        conversionNotes = "hwBitmap.copy failed: ${e.message}"
                                     }
 
-                                    // Screenshot captured with real graphics! Process entirely on background coroutine
-                                    serviceScope.launch(Dispatchers.Default) {
+                                    // Secondary fallback: draw to software Canvas if direct copy is unsupported by driver
+                                    if (softwareBitmap == null && bufferWidth > 0 && bufferHeight > 0) {
                                         try {
-                                            runOcrProcessingOnBackground(softwareCopy, appName, pkgName, bitmapAnalysis)
-                                        } finally {
-                                            isOcrProcessing = false
+                                            val canvasBitmap = Bitmap.createBitmap(bufferWidth, bufferHeight, Bitmap.Config.ARGB_8888)
+                                            val canvas = Canvas(canvasBitmap)
+                                            val paint = Paint(Paint.FILTER_BITMAP_FLAG)
+                                            canvas.drawBitmap(hwBitmap, 0f, 0f, paint)
+                                            softwareBitmap = canvasBitmap
+                                            conversionNotes = (if (conversionNotes.isNotBlank()) "$conversionNotes; " else "") + "software Canvas draw fallback successful"
+                                        } catch (e: Exception) {
+                                            conversionNotes = (if (conversionNotes.isNotBlank()) "$conversionNotes; " else "") + "Canvas draw failed: ${e.message}"
                                         }
                                     }
-                                    return
+
+                                    try {
+                                        hwBitmap.recycle()
+                                    } catch (_: Exception) {}
                                 } else {
-                                    isOcrProcessing = false
-                                    AppStateManager.addDiagnosticLog(
-                                        source = "$appName (Screen Capture)",
-                                        rawText = "[Hardware Bitmap Copy Failed: ${bufferWidth}x${bufferHeight}]",
-                                        result = DetectionResultType.REJECTED,
-                                        category = "BITMAP_CONVERT_FAILED",
-                                        reason = "Screenshot captured (${bufferWidth}x${bufferHeight} px), but software ARGB_8888 copy failed.",
-                                        detectionMethod = DetectionMethod.MLKIT_OCR,
-                                        screenshotCaptured = true,
-                                        imageDimensions = "${bufferWidth}x${bufferHeight}",
-                                        isImageBlank = null,
-                                        ocrRawOutput = null,
-                                        ocrError = "Bitmap.copy(ARGB_8888) returned null"
-                                    )
-                                    return
+                                    conversionNotes = "Bitmap.wrapHardwareBuffer returned null"
                                 }
+                            } catch (e: Exception) {
+                                conversionNotes = "Exception wrapping hardware buffer: ${e.message}"
+                            } finally {
+                                // CRITICAL FIX: Only close HardwareBuffer AFTER the software copy has finished!
+                                try {
+                                    hardwareBuffer.close()
+                                } catch (_: Exception) {}
                             }
 
-                            // Null content returned from hardware buffer
+                            if (softwareBitmap != null) {
+                                val bitmapAnalysis = OcrRecognitionEngine.analyzeBitmapContent(softwareBitmap)
+
+                                // Always proceed to ML Kit OCR with real software bitmap - do not abort on dark/game screens
+                                serviceScope.launch(Dispatchers.Default) {
+                                    try {
+                                        runOcrProcessingOnBackground(
+                                            bitmap = softwareBitmap,
+                                            appName = appName,
+                                            pkgName = pkgName,
+                                            bitmapAnalysis = bitmapAnalysis,
+                                            bufferFormat = bufferFormat
+                                        )
+                                    } finally {
+                                        isOcrProcessing = false
+                                        try { softwareBitmap.recycle() } catch (_: Exception) {}
+                                    }
+                                }
+                                return
+                            }
+
+                            // If conversion failed
                             isOcrProcessing = false
                             AppStateManager.addDiagnosticLog(
                                 source = "$appName (Screen Capture)",
-                                rawText = "[Null Bitmap from Hardware Buffer]",
+                                rawText = "[Buffer Conversion Failed: ${bufferWidth}x${bufferHeight}]",
                                 result = DetectionResultType.REJECTED,
-                                category = "HARDWARE_BUFFER_NULL",
-                                reason = "Screenshot returned hardware buffer (${bufferWidth}x${bufferHeight} px), but wrapping into Bitmap returned null.",
+                                category = "BITMAP_CONVERT_FAILED",
+                                reason = "Screen frame buffer received (${bufferWidth}x${bufferHeight}, format=$bufferFormat), but software bitmap conversion failed: $conversionNotes",
                                 detectionMethod = DetectionMethod.MLKIT_OCR,
-                                screenshotCaptured = false,
+                                screenshotCaptured = true,
                                 imageDimensions = if (bufferWidth > 0) "${bufferWidth}x${bufferHeight}" else null,
                                 isImageBlank = null,
                                 ocrRawOutput = null,
-                                ocrError = "Bitmap.wrapHardwareBuffer failed"
+                                ocrError = "Conversion failure: $conversionNotes"
                             )
                         }
 
                         override fun onFailure(errorCode: Int) {
                             isOcrProcessing = false
                             val (errorName, errorExplanation) = when (errorCode) {
-                                1 -> "INTERNAL_ERROR (1)" to "Android OS internal failure or driver restriction."
-                                2 -> "NO_ACCESSIBILITY_ACCESS (2)" to "Screen capture denied by Android WindowManager (target app enforces FLAG_SECURE or lacks capture permission)."
-                                3 -> "INTERVAL_TIME_SHORT (3)" to "Screenshots requested too rapidly (throttled by system rate-limiter)."
-                                4 -> "INVALID_DISPLAY (4)" to "Default display ID is invalid or not available."
-                                5 -> "INVALID_WINDOW (5)" to "Target window detached or secured."
-                                else -> "ERROR_CODE_$errorCode" to "Unknown capture failure code."
+                                1 -> "INTERNAL_ERROR (1)" to "Android OS internal screen capture error or compositor synchronization issue."
+                                2 -> "NO_ACCESSIBILITY_ACCESS (2)" to "Screenshot permission not granted to Accessibility Service by Android OS. Ensure android:canTakeScreenshot='true' is configured in service XML and service is enabled."
+                                3 -> "INTERVAL_TIME_SHORT (3)" to "Screenshots requested too rapidly. Throttled by Android system rate limiter."
+                                4 -> "INVALID_DISPLAY (4)" to "Display ID (Display.DEFAULT_DISPLAY) is invalid or unavailable in the current display hierarchy."
+                                5 -> "INVALID_WINDOW (5)" to "Target window is detached, invalid, or secured."
+                                else -> "ERROR_CODE_$errorCode" to "takeScreenshot failure code $errorCode."
                             }
 
-                            val isFlagSecure = errorCode == 2
                             AppStateManager.addDiagnosticLog(
                                 source = "$appName (Screen Capture)",
                                 rawText = "[Capture Failed: $errorName]",
                                 result = DetectionResultType.REJECTED,
-                                category = if (isFlagSecure) "FLAG_SECURE_BLOCKED" else "SCREENSHOT_FAILED",
+                                category = "SCREENSHOT_FAILED",
                                 reason = "AccessibilityService.takeScreenshot failed ($errorName): $errorExplanation",
                                 detectionMethod = DetectionMethod.MLKIT_OCR,
                                 screenshotCaptured = false,
                                 imageDimensions = null,
                                 isImageBlank = null,
                                 ocrRawOutput = null,
-                                ocrError = "takeScreenshot onFailure($errorCode): $errorExplanation"
+                                ocrError = "takeScreenshot errorCode=$errorCode ($errorName): $errorExplanation"
                             )
                         }
                     }
@@ -382,7 +400,7 @@ class QuestionDetectorAccessibilityService : AccessibilityService() {
                     rawText = "[Capture Exception: ${e.javaClass.simpleName}]",
                     result = DetectionResultType.REJECTED,
                     category = "SCREENSHOT_EXCEPTION",
-                    reason = "takeScreenshot threw exception: ${e.localizedMessage ?: e.message ?: "Unknown error"}",
+                    reason = "takeScreenshot invocation threw exception: ${e.localizedMessage ?: e.message ?: "Unknown error"}",
                     detectionMethod = DetectionMethod.MLKIT_OCR,
                     screenshotCaptured = false,
                     imageDimensions = null,
@@ -408,7 +426,8 @@ class QuestionDetectorAccessibilityService : AccessibilityService() {
         bitmap: Bitmap,
         appName: String,
         pkgName: String,
-        bitmapAnalysis: com.example.ai.BitmapAnalysisResult
+        bitmapAnalysis: com.example.ai.BitmapAnalysisResult,
+        bufferFormat: Int
     ) {
         val dimensions = "${bitmapAnalysis.width}x${bitmapAnalysis.height}"
         val ocrResult = OcrRecognitionEngine.recognizeTextFromBitmap(bitmap)
@@ -441,7 +460,7 @@ class QuestionDetectorAccessibilityService : AccessibilityService() {
                 latencyMs = ocrResult.latencyMs,
                 screenshotCaptured = true,
                 imageDimensions = dimensions,
-                isImageBlank = false,
+                isImageBlank = bitmapAnalysis.isBlankOrBlack,
                 ocrRawOutput = ocrResult.rawText,
                 ocrError = null
             )
@@ -454,11 +473,17 @@ class QuestionDetectorAccessibilityService : AccessibilityService() {
 
             val reason = when {
                 !ocrResult.isSuccess ->
-                    "Screenshot captured ($dimensions), but ML Kit TextRecognition failed in ${ocrResult.latencyMs}ms: ${ocrResult.errorMessage ?: "Unknown error"}"
+                    "Screenshot captured ($dimensions, format=$bufferFormat), but ML Kit TextRecognition failed in ${ocrResult.latencyMs}ms: ${ocrResult.errorMessage ?: "Unknown error"}"
                 !hasExtractedText ->
-                    "Screenshot captured ($dimensions, active game graphics), but ML Kit recognized 0 text blocks in ${ocrResult.latencyMs}ms. The game screen has no machine-readable Latin text glyphs."
+                    "Screenshot captured ($dimensions, ${bitmapAnalysis.details}), but ML Kit recognized 0 text blocks in ${ocrResult.latencyMs}ms. Raw screen image contains no machine-readable glyphs."
                 else ->
                     "Screenshot captured ($dimensions). ML Kit successfully extracted ${ocrResult.detectedBlocks.size} blocks (${ocrResult.rawText.length} chars) in ${ocrResult.latencyMs}ms, but text was rejected: ${analysis.reason}"
+            }
+
+            val ocrErrorDesc = when {
+                !ocrResult.isSuccess -> ocrResult.errorMessage ?: "ML Kit inference failed"
+                !hasExtractedText -> "ML Kit recognized 0 text blocks (${bitmapAnalysis.details})"
+                else -> null
             }
 
             AppStateManager.addDiagnosticLog(
@@ -471,10 +496,20 @@ class QuestionDetectorAccessibilityService : AccessibilityService() {
                 latencyMs = ocrResult.latencyMs,
                 screenshotCaptured = true,
                 imageDimensions = dimensions,
-                isImageBlank = false,
+                isImageBlank = bitmapAnalysis.isBlankOrBlack,
                 ocrRawOutput = if (hasExtractedText) ocrResult.rawText else "[Empty / 0 Blocks]",
-                ocrError = if (!ocrResult.isSuccess) ocrResult.errorMessage else if (!hasExtractedText) "ML Kit returned 0 text blocks on active game canvas" else null
+                ocrError = ocrErrorDesc
             )
+        }
+    }
+
+    private fun getAppNameFromPackage(packageName: String): String {
+        return try {
+            val pm = packageManager
+            val appInfo = pm.getApplicationInfo(packageName, 0)
+            pm.getApplicationLabel(appInfo).toString()
+        } catch (_: Exception) {
+            packageName.substringAfterLast(".").replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
         }
     }
 

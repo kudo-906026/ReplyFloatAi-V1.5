@@ -9,9 +9,9 @@
 - **⚡ Dual-Engine Question Detection**:
   - **Fast Primary Path (Accessibility Node Scan)**: Scans view hierarchy text nodes in ~3–5ms for standard apps (WhatsApp, Telegram, Discord, Slack, SMS, Browsers).
   - **On-Device OCR Fallback (ML Kit)**: Automatically triggers continuous screen analysis on a background thread (~35–80ms) when apps draw directly to custom canvases, OpenGL, or Unity surfaces with zero accessibility nodes (e.g., *Super Sus* chat, games).
-- **🛡️ FLAG_SECURE & Window Protection Awareness**:
-  - Automatically identifies when a target window (such as a Virtual Machine container or anti-cheat protected game) enforces Android's `FLAG_SECURE`.
-  - Distinguishes OS-level blank/black frame restrictions from app bugs and logs clear diagnostics: `Screen capture blocked by target app (FLAG_SECURE) — OCR unavailable for this app`.
+- **🛡️ Capture Telemetry & Driver Compatibility**:
+  - Automatically captures hardware buffers via Android 11+ Accessibility Screenshot API with automatic ARGB_8888 software conversion and Canvas fallbacks.
+  - Transparently logs raw capture results, frame buffer dimensions, error codes, and extracted text blocks in real-time Diagnostics without false assumptions.
 - **🔄 Resilient Multi-Provider AI Fallback Chain**:
   - Automatically fails over if an API quota is exhausted (HTTP 429), authentication fails (HTTP 401), or a server errors.
   - Supports:
@@ -103,7 +103,7 @@ Standard accessibility services cannot read text rendered in Unity, Unreal, or O
 1. When in a whitelisted game, the background monitor continuously captures frames.
 2. Google ML Kit performs on-device Latin text recognition entirely on `Dispatchers.Default` (background thread), keeping gameplay at full frame rate.
 3. If an emergency meeting or chat question is detected (e.g., *"Where were you when the body was found?"*), floating reply chips appear immediately.
-4. **Note on FLAG_SECURE**: Certain banking apps, Virtual Machine containers, and games with anti-tamper modules apply `WindowManager.LayoutParams.FLAG_SECURE`. In these apps, the Android OS intentionally blacks out screen captures at the driver level. ReplyFloat AI automatically detects this condition and logs an informative diagnostic notice.
+4. **Diagnostic Logging**: The real-time Diagnostics tab displays exact capture telemetry for every attempt—including hardware buffer dimensions, conversion status, system error codes, and raw ML Kit extracted text blocks.
 
 ---
 
@@ -144,7 +144,7 @@ For desktop users, developers, and testing on emulators:
 The app includes built-in inspection and telemetry tools:
 - **Diagnostics Tab**:
   - Review active provider health, recent latency benchmarks, error statuses (e.g., HTTP 401, 429), and failover logs.
-  - Inspect on-device screenshot capture status, pixel buffer verification (FLAG_SECURE detection), and raw ML Kit OCR text output.
+  - Inspect on-device screenshot capture status, pixel buffer verification, system error codes, and raw ML Kit OCR text output.
   - Filter, inspect, and export or clear logs at any time.
 
 ---
