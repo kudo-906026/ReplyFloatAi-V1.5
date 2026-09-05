@@ -99,7 +99,7 @@ ReplyFloat AI requires two core Android system permissions to operate across app
 
 ## 🎮 Game & Custom Canvas Compatibility
 
-Standard accessibility services cannot read text rendered in Unity, Unreal, or OpenGL game surfaces (such as in *Super Sus*). ReplyFloat AI addresses this via its **Continuous Screen Analyze** engine:
+Standard accessibility services cannot read text rendered in Unity, Unreal, or OpenGL game surfaces. ReplyFloat AI addresses this via its **Continuous Screen Analyze** engine:
 1. When in a whitelisted game, the background monitor continuously captures frames.
 2. Google ML Kit performs on-device Latin text recognition entirely on `Dispatchers.Default` (background thread), keeping gameplay at full frame rate.
 3. If an emergency meeting or chat question is detected (e.g., *"Where were you when the body was found?"*), floating reply chips appear immediately.
