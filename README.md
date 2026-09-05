@@ -107,27 +107,6 @@ Standard accessibility services cannot read text rendered in Unity, Unreal, or O
 
 ---
 
-## 🔓 Bypassing FLAG_SECURE (Root & Virtual Machine Setup)
-
-If target games or apps enforce `FLAG_SECURE` (causing black/blank screenshot buffers in Diagnostics), you can remove this restriction and use ReplyFloat AI freely using either a rooted phone or a rooted virtual machine container:
-
-### Method 1: Rooted Physical Phone
-1. **Root your device**: Using Magisk, KernelSU, or APatch.
-2. **Install LSPosed**: Flash the Zygisk-LSPosed framework module.
-3. **Install "Disable FLAG_SECURE"**: Search and download the *Disable-FLAG_SECURE* Xposed module from the LSPosed repository.
-4. **Activate & Reboot**: Enable the module in LSPosed (scope set to System Framework or target app) and restart your phone.
-5. **Use Freely**: Android OS will no longer blank out the screenshot buffer, allowing continuous OCR to capture game chat text and surface floating smart replies without restriction.
-
-### Method 2: Virtual Machine (No Physical Root Required)
-If you prefer not to modify or root your primary physical device:
-1. **Install an Android Virtual Machine App**: Download a VM environment such as **VMOS Pro**, **VPhoneGaGa**, **F1 VM**, or **TwoYi**.
-2. **Enable Root in VM**: Turn on root permissions inside the virtual machine's settings menu.
-3. **Install LSPosed inside VM**: Set up the LSPosed framework within the virtual Android instance.
-4. **Install & Enable "Disable FLAG_SECURE"**: Add the *Disable FLAG_SECURE* module inside LSPosed in the VM.
-5. **Install Target Game & ReplyFloat AI**: Run both the game (e.g. *Super Sus*) and ReplyFloat AI inside the VM container to use OCR and floating smart replies freely.
-
----
-
 ## 🖥️ Desktop Usage & Source Code Download
 
 For desktop users, developers, and testing on emulators:
@@ -135,7 +114,7 @@ For desktop users, developers, and testing on emulators:
 - **Android Studio & Emulators**:
   - Open the project in Android Studio (Giraffe, Hedgehog, Koala, Ladybug, or newer with JDK 17).
   - Run the application on standard Android Studio Virtual Devices (AVD), Genymotion, or Android desktop emulators (e.g., BlueStacks, LDPlayer, Nox).
-  - Desktop emulators often support root privileges and disabling `FLAG_SECURE` directly in their system settings, making development, game chat OCR testing, and AI fallback experimentation fast and flexible.
+  - Test game chat OCR and AI fallback experimentation with real-time telemetry.
 
 ---
 
