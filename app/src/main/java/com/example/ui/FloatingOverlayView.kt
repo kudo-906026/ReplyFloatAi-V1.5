@@ -104,6 +104,7 @@ enum class OverlayBarMode {
 fun FloatingOverlayView(
     context: Context,
     onDrag: (dx: Float, dy: Float) -> Unit,
+    onDragEnd: () -> Unit = {},
     onClose: () -> Unit
 ) {
     val settings by AppStateManager.settings.collectAsStateWithLifecycle()
@@ -114,24 +115,38 @@ fun FloatingOverlayView(
 
     var currentMode by remember { mutableStateOf(OverlayBarMode.MAIN_BAR) }
 
-    val hasContent = currentQuestion != null || activeReplies.isNotEmpty() || isGenerating
+    val hasContent = remember(currentQuestion, activeReplies, isGenerating) {
+        currentQuestion != null || activeReplies.isNotEmpty() || isGenerating
+    }
+
+    val cornerRadius = remember(currentMode, settings.overlayCornerRadius) {
+        if (currentMode == OverlayBarMode.SMALL_PILL) 24.dp else settings.overlayCornerRadius.dp
+    }
+    val containerShape = remember(cornerRadius) { RoundedCornerShape(cornerRadius) }
+    val borderColor = remember(hasContent) {
+        if (hasContent) CrimsonPrimary.copy(alpha = 0.9f) else DarkCardBorder
+    }
 
     // Main Floating Container - 100% Solid opaque dark card so underlying content never bleeds through
     Box(
         modifier = Modifier
             .widthIn(min = 200.dp, max = 350.dp)
-            .clip(RoundedCornerShape(if (currentMode == OverlayBarMode.SMALL_PILL) 24.dp else settings.overlayCornerRadius.dp))
+            .clip(containerShape)
             .background(DarkBg)
             .border(
                 1.5.dp,
-                if (hasContent) CrimsonPrimary.copy(alpha = 0.9f) else DarkCardBorder,
-                RoundedCornerShape(if (currentMode == OverlayBarMode.SMALL_PILL) 24.dp else settings.overlayCornerRadius.dp)
+                borderColor,
+                containerShape
             )
             .pointerInput(Unit) {
-                detectDragGestures { change, dragAmount ->
-                    change.consume()
-                    onDrag(dragAmount.x, dragAmount.y)
-                }
+                detectDragGestures(
+                    onDragEnd = onDragEnd,
+                    onDragCancel = onDragEnd,
+                    onDrag = { change, dragAmount ->
+                        change.consume()
+                        onDrag(dragAmount.x, dragAmount.y)
+                    }
+                )
             }
             .padding(if (currentMode == OverlayBarMode.SMALL_PILL) 6.dp else 10.dp)
     ) {
@@ -432,25 +447,7 @@ private fun MainBarExpanded(
 
         // Expanded Body
         if (isGenerating) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 8.dp),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(14.dp),
-                    strokeWidth = 2.dp,
-                    color = CrimsonPrimary
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = "Synthesizing AI replies...",
-                    fontSize = 11.5.sp,
-                    color = TextSecondary
-                )
-            }
+            GeneratingProgressIndicator()
         } else if (currentQuestion != null) {
             // Detected Question Card
             Column(
@@ -570,38 +567,14 @@ private fun MainBarExpanded(
             // Reply Cards
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 activeReplies.forEach { reply ->
-                    Surface(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(6.dp))
-                            .clickable {
+                    androidx.compose.runtime.key(reply.id) {
+                        ReplyCardItem(
+                            reply = reply,
+                            textSizeSp = settings.overlayTextSizeSp,
+                            onClick = {
                                 AppStateManager.copyAndDismissReply(context, reply)
-                            },
-                        shape = RoundedCornerShape(6.dp),
-                        color = DarkCardElevated,
-                        border = BorderStroke(1.dp, DarkCardBorder)
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 8.dp, vertical = 6.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = reply.text,
-                                fontSize = settings.overlayTextSizeSp.sp,
-                                color = TextWhite,
-                                modifier = Modifier.weight(1f)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Icon(
-                                imageVector = Icons.Default.ContentCopy,
-                                contentDescription = "Copy",
-                                tint = TechBlue,
-                                modifier = Modifier.size(13.dp)
-                            )
-                        }
+                            }
+                        )
                     }
                 }
             }
@@ -971,3 +944,67 @@ private fun LangBarPanel(
         }
     }
 }
+
+@Composable
+private fun GeneratingProgressIndicator() {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        CircularProgressIndicator(
+            modifier = Modifier.size(14.dp),
+            strokeWidth = 2.dp,
+            color = CrimsonPrimary
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(
+            text = "Synthesizing AI replies...",
+            fontSize = 11.5.sp,
+            color = TextSecondary
+        )
+    }
+}
+
+@Composable
+private fun ReplyCardItem(
+    reply: ReplyItem,
+    textSizeSp: Int,
+    onClick: () -> Unit
+) {
+    val cardShape = remember { RoundedCornerShape(6.dp) }
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(cardShape)
+            .clickable(onClick = onClick),
+        shape = cardShape,
+        color = DarkCardElevated,
+        border = BorderStroke(1.dp, DarkCardBorder)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp, vertical = 6.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = reply.text,
+                fontSize = textSizeSp.sp,
+                color = TextWhite,
+                modifier = Modifier.weight(1f)
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+            Icon(
+                imageVector = Icons.Default.ContentCopy,
+                contentDescription = "Copy",
+                tint = TechBlue,
+                modifier = Modifier.size(13.dp)
+            )
+        }
+    }
+}
+

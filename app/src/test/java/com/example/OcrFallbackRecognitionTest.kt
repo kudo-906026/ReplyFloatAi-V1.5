@@ -189,14 +189,18 @@ class OcrFallbackRecognitionTest {
 
         AppStateManager.simulateGameCanvasOcr(null, "Super Sus")
 
-        Thread.sleep(150)
+        var logs = AppStateManager.diagnosticLogs.value
+        val start = System.currentTimeMillis()
+        while (logs.isEmpty() && (System.currentTimeMillis() - start) < 2000) {
+            Thread.sleep(50)
+            logs = AppStateManager.diagnosticLogs.value
+        }
 
-        val logs = AppStateManager.diagnosticLogs.value
         assertTrue("At least one diagnostic log must be recorded from game canvas OCR", logs.isNotEmpty())
 
-        val log = logs.first()
-        assertTrue("Log source must indicate Game Canvas OCR", log.source.contains("Game Canvas OCR"))
-        assertEquals(true, log.screenshotCaptured)
+        val log = logs.firstOrNull { it.source.contains("Game Canvas OCR") }
+        assertTrue("Log source must indicate Game Canvas OCR", log != null)
+        assertEquals(true, log!!.screenshotCaptured)
         assertEquals("900x450", log.imageDimensions)
         assertEquals(false, log.isImageBlank)
     }

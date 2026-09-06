@@ -38,6 +38,7 @@ jobs:
         fi
         if [ -f debug.keystore ]; then
           cp debug.keystore ~/.android/debug.keystore
+          cp debug.keystore app/debug.keystore
           echo "Keystore successfully configured."
         fi
 

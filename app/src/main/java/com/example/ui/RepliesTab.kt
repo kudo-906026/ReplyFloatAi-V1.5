@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -92,6 +93,7 @@ fun RepliesTab(
     onSetUnderstandingSummaryLength: (UnderstandingSummaryLength) -> Unit,
     onSetAutoGenerateReplies: (Boolean) -> Unit,
     onSetDetectQuestionsOnly: (Boolean) -> Unit,
+    onSetSmartDetectionAiVerified: (Boolean) -> Unit = { AppStateManager.setSmartDetectionAiVerified(it) },
     onSetPrefetchOnAppFocus: (Boolean) -> Unit,
     onSetAutoCopySingleReply: (Boolean) -> Unit,
     onSetExpandableReplies: (Boolean) -> Unit,
@@ -370,6 +372,50 @@ fun RepliesTab(
                             checked = settings.detectQuestionsOnly,
                             onCheckedChange = onSetDetectQuestionsOnly,
                             activeColor = AccentBlue
+                        )
+                    }
+
+                    HorizontalDivider(color = DarkCardBorder)
+
+                    // Smart Detection (AI Verified)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Text("Smart Detection (AI Verified)", fontWeight = FontWeight.SemiBold, fontSize = 12.5.sp, color = TextWhite)
+                                Surface(
+                                    color = if (settings.smartDetectionAiVerified) AccentPurple.copy(alpha = 0.2f) else DarkSurfaceVariant,
+                                    shape = RoundedCornerShape(4.dp),
+                                    border = BorderStroke(0.5.dp, if (settings.smartDetectionAiVerified) AccentPurple else DarkCardBorder)
+                                ) {
+                                    Text(
+                                        text = if (settings.smartDetectionAiVerified) "AI VERIFIED" else "OFF (FAST)",
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (settings.smartDetectionAiVerified) AccentPurple else TextMuted,
+                                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "Enabling this adds a small delay per detection but significantly reduces false positives (like URLs containing '?' or random UI labels), while keeping it off keeps detection instant but more prone to false triggers.",
+                                fontSize = 10.5.sp,
+                                color = TextSecondary,
+                                lineHeight = 14.sp
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        ControlPanelSwitch(
+                            checked = settings.smartDetectionAiVerified,
+                            onCheckedChange = onSetSmartDetectionAiVerified,
+                            activeColor = AccentPurple
                         )
                     }
 

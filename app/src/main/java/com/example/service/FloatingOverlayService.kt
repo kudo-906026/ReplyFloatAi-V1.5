@@ -10,6 +10,7 @@ import android.content.Intent
 import android.graphics.PixelFormat
 import android.os.Build
 import android.os.IBinder
+import android.view.Choreographer
 import android.view.Gravity
 import android.view.View
 import android.view.WindowManager
@@ -83,6 +84,42 @@ class FloatingOverlayService : Service(), LifecycleOwner, ViewModelStoreOwner, S
         AppStateManager.setOverlayRunning(true)
     }
 
+    private var pendingDx = 0f
+    private var pendingDy = 0f
+    private var isFrameScheduled = false
+    private val frameCallback = Choreographer.FrameCallback {
+        isFrameScheduled = false
+        val intX = pendingDx.toInt()
+        val intY = pendingDy.toInt()
+        if (intX != 0 || intY != 0) {
+            pendingDx -= intX
+            pendingDy -= intY
+            val lp = windowLayoutParams
+            val view = overlayComposeView
+            if (lp != null && view != null) {
+                lp.x += intX
+                lp.y += intY
+                runCatching { windowManager?.updateViewLayout(view, lp) }
+            }
+        }
+    }
+
+    private fun flushPendingDrag() {
+        val intX = pendingDx.toInt()
+        val intY = pendingDy.toInt()
+        if (intX != 0 || intY != 0) {
+            pendingDx -= intX
+            pendingDy -= intY
+            val lp = windowLayoutParams
+            val view = overlayComposeView
+            if (lp != null && view != null) {
+                lp.x += intX
+                lp.y += intY
+                runCatching { windowManager?.updateViewLayout(view, lp) }
+            }
+        }
+    }
+
     private fun initOverlayView() {
         try {
             windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
@@ -99,7 +136,8 @@ class FloatingOverlayService : Service(), LifecycleOwner, ViewModelStoreOwner, S
                 WindowManager.LayoutParams.WRAP_CONTENT,
                 layoutType,
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                        WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+                        WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
+                        WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
                 PixelFormat.TRANSLUCENT
             ).apply {
                 gravity = Gravity.TOP or Gravity.START
@@ -114,30 +152,20 @@ class FloatingOverlayService : Service(), LifecycleOwner, ViewModelStoreOwner, S
                 setViewTreeViewModelStoreOwner(this@FloatingOverlayService)
                 setViewTreeSavedStateRegistryOwner(this@FloatingOverlayService)
 
-                var accumulatedDx = 0f
-                var accumulatedDy = 0f
-
                 setContent {
                     ReplyFloatTheme {
                         FloatingOverlayView(
                             context = this@FloatingOverlayService,
                             onDrag = { dx, dy ->
-                                accumulatedDx += dx
-                                accumulatedDy += dy
-                                val intX = accumulatedDx.toInt()
-                                val intY = accumulatedDy.toInt()
-                                if (intX != 0 || intY != 0) {
-                                    accumulatedDx -= intX
-                                    accumulatedDy -= intY
-                                    val lp = windowLayoutParams
-                                    if (lp != null) {
-                                        lp.x += intX
-                                        lp.y += intY
-                                        overlayComposeView?.let { view ->
-                                            runCatching { windowManager?.updateViewLayout(view, lp) }
-                                        }
-                                    }
+                                pendingDx += dx
+                                pendingDy += dy
+                                if (!isFrameScheduled) {
+                                    isFrameScheduled = true
+                                    Choreographer.getInstance().postFrameCallback(frameCallback)
                                 }
+                            },
+                            onDragEnd = {
+                                flushPendingDrag()
                             },
                             onClose = {
                                 stopSelf()
@@ -187,6 +215,10 @@ class FloatingOverlayService : Service(), LifecycleOwner, ViewModelStoreOwner, S
     }
 
     override fun onDestroy() {
+        if (isFrameScheduled) {
+            runCatching { Choreographer.getInstance().removeFrameCallback(frameCallback) }
+            isFrameScheduled = false
+        }
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_PAUSE)
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_STOP)
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_DESTROY)

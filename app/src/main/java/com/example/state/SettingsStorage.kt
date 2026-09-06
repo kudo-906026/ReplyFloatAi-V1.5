@@ -129,6 +129,7 @@ object SettingsStorage {
         root.put("count", settings.count)
         root.put("autoGenerate", settings.autoGenerate)
         root.put("detectQuestionsOnly", settings.detectQuestionsOnly)
+        root.put("smartDetectionAiVerified", settings.smartDetectionAiVerified)
         root.put("prefetchOnAppFocus", settings.prefetchOnAppFocus)
         root.put("autoCopySingleReply", settings.autoCopySingleReply)
         root.put("understandingMode", settings.understandingMode)
@@ -349,6 +350,7 @@ object SettingsStorage {
             count = root.optInt("count", 3),
             autoGenerate = root.optBoolean("autoGenerate", true),
             detectQuestionsOnly = root.optBoolean("detectQuestionsOnly", true),
+            smartDetectionAiVerified = root.optBoolean("smartDetectionAiVerified", false),
             triggers = finalTriggers,
             prefetchOnAppFocus = root.optBoolean("prefetchOnAppFocus", true),
             autoCopySingleReply = root.optBoolean("autoCopySingleReply", false),

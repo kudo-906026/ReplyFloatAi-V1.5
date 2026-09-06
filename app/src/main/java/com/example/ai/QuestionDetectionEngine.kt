@@ -49,6 +49,64 @@ object QuestionDetectionEngine {
         "tell me about", "wondering if", "check if", "wanna", "want to"
     )
 
+    // Conversational inquiry & confirmation terms that form valid short inquiries with '?'
+    val CONVERSATIONAL_INQUIRY_WORDS = setOf(
+        "huh", "really", "ready", "agree", "thoughts", "serious", "sure", "okay", "ok",
+        "done", "interested", "coming", "free", "busy", "there", "good", "fine", "cool",
+        "correct", "right", "wrong", "true", "false", "possible", "safe"
+    )
+
+    // Regex matching any standard URL, web link, shortener, or domain.tld/path pattern
+    val URL_PATTERN_REGEX = Regex(
+        "(?i)(" +
+            "https?://[^\\s]+" +
+            "|\\bwww\\.[a-zA-Z0-9\\-]+\\.[a-zA-Z0-9.\\-_]+(/[^\\s]*)?" +
+            "|\\b(youtu\\.be|t\\.co|bit\\.ly|tinyurl\\.com|goo\\.gl|t\\.me|wa\\.me)/[^\\s]+" +
+            "|\\b[a-zA-Z0-9\\-]+\\.(com|org|net|edu|gov|io|ai|co|app|dev|me|info|biz|tv|xyz|uk|ca|de|jp|fr|au|in|ru|br|cn)/[^\\s]+" +
+            "|\\b[a-zA-Z0-9\\-]+\\.(com|org|net|edu|gov|io|ai|co|app|dev|me|info|biz|tv|xyz|uk|ca|de|jp|fr|au|in|ru|br|cn)\\?[^\\s]+" +
+        ")"
+    )
+
+    // Regex matching programming code snippets, file paths, operators, or technical syntax
+    private val CODE_OR_TECHNICAL_PATTERNS = listOf(
+        // Ternary operator: ' ? ' or '? :' or '?:'
+        Regex("\\s\\?\\s"),
+        Regex("\\?\\s*:"),
+        Regex("\\?:"),
+        // Safe-call operator: ?. (e.g. user?.name, obj?.field)
+        Regex("\\?\\."),
+        // Null assertion / optional types / casting: as?, is?, !!
+        Regex("\\b(as\\?|is\\?)\\b"),
+        Regex("!!"),
+        // Kotlin / Swift / TypeScript type declaration with nullable: e.g. ': String?' or ': User?' or 'var count: Int?' or '<String?>'
+        Regex("(:\\s*|as\\s+|is\\s+|<)[A-Z][a-zA-Z0-9_]*\\?\\s*([=,;)\\]>]|\\z)"),
+        Regex("\\b(val|var|let|const)\\s+[a-zA-Z0-9_]+\\s*:\\s*[A-Z][a-zA-Z0-9_]*\\?"),
+        // C# / Java nullable declaration: e.g. 'int? count' or 'String? name'
+        Regex("\\b(int|long|bool|double|float|string)\\?\\s+[a-zA-Z0-9_]+"),
+        // SQL query placeholders: 'WHERE ... = ?' or 'VALUES (?)'
+        Regex("(?i)\\b(WHERE|VALUES|SET|AND|OR)\\s+[a-zA-Z0-9_]+\\s*(=|<|>|LIKE|IN)\\s*\\?"),
+        Regex("(?i)VALUES\\s*\\(\\s*\\?"),
+        // Regular expression syntax with ?: or ?= or ?<= or ?! or ?<!
+        Regex("\\(\\?[=!:<!]"),
+        // CLI command flags: e.g. /? or -?
+        Regex("(\\s|^)(/\\?|-\\?)(\\s|\\z)"),
+        // System file paths with directory separators: e.g. C:\path\file, /usr/bin, folder/file
+        Regex("[a-zA-Z]:\\\\|\\\\|/(etc|usr|bin|var|opt|tmp|home|sys|proc|app|src)/"),
+        // File path with extension ending or containing ?: e.g. file.kt?, main.cpp?, test.py?
+        Regex("\\.[a-zA-Z0-9]{2,4}\\?"),
+        // Code structural tokens: semicolons at end of line preceded by assignment or call
+        Regex("=\\s*[^;]+;\\s*$"),
+        Regex("^(val|var|fun|def|function|class|interface|import|package|SELECT|INSERT|UPDATE|DELETE)\\s+")
+    )
+
+    fun containsUrlPattern(text: String): Boolean {
+        return URL_PATTERN_REGEX.containsMatchIn(text)
+    }
+
+    fun isTechnicalOrCodeSnippet(text: String): Boolean {
+        return CODE_OR_TECHNICAL_PATTERNS.any { it.containsMatchIn(text) }
+    }
+
     fun matchesAnyTrigger(text: String, triggers: List<com.example.model.TriggerItem>): Pair<Boolean, String?> {
         val enabled = triggers.filter { it.isEnabled && it.pattern.isNotBlank() }
         if (enabled.isEmpty()) {
@@ -78,6 +136,31 @@ object QuestionDetectionEngine {
         return false to null
     }
 
+    fun isGrammaticallyPlausibleQuestion(text: String): Boolean {
+        val lowerText = text.lowercase()
+        val words = extractWords(text)
+
+        // 1. Sentence starter with question word
+        if (checkSentenceStarters(text) != null) return true
+
+        // 2. Contains any Wh- word, modal verb, auxiliary verb
+        if (words.any { it in QUESTION_WORDS }) return true
+
+        // 3. Contains conversational inquiry phrase
+        if (QUESTION_PHRASES.any { lowerText.contains(it) }) return true
+
+        // 4. Contains conversational inquiry term (e.g. "huh", "really", "ready", "okay", "thoughts", etc.)
+        if (words.any { it in CONVERSATIONAL_INQUIRY_WORDS }) return true
+
+        // 5. Math expression / calculation
+        if (checkMathNotation(text) != null) return true
+
+        // 6. Multi-line interrogative clause
+        if (text.contains("\n") && checkMultiLineQuestion(text) != null) return true
+
+        return false
+    }
+
     fun analyze(
         rawText: String,
         detectQuestionsOnly: Boolean,
@@ -94,12 +177,23 @@ object QuestionDetectionEngine {
             )
         }
 
-        // Ignore URLs and file paths that happen to have '?'
-        if (isUrlOrFilePath(trimmed)) {
+        // 1. Strict URL filtering: ANY text matching a URL pattern is NEVER treated as a question,
+        // even if it contains '?' in a query parameter or question words elsewhere in the message.
+        if (containsUrlPattern(trimmed)) {
             return DetectionAnalysisResult(
                 isQuestion = false,
                 category = "URL_OR_PATH",
                 reason = "Text appears to be a URL, link, or path with query parameters",
+                extractedQuestionText = trimmed
+            )
+        }
+
+        // 2. Strict Technical / Code Snippet filtering: reject ternary operators, safe calls, SQL, file paths
+        if (isTechnicalOrCodeSnippet(trimmed)) {
+            return DetectionAnalysisResult(
+                isQuestion = false,
+                category = "REJECTED_TECHNICAL_TEXT",
+                reason = "Text contains code syntax, file paths, or technical placeholders rather than a natural conversation question",
                 extractedQuestionText = trimmed
             )
         }
@@ -110,29 +204,19 @@ object QuestionDetectionEngine {
         if (detectQuestionsOnly && !hasTriggerMatch) {
             return DetectionAnalysisResult(
                 isQuestion = false,
-                category = "NO_QUESTION_TRIGGER",
-                reason = "Rejected: Text does not contain any enabled question trigger word or symbol",
+                category = "NO_QUESTION_MARK",
+                reason = "Rejected: Text does not contain any enabled question trigger or question mark",
                 extractedQuestionText = trimmed
             )
         }
 
-        // 1. Check for Math Notation / Math Prompts (Must contain math calculation keywords or equation)
+        // 3. Check for Math Notation / Math Prompts (Must contain math calculation keywords or equation)
         val mathResult = checkMathNotation(trimmed)
         if (mathResult != null) {
             return mathResult
         }
 
-        // 2. If trigger matched, accept question
-        if (hasTriggerMatch && matchedTrigger != null) {
-            return DetectionAnalysisResult(
-                isQuestion = true,
-                category = if (matchedTrigger == "?" || matchedTrigger == "？") "QUESTION_MARK" else "TRIGGER_WORD",
-                reason = "Contains enabled question trigger '$matchedTrigger'",
-                extractedQuestionText = trimmed
-            )
-        }
-
-        // 3. Conversational question phrases
+        // 4. Conversational question phrases
         val lowerText = trimmed.lowercase()
         for (phrase in QUESTION_PHRASES) {
             if (lowerText.contains(phrase)) {
@@ -147,7 +231,7 @@ object QuestionDetectionEngine {
             }
         }
 
-        // 4. Multi-line checks
+        // 5. Multi-line checks
         if (trimmed.contains("\n")) {
             val multiLineResult = checkMultiLineQuestion(trimmed)
             if (multiLineResult != null) {
@@ -155,13 +239,34 @@ object QuestionDetectionEngine {
             }
         }
 
-        // 5. Sentence starter with question word
+        // 6. Sentence starter with question word
         val starterResult = checkSentenceStarters(trimmed)
         if (starterResult != null && (hasTriggerMatch || !detectQuestionsOnly)) {
             return starterResult
         }
 
-        // 6. If detectQuestionsOnly is disabled, accept all messaging text
+        // 7. Contextual natural language validation for questions with '?' or trigger words
+        val isPlausible = isGrammaticallyPlausibleQuestion(trimmed)
+        if (isPlausible && (hasTriggerMatch || !detectQuestionsOnly)) {
+            return DetectionAnalysisResult(
+                isQuestion = true,
+                category = if (matchedTrigger == "?" || matchedTrigger == "？" || trimmed.contains("?")) "QUESTION_MARK" else "TRIGGER_WORD",
+                reason = "Valid conversational question structure detected with trigger '${matchedTrigger ?: "?"}'",
+                extractedQuestionText = trimmed
+            )
+        }
+
+        // 8. If text has '?' or trigger but is NOT grammatically/conversationally plausible as a question
+        if (hasTriggerMatch) {
+            return DetectionAnalysisResult(
+                isQuestion = false,
+                category = "REJECTED_NON_QUESTION_CONTEXT",
+                reason = "Question mark '?' or trigger does not appear in a grammatically plausible natural language question structure",
+                extractedQuestionText = trimmed
+            )
+        }
+
+        // 9. If detectQuestionsOnly is disabled, accept all messaging text
         if (!detectQuestionsOnly) {
             return DetectionAnalysisResult(
                 isQuestion = true,
@@ -171,7 +276,7 @@ object QuestionDetectionEngine {
             )
         }
 
-        // 7. Otherwise, safely classify as normal non-question messaging text
+        // 10. Otherwise, safely classify as normal non-question messaging text
         return DetectionAnalysisResult(
             isQuestion = false,
             category = "NORMAL_STATEMENT",
@@ -187,13 +292,8 @@ object QuestionDetectionEngine {
             .filter { it.isNotBlank() }
     }
 
-    private fun isUrlOrFilePath(text: String): Boolean {
-        val lower = text.lowercase()
-        return lower.startsWith("http://") ||
-                lower.startsWith("https://") ||
-                lower.startsWith("www.") ||
-                lower.startsWith("file://") ||
-                (lower.contains("?") && (lower.contains("utm_") || lower.contains(".com/") || lower.contains(".org/") || lower.contains(".net/")))
+    fun isUrlOrFilePath(text: String): Boolean {
+        return containsUrlPattern(text) || isTechnicalOrCodeSnippet(text)
     }
 
     private fun checkMathNotation(text: String): DetectionAnalysisResult? {

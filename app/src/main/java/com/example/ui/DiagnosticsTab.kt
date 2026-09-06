@@ -740,7 +740,7 @@ fun DiagnosticsTab(
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = if (diagnosticLogs.isEmpty()) "No diagnostic events yet. Trigger a message scan or use the Simulator to generate events." else "No events match the selected filter.",
+                                text = if (diagnosticLogs.isEmpty()) "No diagnostic events yet. Incoming messages and detection events will be logged here." else "No events match the selected filter.",
                                 fontSize = 11.5.sp,
                                 color = TextMuted
                             )

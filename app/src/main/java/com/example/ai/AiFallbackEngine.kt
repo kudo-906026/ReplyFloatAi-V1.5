@@ -3,6 +3,7 @@ package com.example.ai
 import com.example.model.AiModelTier
 import com.example.model.AiProvider
 import com.example.model.AiProviderType
+import com.example.model.AiQuestionVerificationResult
 import com.example.model.DetectionResultType
 import com.example.model.ReplyItem
 import com.example.model.ReplySettings
@@ -210,6 +211,249 @@ object AiFallbackEngine {
         val result = generateRepliesWithFallback(question, settings)
         Pair(result.replies, result.understanding)
     }
+
+    /**
+     * Executes the extra AI classification pre-check step for "Smart Detection (AI Verified)".
+     * Selects the fastest/cheapest available model specifically for this check,
+     * falling back to the on-device built-in engine if offline or if no remote key is configured.
+     */
+    suspend fun classifyQuestionWithFastestModel(
+        text: String,
+        settings: ReplySettings
+    ): AiQuestionVerificationResult = withContext(Dispatchers.IO) {
+        val startTime = System.currentTimeMillis()
+        val clean = text.trim()
+
+        val allMap = (defaultBuiltInProviders() + settings.customProviders).associateBy { it.id }.toMutableMap()
+        settings.providerApiKeys.forEach { (id, key) ->
+            allMap[id]?.let { allMap[id] = it.copy(apiKey = key) }
+        }
+        settings.providerModelOverrides.forEach { (id, model) ->
+            allMap[id]?.let { allMap[id] = it.copy(modelName = model) }
+        }
+
+        // Rank available providers by latency & cost for classification (Groq/Gemini Flash Lite/OpenAI 4o-mini)
+        val fastestProvider = listOfNotNull(
+            allMap["groq"]?.takeIf { it.apiKey.isNotBlank() },
+            allMap["gemini-api"]?.takeIf { it.apiKey.isNotBlank() },
+            allMap["openai"]?.takeIf { it.apiKey.isNotBlank() },
+            allMap["anthropic"]?.takeIf { it.apiKey.isNotBlank() }
+        ).firstOrNull() ?: allMap["gemini-builtin"] ?: defaultBuiltInProviders().first { it.type == AiProviderType.GEMINI_BUILTIN }
+
+        if (fastestProvider.type == AiProviderType.GEMINI_BUILTIN) {
+            val (isQ, reason) = classifyWithBuiltInEngine(clean)
+            val latency = System.currentTimeMillis() - startTime
+            return@withContext AiQuestionVerificationResult(
+                isQuestion = isQ,
+                reason = reason,
+                modelUsed = fastestProvider.displayName,
+                latencyMs = latency
+            )
+        }
+
+        try {
+            val (isQ, reason) = when (fastestProvider.type) {
+                AiProviderType.GEMINI_API -> callGeminiClassification(fastestProvider, clean)
+                AiProviderType.GROQ, AiProviderType.OPENAI, AiProviderType.CUSTOM_REST -> callOpenAiCompatibleClassification(fastestProvider, clean)
+                AiProviderType.ANTHROPIC -> callAnthropicClassification(fastestProvider, clean)
+                else -> classifyWithBuiltInEngine(clean)
+            }
+            val latency = System.currentTimeMillis() - startTime
+            return@withContext AiQuestionVerificationResult(
+                isQuestion = isQ,
+                reason = reason,
+                modelUsed = "${fastestProvider.displayName} (${fastestProvider.modelName})",
+                latencyMs = latency
+            )
+        } catch (e: Exception) {
+            val (isQ, reason) = classifyWithBuiltInEngine(clean)
+            val latency = System.currentTimeMillis() - startTime
+            return@withContext AiQuestionVerificationResult(
+                isQuestion = isQ,
+                reason = "$reason (Fallback from ${fastestProvider.displayName}: ${e.message ?: "Network failure"})",
+                modelUsed = "Gemini Flash Lite (Built-in Fallback)",
+                latencyMs = latency
+            )
+        }
+    }
+
+    fun classifyWithBuiltInEngine(clean: String): Pair<Boolean, String> {
+        if (QuestionDetectionEngine.containsUrlPattern(clean)) {
+            return Pair(false, "Detected URL, web link, or query parameter structure")
+        }
+        if (QuestionDetectionEngine.isTechnicalOrCodeSnippet(clean)) {
+            return Pair(false, "Detected programming syntax, technical operator, or file path")
+        }
+        val analysis = QuestionDetectionEngine.analyze(clean, detectQuestionsOnly = true)
+        if (!analysis.isQuestion) {
+            return Pair(false, analysis.reason)
+        }
+        return Pair(true, "Context verified as genuine conversational inquiry (${analysis.category})")
+    }
+
+    private fun callGeminiClassification(provider: AiProvider, text: String): Pair<Boolean, String> {
+        var rawModel = provider.modelName.trim()
+        if (rawModel.startsWith("models/")) rawModel = rawModel.removePrefix("models/")
+        rawModel = rawModel.replace(" ", "-")
+        val model = if (rawModel.isBlank()) "gemini-3.1-flash-lite" else rawModel
+        val url = URL("https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=${provider.apiKey.trim()}")
+        val conn = (url.openConnection() as HttpURLConnection).apply {
+            requestMethod = "POST"
+            doOutput = true
+            setRequestProperty("Content-Type", "application/json")
+            connectTimeout = 4000
+            readTimeout = 4000
+        }
+
+        val prompt = "You are an AI pre-check classifier for a chat assistant. Determine if this message is a genuine conversational question or an inquiry requiring a reply in messaging.\n" +
+                "Reject: URLs/links (even with '?'), code/programming syntax, error logs, random UI labels, or non-question text.\n" +
+                "Text: \"$text\"\n" +
+                "Respond strictly with JSON: {\"isQuestion\": true|false, \"reason\": \"<short reason>\"}."
+
+        val jsonBody = JSONObject().apply {
+            put("contents", JSONArray().apply {
+                put(JSONObject().apply {
+                    put("parts", JSONArray().apply {
+                        put(JSONObject().apply { put("text", prompt) })
+                    })
+                })
+            })
+            put("generationConfig", JSONObject().apply {
+                put("responseMimeType", "application/json")
+                put("temperature", 0.0)
+                put("maxOutputTokens", 80)
+            })
+        }
+
+        OutputStreamWriter(conn.outputStream).use { it.write(jsonBody.toString()) }
+
+        if (conn.responseCode == 200) {
+            val responseText = BufferedReader(InputStreamReader(conn.inputStream)).use { it.readText() }
+            val root = JSONObject(responseText)
+            val candidates = root.optJSONArray("candidates")
+            if (candidates != null && candidates.length() > 0) {
+                val out = candidates.getJSONObject(0).getJSONObject("content").getJSONArray("parts").getJSONObject(0).getString("text")
+                return parseClassificationJson(out)
+            }
+        }
+        throw java.io.IOException("Gemini API classification failed (HTTP ${conn.responseCode})")
+    }
+
+    private fun callOpenAiCompatibleClassification(provider: AiProvider, text: String): Pair<Boolean, String> {
+        val endpoint = provider.customEndpoint?.takeIf { it.isNotBlank() } ?: if (provider.type == AiProviderType.GROQ) {
+            "https://api.groq.com/openai/v1/chat/completions"
+        } else {
+            "https://api.openai.com/v1/chat/completions"
+        }
+        val url = URL(endpoint)
+        val conn = (url.openConnection() as HttpURLConnection).apply {
+            requestMethod = "POST"
+            doOutput = true
+            setRequestProperty("Content-Type", "application/json; charset=utf-8")
+            setRequestProperty("Accept", "application/json")
+            if (provider.apiKey.isNotBlank()) {
+                setRequestProperty("Authorization", "Bearer ${provider.apiKey.trim()}")
+            }
+            connectTimeout = 4000
+            readTimeout = 4000
+        }
+
+        val prompt = "You are an AI pre-check classifier for a chat assistant. Determine if this message is a genuine conversational question or an inquiry requiring a reply in messaging.\n" +
+                "Reject: URLs/links (even with '?'), code/programming syntax, error logs, random UI labels, or non-question text.\n" +
+                "Text: \"$text\"\n" +
+                "Respond strictly with JSON: {\"isQuestion\": true|false, \"reason\": \"<short reason>\"}."
+
+        val jsonBody = JSONObject().apply {
+            put("model", provider.modelName.ifBlank { "gpt-4o-mini" })
+            put("max_tokens", 80)
+            put("temperature", 0.0)
+            put("response_format", JSONObject().put("type", "json_object"))
+            put("messages", JSONArray().apply {
+                put(JSONObject().apply {
+                    put("role", "system")
+                    put("content", "You output strictly valid JSON classification objects.")
+                })
+                put(JSONObject().apply {
+                    put("role", "user")
+                    put("content", prompt)
+                })
+            })
+        }
+
+        OutputStreamWriter(conn.outputStream).use { it.write(jsonBody.toString()) }
+
+        if (conn.responseCode == 200) {
+            val responseText = BufferedReader(InputStreamReader(conn.inputStream)).use { it.readText() }
+            val root = JSONObject(responseText)
+            val content = extractContentFromOpenAiJson(root)
+            if (content.isNotBlank()) {
+                return parseClassificationJson(content)
+            }
+        }
+        throw java.io.IOException("${provider.displayName} classification failed (HTTP ${conn.responseCode})")
+    }
+
+    private fun callAnthropicClassification(provider: AiProvider, text: String): Pair<Boolean, String> {
+        val url = URL("https://api.anthropic.com/v1/messages")
+        val conn = (url.openConnection() as HttpURLConnection).apply {
+            requestMethod = "POST"
+            doOutput = true
+            setRequestProperty("Content-Type", "application/json")
+            setRequestProperty("x-api-key", provider.apiKey.trim())
+            setRequestProperty("anthropic-version", "2023-06-01")
+            connectTimeout = 4000
+            readTimeout = 4000
+        }
+
+        val prompt = "Determine if this message is a genuine conversational question or inquiry requiring a reply in messaging. Reject: URLs/links (even with '?'), code/programming syntax, error logs, random UI labels, or non-question text.\nText: \"$text\"\nOutput ONLY JSON: {\"isQuestion\": true|false, \"reason\": \"<short reason>\"}."
+
+        val body = JSONObject().apply {
+            put("model", provider.modelName.ifBlank { "claude-3-5-haiku-20241022" })
+            put("max_tokens", 80)
+            put("messages", JSONArray().apply {
+                put(JSONObject().apply {
+                    put("role", "user")
+                    put("content", prompt)
+                })
+            })
+        }
+
+        OutputStreamWriter(conn.outputStream).use { it.write(body.toString()) }
+
+        if (conn.responseCode == 200) {
+            val resp = BufferedReader(InputStreamReader(conn.inputStream)).use { it.readText() }
+            val root = JSONObject(resp)
+            val contentArr = root.getJSONArray("content")
+            if (contentArr.length() > 0) {
+                val out = contentArr.getJSONObject(0).getString("text")
+                return parseClassificationJson(out)
+            }
+        }
+        throw java.io.IOException("Anthropic classification failed (HTTP ${conn.responseCode})")
+    }
+
+    fun parseClassificationJson(raw: String): Pair<Boolean, String> {
+        var clean = raw.trim()
+        if (clean.contains("</think>")) {
+            clean = clean.substringAfter("</think>").trim()
+        }
+        clean = clean.replace("```json", "").replace("```JSON", "").replace("```", "").trim()
+        try {
+            val start = clean.indexOf('{')
+            val end = clean.lastIndexOf('}')
+            if (start != -1 && end != -1 && end > start) {
+                val json = JSONObject(clean.substring(start, end + 1))
+                val isQ = json.optBoolean("isQuestion", json.optBoolean("is_question", false))
+                val rsn = json.optString("reason", if (isQ) "Verified conversational question" else "Rejected by AI classifier")
+                return Pair(isQ, rsn)
+            }
+        } catch (_: Exception) {}
+
+        val lower = clean.lowercase()
+        val isQ = lower.contains("\"isquestion\": true") || lower.contains("\"is_question\": true") || lower.contains("true")
+        return Pair(isQ, if (isQ) "Verified conversational question" else "Rejected by AI classifier")
+    }
+
 
     suspend fun testProviderConnection(
         provider: AiProvider,

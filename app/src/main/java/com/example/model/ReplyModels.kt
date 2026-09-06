@@ -221,6 +221,7 @@ data class ReplySettings(
     val count: Int = 3,
     val autoGenerate: Boolean = true,
     val detectQuestionsOnly: Boolean = true,
+    val smartDetectionAiVerified: Boolean = false,
     val triggers: List<TriggerItem> = defaultTriggers(),
     val prefetchOnAppFocus: Boolean = true,
     val autoCopySingleReply: Boolean = false,
@@ -383,3 +384,9 @@ data class DiagnosticLogEntry(
     val ocrError: String? = null
 )
 
+data class AiQuestionVerificationResult(
+    val isQuestion: Boolean,
+    val reason: String,
+    val modelUsed: String,
+    val latencyMs: Long
+)

@@ -7,6 +7,7 @@ import com.example.model.ReplyTone
 import com.example.model.defaultBuiltInProviders
 import com.example.state.SettingsStorage
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -84,5 +85,24 @@ class SettingsStorageTest {
         val deserialized = SettingsStorage.deserializeSettings(serialized)
         assertEquals(p2.id, deserialized.fallbackOrder[0])
         assertEquals(p2.id, deserialized.preferredProvider.id)
+    }
+
+    @Test
+    fun testSmartDetectionAiVerifiedPersistence() {
+        // Default must be false (fast local pattern-matching by default)
+        val defaultSettings = ReplySettings()
+        assertFalse("Expected smartDetectionAiVerified to be false by default", defaultSettings.smartDetectionAiVerified)
+
+        val serializedDefault = SettingsStorage.serializeSettings(defaultSettings)
+        val deserializedDefault = SettingsStorage.deserializeSettings(serializedDefault)
+        assertFalse("Expected restored default smartDetectionAiVerified to be false", deserializedDefault.smartDetectionAiVerified)
+
+        // When toggled to true, must persist across save/reload
+        val enabledSettings = defaultSettings.copy(smartDetectionAiVerified = true)
+        assertTrue(enabledSettings.smartDetectionAiVerified)
+
+        val serializedEnabled = SettingsStorage.serializeSettings(enabledSettings)
+        val deserializedEnabled = SettingsStorage.deserializeSettings(serializedEnabled)
+        assertTrue("Expected restored smartDetectionAiVerified to be true after toggle", deserializedEnabled.smartDetectionAiVerified)
     }
 }

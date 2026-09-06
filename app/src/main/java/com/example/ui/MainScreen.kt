@@ -94,7 +94,6 @@ import com.example.ui.theme.TextWhite
 
 enum class ControlPanelTab(val title: String, val icon: ImageVector, val tag: String) {
     CONTROLS("Controls", Icons.Default.Dashboard, "tab_controls"),
-    SIMULATOR("Simulator", Icons.Default.Speed, "tab_simulator"),
     DIAGNOSTICS("Diagnostics", Icons.Default.BugReport, "tab_diagnostics"),
     HISTORY("History", Icons.Default.History, "tab_history"),
     PROVIDERS("Providers", Icons.Default.Psychology, "tab_providers"),
@@ -347,29 +346,6 @@ fun MainScreen() {
                         }
                     )
                 }
-                ControlPanelTab.SIMULATOR -> {
-                    SimulatorTab(
-                        currentQuestion = currentQuestion,
-                        activeReplies = activeReplies,
-                        isGenerating = isGenerating,
-                        errorMessage = errorMessage,
-                        settings = settings,
-                        activeProvider = activeProvider,
-                        diagnosticLogs = diagnosticLogs,
-                        onSimulateQuestion = { text, source ->
-                            AppStateManager.simulateQuestionDetected(context, text, source)
-                        },
-                        onSimulateOcrQuestion = { text, source ->
-                            AppStateManager.simulateOcrQuestionDetected(context, text, source)
-                        },
-                        onCopyReply = { reply ->
-                            AppStateManager.copyAndDismissReply(context, reply)
-                        },
-                        onClearDiagnosticLogs = {
-                            AppStateManager.clearDiagnosticLogs()
-                        }
-                    )
-                }
                 ControlPanelTab.DIAGNOSTICS -> {
                     DiagnosticsTab(
                         settings = settings,
@@ -439,6 +415,7 @@ fun MainScreen() {
                         onSetUnderstandingSummaryLength = { AppStateManager.setUnderstandingSummaryLength(it) },
                         onSetAutoGenerateReplies = { AppStateManager.setAutoGenerateReplies(it) },
                         onSetDetectQuestionsOnly = { AppStateManager.setDetectQuestionsOnly(it) },
+                        onSetSmartDetectionAiVerified = { AppStateManager.setSmartDetectionAiVerified(it) },
                         onSetPrefetchOnAppFocus = { AppStateManager.setPrefetchOnAppFocus(it) },
                         onSetAutoCopySingleReply = { AppStateManager.setAutoCopySingleReply(it) },
                         onSetExpandableReplies = { AppStateManager.setExpandableReplies(it) },

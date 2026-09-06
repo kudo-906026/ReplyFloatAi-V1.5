@@ -52,6 +52,8 @@ class QuestionDetectorAccessibilityService : AccessibilityService() {
 
     private var lastProcessedText: String = ""
     private var lastProcessedTime: Long = 0L
+    private var lastScanAttemptTime: Long = 0L
+    private var lastRejectedLoggedText: String = ""
     private var lastOcrScanTime: Long = 0L
     private var isOcrProcessing: Boolean = false
 
@@ -61,6 +63,8 @@ class QuestionDetectorAccessibilityService : AccessibilityService() {
     private fun resetState() {
         lastProcessedText = ""
         lastProcessedTime = 0L
+        lastScanAttemptTime = 0L
+        lastRejectedLoggedText = ""
         lastOcrScanTime = 0L
         isOcrProcessing = false
     }
@@ -68,6 +72,7 @@ class QuestionDetectorAccessibilityService : AccessibilityService() {
     // Background coroutine scope ensuring zero UI/main thread blocking
     private val serviceScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
     private var continuousScanJob: kotlinx.coroutines.Job? = null
+    private var pendingEventScanJob: kotlinx.coroutines.Job? = null
 
     override fun onServiceConnected() {
         super.onServiceConnected()
@@ -114,6 +119,28 @@ class QuestionDetectorAccessibilityService : AccessibilityService() {
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event == null) return
+        val type = event.eventType
+        // Only trigger scans on events that change screen text, window state, or scroll position
+        if (type != AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED &&
+            type != AccessibilityEvent.TYPE_VIEW_SCROLLED &&
+            type != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED &&
+            type != AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED
+        ) {
+            return
+        }
+
+        val now = System.currentTimeMillis()
+        val debounce = AppStateManager.settings.value.smartDebounceMs.toLong().coerceAtLeast(300L)
+        if (now - lastScanAttemptTime < debounce) {
+            // Trailing edge debounce: schedule deferred scan when rapid bursts subside
+            pendingEventScanJob?.cancel()
+            pendingEventScanJob = serviceScope.launch(Dispatchers.Main) {
+                delay(debounce)
+                performWindowScan(isContinuousTick = false, forcedBypass = false)
+            }
+            return
+        }
+
         performWindowScan(isContinuousTick = false, forcedBypass = false, event = event)
     }
 
@@ -126,6 +153,12 @@ class QuestionDetectorAccessibilityService : AccessibilityService() {
         if (!settings.continuousScreenAnalysis && !forcedBypass) {
             return
         }
+
+        val now = System.currentTimeMillis()
+        if (!forcedBypass && (now - lastScanAttemptTime < settings.smartDebounceMs)) {
+            return
+        }
+        lastScanAttemptTime = now
 
         val rootNode = try { rootInActiveWindow } catch (_: Exception) { null }
         var pkgName = rootNode?.packageName?.toString() ?: event?.packageName?.toString()
@@ -146,11 +179,6 @@ class QuestionDetectorAccessibilityService : AccessibilityService() {
         val appName = whitelistedApp?.appName ?: getAppNameFromPackage(pkgName)
 
         if (whitelistedApp == null && !forcedBypass) {
-            return
-        }
-
-        val now = System.currentTimeMillis()
-        if (!forcedBypass && (now - lastProcessedTime < settings.smartDebounceMs)) {
             return
         }
 
@@ -243,7 +271,8 @@ class QuestionDetectorAccessibilityService : AccessibilityService() {
             // If no valid question node found, log rejection diagnostic if not a tick loop
             if (!isContinuousTick) {
                 val lowestNode = sortedNodes.firstOrNull()
-                if (lowestNode != null && lowestNode.text != lastProcessedText) {
+                if (lowestNode != null && lowestNode.text != lastProcessedText && lowestNode.text != lastRejectedLoggedText) {
+                    lastRejectedLoggedText = lowestNode.text
                     val lowestAnalysis = QuestionDetectionEngine.analyze(lowestNode.text, settings.detectQuestionsOnly)
                     AppStateManager.addDiagnosticLog(
                         source = "$appName (Visible Screen Node)",
