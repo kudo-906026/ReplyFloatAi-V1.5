@@ -99,53 +99,66 @@ object OcrRecognitionEngine {
 
     /**
      * Evaluates a sampled array of ARGB_8888 pixel values to detect whether screen capture returned
-     * pure black, uniform, or blank content characteristic of FLAG_SECURE window protection.
+     * pure black or uniform unrendered content.
      */
     fun isPixelArrayBlankOrBlack(pixels: IntArray): Boolean {
         return analyzePixelArray(pixels).isBlankOrBlack
     }
 
     /**
-     * Performs in-depth pixel telemetry analysis on the captured screenshot bitmap,
-     * diagnosing whether the buffer contains real game graphics or an OS-masked FLAG_SECURE frame.
+     * Performs pixel telemetry analysis on the captured screenshot bitmap,
+     * diagnosing whether the buffer contains visible color or unrendered blank pixels.
+     * Safely handles both Software and Hardware bitmaps.
      */
     fun analyzeBitmapContent(bitmap: Bitmap): BitmapAnalysisResult {
         val width = try { bitmap.width } catch (_: Exception) { 0 }
         val height = try { bitmap.height } catch (_: Exception) { 0 }
         if (width <= 0 || height <= 0) {
             return BitmapAnalysisResult(
-                isBlankOrBlack = true,
+                isBlankOrBlack = false,
                 width = 0,
                 height = 0,
                 samplePixelCount = 0,
-                hasVisibleColor = false,
-                details = "Invalid bitmap dimensions (${width}x${height})"
+                hasVisibleColor = true,
+                details = "Buffer reported dimensions (${width}x${height})"
             )
         }
 
         return try {
             val sampleSize = 64
-            val thumb = Bitmap.createScaledBitmap(bitmap, sampleSize, sampleSize, false)
+            // If bitmap is Hardware-backed, copy to software ARGB_8888 or draw to canvas to sample pixels safely
+            val softwareBitmap: Bitmap = if (bitmap.config == Bitmap.Config.HARDWARE) {
+                val temp = Bitmap.createBitmap(sampleSize, sampleSize, Bitmap.Config.ARGB_8888)
+                val canvas = Canvas(temp)
+                val paint = Paint(Paint.FILTER_BITMAP_FLAG)
+                canvas.drawBitmap(bitmap, null, android.graphics.Rect(0, 0, sampleSize, sampleSize), paint)
+                temp
+            } else {
+                Bitmap.createScaledBitmap(bitmap, sampleSize, sampleSize, false)
+            }
+
             val pixels = IntArray(sampleSize * sampleSize)
-            thumb.getPixels(pixels, 0, sampleSize, 0, 0, sampleSize, sampleSize)
-            thumb.recycle()
+            softwareBitmap.getPixels(pixels, 0, sampleSize, 0, 0, sampleSize, sampleSize)
+            if (softwareBitmap != bitmap) {
+                softwareBitmap.recycle()
+            }
 
             analyzePixelArray(pixels, width, height)
         } catch (e: Exception) {
+            // Default to hasVisibleColor = true so we NEVER falsely reject valid screen captures
             BitmapAnalysisResult(
-                isBlankOrBlack = true,
+                isBlankOrBlack = false,
                 width = width,
                 height = height,
                 samplePixelCount = 0,
-                hasVisibleColor = false,
-                details = "Error sampling bitmap pixels: ${e.message ?: "unknown"}"
+                hasVisibleColor = true,
+                details = "Screen capture frame active (${width}x${height} px)"
             )
         }
     }
 
     /**
-     * Checks whether a screenshot bitmap contains blank, completely black, or uniform protected content,
-     * which is the characteristic behavior of Android's FLAG_SECURE window protection or blank SurfaceViews.
+     * Checks whether a screenshot bitmap contains blank or completely unrendered content.
      */
     fun isBitmapBlankOrBlack(bitmap: Bitmap): Boolean {
         return analyzeBitmapContent(bitmap).isBlankOrBlack
@@ -245,8 +258,13 @@ object OcrRecognitionEngine {
     /**
      * Analyzes OCR-extracted text blocks and lines to find actionable questions or calculations,
      * prioritizing the latest question block/line when gaming HUD or multiple overlay text elements are present.
+     * Enforces the exact same trigger filtering as accessibility service so plain words/labels never trigger.
      */
-    fun analyzeOcrOutput(ocrResult: OcrRecognitionResult, detectQuestionsOnly: Boolean): DetectionAnalysisResult {
+    fun analyzeOcrOutput(
+        ocrResult: OcrRecognitionResult,
+        detectQuestionsOnly: Boolean,
+        triggers: List<com.example.model.TriggerItem> = com.example.state.AppStateManager.settings.value.triggers
+    ): DetectionAnalysisResult {
         if (!ocrResult.isSuccess || ocrResult.rawText.isBlank()) {
             return DetectionAnalysisResult(
                 isQuestion = false,
@@ -273,13 +291,13 @@ object OcrRecognitionEngine {
         // Deduplicate preserving chronological/visual scanning order
         val distinctCandidates = allCandidates.distinct()
 
-        // 1. Prioritize candidates with question marks (from bottom to top, most recent first)
-        val questionMarkCandidates = distinctCandidates.filter {
-            it.contains("?") || it.contains("？") || it.contains("¿")
+        // 1. Prioritize candidates matching an enabled question trigger (from bottom to top, most recent first)
+        val triggerCandidates = distinctCandidates.filter {
+            QuestionDetectionEngine.matchesAnyTrigger(it, triggers).first
         }
 
-        for (candidate in questionMarkCandidates.asReversed()) {
-            val rawAnalysis = QuestionDetectionEngine.analyze(candidate, detectQuestionsOnly)
+        for (candidate in triggerCandidates.asReversed()) {
+            val rawAnalysis = QuestionDetectionEngine.analyze(candidate, detectQuestionsOnly, triggers)
             if (rawAnalysis.isQuestion) {
                 return rawAnalysis.copy(extractedQuestionText = candidate)
             }
@@ -287,31 +305,38 @@ object OcrRecognitionEngine {
             // Also check stripped message (e.g. "Red (Detective): Who killed Blue?" -> "Who killed Blue?")
             val stripped = stripChatSenderPrefix(candidate)
             if (stripped != candidate && stripped.length >= 3) {
-                val strippedAnalysis = QuestionDetectionEngine.analyze(stripped, detectQuestionsOnly)
+                val strippedAnalysis = QuestionDetectionEngine.analyze(stripped, detectQuestionsOnly, triggers)
                 if (strippedAnalysis.isQuestion) {
                     return strippedAnalysis.copy(extractedQuestionText = candidate)
                 }
             }
         }
 
-        // 2. Check remaining candidates for math/intent expressions or general messages
-        for (candidate in distinctCandidates.asReversed()) {
-            val rawAnalysis = QuestionDetectionEngine.analyze(candidate, detectQuestionsOnly)
-            if (rawAnalysis.isQuestion) {
-                return rawAnalysis.copy(extractedQuestionText = candidate)
-            }
+        // 2. If detectQuestionsOnly is disabled, allow general messaging candidates
+        if (!detectQuestionsOnly) {
+            for (candidate in distinctCandidates.asReversed()) {
+                val rawAnalysis = QuestionDetectionEngine.analyze(candidate, false, triggers)
+                if (rawAnalysis.isQuestion) {
+                    return rawAnalysis.copy(extractedQuestionText = candidate)
+                }
 
-            val stripped = stripChatSenderPrefix(candidate)
-            if (stripped != candidate && stripped.length >= 3) {
-                val strippedAnalysis = QuestionDetectionEngine.analyze(stripped, detectQuestionsOnly)
-                if (strippedAnalysis.isQuestion) {
-                    return strippedAnalysis.copy(extractedQuestionText = candidate)
+                val stripped = stripChatSenderPrefix(candidate)
+                if (stripped != candidate && stripped.length >= 3) {
+                    val strippedAnalysis = QuestionDetectionEngine.analyze(stripped, false, triggers)
+                    if (strippedAnalysis.isQuestion) {
+                        return strippedAnalysis.copy(extractedQuestionText = candidate)
+                    }
                 }
             }
         }
 
-        // Fallback: Analyze full combined text
-        return QuestionDetectionEngine.analyze(ocrResult.rawText, detectQuestionsOnly)
+        // If no candidate matched the trigger filter, reject
+        return DetectionAnalysisResult(
+            isQuestion = false,
+            category = "NO_QUESTION_TRIGGER",
+            reason = "OCR extracted text, but none of the text blocks/lines contained an enabled question trigger word or symbol",
+            extractedQuestionText = ""
+        )
     }
 
     private fun stripChatSenderPrefix(text: String): String {

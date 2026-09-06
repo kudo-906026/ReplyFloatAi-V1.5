@@ -18,22 +18,33 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Cached
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.FilterAlt
 import androidx.compose.material.icons.filled.HelpOutline
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Psychology
+import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material.icons.filled.ShortText
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import com.example.model.TriggerItem
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -364,6 +375,15 @@ fun RepliesTab(
 
                     HorizontalDivider(color = DarkCardBorder)
 
+                    // Configurable Trigger-Word/Symbol List
+                    QuestionTriggersConfigSection(
+                        triggers = settings.triggers,
+                        onToggle = { AppStateManager.toggleTrigger(it) },
+                        onAdd = { AppStateManager.addTrigger(it) },
+                        onRemove = { AppStateManager.removeTrigger(it) },
+                        onReset = { AppStateManager.resetTriggersToDefault() }
+                    )
+
                     HorizontalDivider(color = DarkCardBorder)
 
                     // Reply Auto-Delete on Copy Timer (1m up to 10m)
@@ -610,6 +630,212 @@ fun RepliesTab(
                             colors = SliderDefaults.colors(thumbColor = CrimsonPrimary, activeTrackColor = CrimsonPrimary, inactiveTrackColor = DarkSurfaceVariant)
                         )
                     }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun QuestionTriggersConfigSection(
+    triggers: List<TriggerItem>,
+    onToggle: (String) -> Unit,
+    onAdd: (String) -> Unit,
+    onRemove: (String) -> Unit,
+    onReset: () -> Unit
+) {
+    var newTriggerText by remember { mutableStateOf("") }
+    val activeCount = triggers.count { it.isEnabled }
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Question Trigger Words & Symbols",
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 12.5.sp,
+                    color = TextWhite
+                )
+                Text(
+                    text = "Detection only fires if text contains at least one enabled trigger",
+                    fontSize = 10.5.sp,
+                    color = TextSecondary
+                )
+            }
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = if (activeCount > 0) TechGreen.copy(alpha = 0.18f) else CrimsonPrimary.copy(alpha = 0.18f),
+                border = BorderStroke(0.5.dp, if (activeCount > 0) TechGreen else CrimsonPrimary)
+            ) {
+                Text(
+                    text = "$activeCount Active",
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = if (activeCount > 0) TechGreen else CrimsonLight,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                )
+            }
+        }
+
+        // Add new trigger input bar
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            OutlinedTextField(
+                value = newTriggerText,
+                onValueChange = { newTriggerText = it },
+                placeholder = { Text("Add word/symbol (e.g. where, ?!)", fontSize = 11.sp, color = TextMuted) },
+                singleLine = true,
+                modifier = Modifier
+                    .weight(1f)
+                    .height(44.dp)
+                    .testTag("input_add_trigger"),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = CrimsonPrimary,
+                    unfocusedBorderColor = DarkCardBorder,
+                    focusedTextColor = TextWhite,
+                    unfocusedTextColor = TextWhite,
+                    cursorColor = CrimsonPrimary
+                ),
+                textStyle = androidx.compose.ui.text.TextStyle(fontSize = 12.sp, color = TextWhite)
+            )
+
+            Surface(
+                shape = RoundedCornerShape(8.dp),
+                color = CrimsonPrimary,
+                modifier = Modifier
+                    .height(44.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable {
+                        if (newTriggerText.isNotBlank()) {
+                            onAdd(newTriggerText.trim())
+                            newTriggerText = ""
+                        }
+                    }
+                    .testTag("btn_add_trigger")
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Icon(imageVector = Icons.Default.Add, contentDescription = "Add Trigger", tint = TextWhite, modifier = Modifier.size(15.dp))
+                    Text("Add", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = TextWhite)
+                }
+            }
+        }
+
+        // List of trigger chips (chunked rows of 3 chips)
+        Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+            triggers.chunked(3).forEach { rowTriggers ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    rowTriggers.forEach { trigger ->
+                        Surface(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable { onToggle(trigger.id) }
+                                .testTag("trigger_chip_${trigger.pattern}"),
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (trigger.isEnabled) DarkCardElevated else DarkSurfaceVariant.copy(alpha = 0.5f),
+                            border = BorderStroke(
+                                1.dp,
+                                if (trigger.isEnabled) AccentBlue.copy(alpha = 0.6f) else DarkCardBorder
+                            )
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 6.dp, vertical = 6.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                    modifier = Modifier.weight(1f, fill = false)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(7.dp)
+                                            .clip(CircleShape)
+                                            .background(if (trigger.isEnabled) AccentBlue else TextMuted)
+                                    )
+                                    Text(
+                                        text = trigger.pattern,
+                                        fontSize = 11.5.sp,
+                                        fontWeight = if (trigger.isEnabled) FontWeight.Bold else FontWeight.Normal,
+                                        color = if (trigger.isEnabled) TextWhite else TextSecondary,
+                                        fontFamily = FontFamily.Monospace,
+                                        maxLines = 1
+                                    )
+                                }
+
+                                IconButton(
+                                    onClick = { onRemove(trigger.id) },
+                                    modifier = Modifier
+                                        .size(18.dp)
+                                        .testTag("remove_trigger_${trigger.pattern}")
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Close,
+                                        contentDescription = "Remove trigger",
+                                        tint = TextMuted,
+                                        modifier = Modifier.size(12.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    if (rowTriggers.size < 3) {
+                        repeat(3 - rowTriggers.size) {
+                            Spacer(modifier = Modifier.weight(1f))
+                        }
+                    }
+                }
+            }
+        }
+
+        // Reset to Defaults Action Row
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.End,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Surface(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(6.dp))
+                    .clickable { onReset() }
+                    .testTag("btn_reset_triggers_default"),
+                shape = RoundedCornerShape(6.dp),
+                color = DarkSurfaceVariant,
+                border = BorderStroke(0.5.dp, DarkCardBorder)
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.RestartAlt,
+                        contentDescription = "Reset triggers to default",
+                        tint = TextSecondary,
+                        modifier = Modifier.size(12.dp)
+                    )
+                    Text(
+                        text = "Reset Defaults (?, why, what, how, whom, huh?, huh)",
+                        fontSize = 9.5.sp,
+                        color = TextSecondary
+                    )
                 }
             }
         }

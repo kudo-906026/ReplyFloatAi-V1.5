@@ -128,6 +128,7 @@ fun SimulatorTab(
     onCopyReply: (ReplyItem) -> Unit,
     onClearDiagnosticLogs: () -> Unit
 ) {
+    val context = LocalContext.current
     var customInput by remember { mutableStateOf("") }
     val coroutineScope = rememberCoroutineScope()
     var isRunningBatchSuite by remember { mutableStateOf(false) }
@@ -769,21 +770,21 @@ fun SimulatorTab(
                         }
                     }
 
-                    // Simulate FLAG_SECURE Window Protection
+                    // Simulate Game Chat Screen OCR (Super Sus / Unity Canvas)
                     Button(
                         onClick = {
-                            AppStateManager.simulateFlagSecureBlock("VM / Super Sus (Protected Window)")
+                            AppStateManager.simulateGameCanvasOcr(context, "Super Sus")
                         },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(36.dp),
                         shape = RoundedCornerShape(8.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = CrimsonPrimary.copy(alpha = 0.2f), contentColor = CrimsonLight),
-                        border = BorderStroke(1.dp, CrimsonPrimary.copy(alpha = 0.5f))
+                        colors = ButtonDefaults.buttonColors(containerColor = TechBlue.copy(alpha = 0.2f), contentColor = TechBlue),
+                        border = BorderStroke(1.dp, TechBlue.copy(alpha = 0.5f))
                     ) {
-                        Icon(Icons.Default.ReportProblem, contentDescription = null, modifier = Modifier.size(13.dp))
+                        Icon(Icons.Default.CameraAlt, contentDescription = null, modifier = Modifier.size(13.dp))
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("Simulate FLAG_SECURE Block (VM / Protected Window)", fontSize = 10.5.sp, fontWeight = FontWeight.Bold)
+                        Text("Simulate Game Chat OCR (Super Sus Canvas)", fontSize = 10.5.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }

@@ -378,6 +378,38 @@ object AppStateManager {
         saveCurrentSettings()
     }
 
+    fun toggleTrigger(triggerId: String) {
+        val updated = _settings.value.triggers.map {
+            if (it.id == triggerId) it.copy(isEnabled = !it.isEnabled) else it
+        }
+        _settings.value = _settings.value.copy(triggers = updated)
+        saveCurrentSettings()
+    }
+
+    fun addTrigger(pattern: String) {
+        val clean = pattern.trim().lowercase()
+        if (clean.isBlank()) return
+        if (_settings.value.triggers.any { it.pattern.equals(clean, ignoreCase = true) }) return
+        val newTrigger = com.example.model.TriggerItem(
+            pattern = clean,
+            isEnabled = true,
+            isDefault = false
+        )
+        _settings.value = _settings.value.copy(triggers = _settings.value.triggers + newTrigger)
+        saveCurrentSettings()
+    }
+
+    fun removeTrigger(triggerId: String) {
+        val updated = _settings.value.triggers.filter { it.id != triggerId }
+        _settings.value = _settings.value.copy(triggers = updated)
+        saveCurrentSettings()
+    }
+
+    fun resetTriggersToDefault() {
+        _settings.value = _settings.value.copy(triggers = com.example.model.defaultTriggers())
+        saveCurrentSettings()
+    }
+
     fun setPrefetchOnAppFocus(enabled: Boolean) {
         _settings.value = _settings.value.copy(prefetchOnAppFocus = enabled)
         saveCurrentSettings()
@@ -593,7 +625,7 @@ object AppStateManager {
     }
 
     fun onQuestionDetected(
-        context: Context,
+        context: Context? = null,
         text: String,
         sourceApp: String?,
         packageName: String? = null,
@@ -615,21 +647,11 @@ object AppStateManager {
         }
 
         val sourceLabel = sourceApp ?: packageName ?: if (detectionMethod == DetectionMethod.MLKIT_OCR) "OCR Screen Engine" else "Accessibility Scanner"
-        val analysis = QuestionDetectionEngine.analyze(cleanText, _settings.value.detectQuestionsOnly)
-
-        val hasQuestionMark = cleanText.contains("?") || cleanText.contains("？") || cleanText.contains("¿")
-        if (_settings.value.detectQuestionsOnly && !hasQuestionMark) {
-            addDiagnosticLog(
-                source = sourceLabel,
-                rawText = cleanText,
-                result = DetectionResultType.REJECTED,
-                category = "NO_QUESTION_MARK",
-                reason = "Rejected: Text does not contain a question mark '?' (Strict interrogation mark check)",
-                detectionMethod = detectionMethod,
-                latencyMs = ocrLatencyMs
-            )
-            return
-        }
+        val analysis = QuestionDetectionEngine.analyze(
+            rawText = cleanText,
+            detectQuestionsOnly = _settings.value.detectQuestionsOnly,
+            triggers = _settings.value.triggers
+        )
 
         if (!analysis.isQuestion) {
             addDiagnosticLog(
@@ -765,7 +787,7 @@ object AppStateManager {
     ) {
         scope.launch(Dispatchers.Default) {
             val ocrResult = OcrRecognitionEngine.simulateCustomCanvasOcr(renderedText)
-            val analysis = OcrRecognitionEngine.analyzeOcrOutput(ocrResult, _settings.value.detectQuestionsOnly)
+            val analysis = OcrRecognitionEngine.analyzeOcrOutput(ocrResult, _settings.value.detectQuestionsOnly, _settings.value.triggers)
             val canvasDims = "900x450"
 
             if (!ocrResult.isSuccess || ocrResult.rawText.isBlank()) {
@@ -834,22 +856,57 @@ object AppStateManager {
     }
 
     /**
-     * Simulates an Android FLAG_SECURE window restriction (e.g. VM container or anti-cheat protected game)
-     * where screen capture returns black/blank/null buffer.
+     * Simulates rendering a game canvas frame (e.g. Super Sus / Unity Canvas)
+     * and runs real on-device ML Kit OCR to demonstrate end-to-end game chat detection.
      */
-    fun simulateFlagSecureBlock(sourceApp: String = "Virtual Machine / Super Sus") {
-        addDiagnosticLog(
-            source = "$sourceApp (Screen Capture)",
-            rawText = "[Blank/Black Content: 1080x2400]",
-            result = DetectionResultType.REJECTED,
-            category = "FLAG_SECURE_BLOCKED",
-            reason = "Screenshot captured (1080x2400), but frame buffer contains 100% black pixels (#FF000000). Target app enforces FLAG_SECURE window masking.",
-            detectionMethod = DetectionMethod.MLKIT_OCR,
-            screenshotCaptured = true,
-            imageDimensions = "1080x2400",
-            isImageBlank = true,
-            ocrRawOutput = "[Blank Screen - ML Kit bypassed]",
-            ocrError = "FLAG_SECURE window policy enforced by target app. Android OS masks window pixels with pure black dummy buffer."
-        )
+    fun simulateGameCanvasOcr(context: Context? = null, sourceApp: String = "Super Sus") {
+        scope.launch(Dispatchers.Default) {
+            val simulatedGameText = "Cyan: Who was near navigation?\nYellow: I was with Blue in Reactor."
+            val ocrResult = OcrRecognitionEngine.simulateCustomCanvasOcr(simulatedGameText)
+            val currSettings = settings.value
+            val analysis = OcrRecognitionEngine.analyzeOcrOutput(ocrResult, currSettings.detectQuestionsOnly, currSettings.triggers)
+            val detectedQuestionText = analysis.extractedQuestionText
+
+            if (analysis.isQuestion && detectedQuestionText.isNotBlank()) {
+                onQuestionDetected(
+                    context = context,
+                    text = detectedQuestionText,
+                    sourceApp = sourceApp,
+                    packageName = "com.piashs.solvaland",
+                    forcedBypass = false,
+                    detectionMethod = DetectionMethod.MLKIT_OCR,
+                    ocrLatencyMs = ocrResult.latencyMs
+                )
+                addDiagnosticLog(
+                    source = "$sourceApp (Game Canvas OCR)",
+                    rawText = detectedQuestionText,
+                    result = DetectionResultType.MATCHED,
+                    category = "GAME_CANVAS_OCR_MATCH",
+                    reason = "Rendered 900x450 game canvas frame. ML Kit extracted ${ocrResult.detectedBlocks.size} blocks (${ocrResult.rawText.length} chars) in ${ocrResult.latencyMs}ms. Question pattern matched.",
+                    detectionMethod = DetectionMethod.MLKIT_OCR,
+                    latencyMs = ocrResult.latencyMs,
+                    screenshotCaptured = true,
+                    imageDimensions = "900x450",
+                    isImageBlank = false,
+                    ocrRawOutput = ocrResult.rawText,
+                    ocrError = null
+                )
+            } else {
+                addDiagnosticLog(
+                    source = "$sourceApp (Game Canvas OCR)",
+                    rawText = ocrResult.rawText,
+                    result = DetectionResultType.REJECTED,
+                    category = analysis.category,
+                    reason = "Rendered 900x450 game canvas frame. ML Kit extracted ${ocrResult.detectedBlocks.size} blocks in ${ocrResult.latencyMs}ms: ${analysis.reason}",
+                    detectionMethod = DetectionMethod.MLKIT_OCR,
+                    latencyMs = ocrResult.latencyMs,
+                    screenshotCaptured = true,
+                    imageDimensions = "900x450",
+                    isImageBlank = false,
+                    ocrRawOutput = ocrResult.rawText,
+                    ocrError = null
+                )
+            }
+        }
     }
 }

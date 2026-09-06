@@ -111,6 +111,19 @@ object SettingsStorage {
         }
         root.put("savedPositions", posArray)
 
+        // 6b. Configurable Triggers
+        val trigArray = JSONArray()
+        settings.triggers.forEach { trig ->
+            val trigObj = JSONObject().apply {
+                put("id", trig.id)
+                put("pattern", trig.pattern)
+                put("isEnabled", trig.isEnabled)
+                put("isDefault", trig.isDefault)
+            }
+            trigArray.put(trigObj)
+        }
+        root.put("triggers", trigArray)
+
         // 7. Core Configuration Fields
         root.put("tone", settings.tone.name)
         root.put("count", settings.count)
@@ -310,6 +323,23 @@ object SettingsStorage {
             OverlayInteractionMode.FLOATING_DRAGGABLE
         }
 
+        val triggers = mutableListOf<com.example.model.TriggerItem>()
+        if (root.has("triggers")) {
+            val trigArray = root.getJSONArray("triggers")
+            for (i in 0 until trigArray.length()) {
+                val tObj = trigArray.getJSONObject(i)
+                triggers.add(
+                    com.example.model.TriggerItem(
+                        id = tObj.optString("id", java.util.UUID.randomUUID().toString()),
+                        pattern = tObj.optString("pattern", ""),
+                        isEnabled = tObj.optBoolean("isEnabled", true),
+                        isDefault = tObj.optBoolean("isDefault", false)
+                    )
+                )
+            }
+        }
+        val finalTriggers = if (triggers.isNotEmpty()) triggers else com.example.model.defaultTriggers()
+
         return ReplySettings(
             preferredProvider = preferredProvider,
             fallbackOrder = finalFallbackOrder,
@@ -319,6 +349,7 @@ object SettingsStorage {
             count = root.optInt("count", 3),
             autoGenerate = root.optBoolean("autoGenerate", true),
             detectQuestionsOnly = root.optBoolean("detectQuestionsOnly", true),
+            triggers = finalTriggers,
             prefetchOnAppFocus = root.optBoolean("prefetchOnAppFocus", true),
             autoCopySingleReply = root.optBoolean("autoCopySingleReply", false),
             understandingMode = root.optBoolean("understandingMode", true),

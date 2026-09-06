@@ -14,6 +14,7 @@ import android.view.Gravity
 import android.view.View
 import android.view.WindowManager
 import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.core.app.NotificationCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
@@ -108,21 +109,33 @@ class FloatingOverlayService : Service(), LifecycleOwner, ViewModelStoreOwner, S
             windowLayoutParams = params
 
             val composeView = ComposeView(this).apply {
+                setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnLifecycleDestroyed(lifecycle))
                 setViewTreeLifecycleOwner(this@FloatingOverlayService)
                 setViewTreeViewModelStoreOwner(this@FloatingOverlayService)
                 setViewTreeSavedStateRegistryOwner(this@FloatingOverlayService)
+
+                var accumulatedDx = 0f
+                var accumulatedDy = 0f
 
                 setContent {
                     ReplyFloatTheme {
                         FloatingOverlayView(
                             context = this@FloatingOverlayService,
                             onDrag = { dx, dy ->
-                                val lp = windowLayoutParams
-                                if (lp != null) {
-                                    lp.x += dx.toInt()
-                                    lp.y += dy.toInt()
-                                    overlayComposeView?.let { view ->
-                                        windowManager?.updateViewLayout(view, lp)
+                                accumulatedDx += dx
+                                accumulatedDy += dy
+                                val intX = accumulatedDx.toInt()
+                                val intY = accumulatedDy.toInt()
+                                if (intX != 0 || intY != 0) {
+                                    accumulatedDx -= intX
+                                    accumulatedDy -= intY
+                                    val lp = windowLayoutParams
+                                    if (lp != null) {
+                                        lp.x += intX
+                                        lp.y += intY
+                                        overlayComposeView?.let { view ->
+                                            runCatching { windowManager?.updateViewLayout(view, lp) }
+                                        }
                                     }
                                 }
                             },

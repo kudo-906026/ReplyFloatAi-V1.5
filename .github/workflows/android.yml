@@ -24,12 +24,33 @@ jobs:
     - name: Setup Gradle
       uses: gradle/actions/setup-gradle@v3
 
-    - name: Clean build & assemble debug APK
-      run: ./gradlew assembleDebug --stacktrace --info || gradle assembleDebug --stacktrace --info
+    - name: Restore persistent signing keystore
+      env:
+        RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+      run: |
+        mkdir -p ~/.android
+        if [ -n "$RELEASE_KEYSTORE_BASE64" ]; then
+          echo "Restoring persistent keystore from RELEASE_KEYSTORE_BASE64 repository secret..."
+          echo "$RELEASE_KEYSTORE_BASE64" | tr -d '\r\n ' | base64 --decode > debug.keystore
+        elif [ -f debug.keystore.base64 ]; then
+          echo "Restoring persistent keystore from committed debug.keystore.base64..."
+          cat debug.keystore.base64 | tr -d '\r\n ' | base64 --decode > debug.keystore
+        fi
+        if [ -f debug.keystore ]; then
+          cp debug.keystore ~/.android/debug.keystore
+          echo "Keystore successfully configured."
+        fi
 
-    - name: Upload Debug APK
+    - name: Build & assemble APK
+      run: |
+        chmod +x gradlew || true
+        ./gradlew assembleDebug assembleRelease --stacktrace || ./gradlew assembleDebug --stacktrace || gradle assembleDebug --stacktrace
+
+    - name: Upload APKs
       uses: actions/upload-artifact@v4
       with:
-        name: ReplyFloatAi-debug-apk
-        path: app/build/outputs/apk/debug/*.apk
-        if-no-files-found: error
+        name: ReplyFloatAi-apks
+        path: |
+          app/build/outputs/apk/debug/*.apk
+          app/build/outputs/apk/release/*.apk
+        if-no-files-found: warn

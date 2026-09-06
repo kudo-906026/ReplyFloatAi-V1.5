@@ -187,6 +187,23 @@ data class WhitelistedApp(
     val isCustom: Boolean = false
 )
 
+data class TriggerItem(
+    val id: String = UUID.randomUUID().toString(),
+    val pattern: String,
+    val isEnabled: Boolean = true,
+    val isDefault: Boolean = false
+)
+
+fun defaultTriggers(): List<TriggerItem> = listOf(
+    TriggerItem(id = "trig_qmark", pattern = "?", isEnabled = true, isDefault = true),
+    TriggerItem(id = "trig_why", pattern = "why", isEnabled = true, isDefault = true),
+    TriggerItem(id = "trig_what", pattern = "what", isEnabled = true, isDefault = true),
+    TriggerItem(id = "trig_how", pattern = "how", isEnabled = true, isDefault = true),
+    TriggerItem(id = "trig_whom", pattern = "whom", isEnabled = true, isDefault = true),
+    TriggerItem(id = "trig_huh_q", pattern = "huh?", isEnabled = true, isDefault = true),
+    TriggerItem(id = "trig_huh", pattern = "huh", isEnabled = true, isDefault = true)
+)
+
 data class SavedOverlayPosition(
     val id: String = UUID.randomUUID().toString(),
     val packageName: String,
@@ -204,6 +221,7 @@ data class ReplySettings(
     val count: Int = 3,
     val autoGenerate: Boolean = true,
     val detectQuestionsOnly: Boolean = true,
+    val triggers: List<TriggerItem> = defaultTriggers(),
     val prefetchOnAppFocus: Boolean = true,
     val autoCopySingleReply: Boolean = false,
     val understandingMode: Boolean = true,
@@ -325,6 +343,7 @@ data class DetectedQuestion(
     val packageName: String? = null,
     val timestamp: Long = System.currentTimeMillis(),
     val englishMeaning: String? = null,
+    val detectedLanguage: String? = null,
     val generatedByProvider: AiProvider? = null,
     val fallbackNotice: String? = null,
     val detectionMethod: DetectionMethod = DetectionMethod.ACCESSIBILITY,

@@ -49,7 +49,40 @@ object QuestionDetectionEngine {
         "tell me about", "wondering if", "check if", "wanna", "want to"
     )
 
-    fun analyze(rawText: String, detectQuestionsOnly: Boolean): DetectionAnalysisResult {
+    fun matchesAnyTrigger(text: String, triggers: List<com.example.model.TriggerItem>): Pair<Boolean, String?> {
+        val enabled = triggers.filter { it.isEnabled && it.pattern.isNotBlank() }
+        if (enabled.isEmpty()) {
+            return false to null
+        }
+        val lowerText = text.lowercase().trim()
+        val words = extractWords(text)
+
+        for (trigger in enabled) {
+            val pattern = trigger.pattern.trim().lowercase()
+            if (pattern == "?" || pattern == "？" || pattern == "¿") {
+                if (text.contains("?") || text.contains("？") || text.contains("¿")) {
+                    return true to pattern
+                }
+            } else if (pattern.all { it.isLetterOrDigit() || it == '_' }) {
+                // Word pattern: match whole word (e.g. "why", "what", "how", "whom", "huh")
+                if (words.contains(pattern)) {
+                    return true to pattern
+                }
+            } else {
+                // Compound symbol or punctuation (e.g. "huh?", "?!", etc.)
+                if (lowerText.contains(pattern)) {
+                    return true to pattern
+                }
+            }
+        }
+        return false to null
+    }
+
+    fun analyze(
+        rawText: String,
+        detectQuestionsOnly: Boolean,
+        triggers: List<com.example.model.TriggerItem> = com.example.state.AppStateManager.settings.value.triggers
+    ): DetectionAnalysisResult {
         val trimmed = rawText.trim()
 
         if (trimmed.length < 3) {
@@ -71,57 +104,50 @@ object QuestionDetectionEngine {
             )
         }
 
-        // Check if text contains interrogative punctuation mark '?' or '？' or '¿'
-        val hasQuestionMark = trimmed.contains("?") || trimmed.contains("？") || trimmed.contains("¿")
+        val (hasTriggerMatch, matchedTrigger) = matchesAnyTrigger(trimmed, triggers)
 
-        // MANDATORY CHECK: If detectQuestionsOnly is enabled, text WITHOUT a '?' is NEVER a detected question
-        if (detectQuestionsOnly && !hasQuestionMark) {
+        // MANDATORY CHECK: If detectQuestionsOnly is enabled, text WITHOUT an enabled trigger word/symbol is NEVER a question
+        if (detectQuestionsOnly && !hasTriggerMatch) {
             return DetectionAnalysisResult(
                 isQuestion = false,
-                category = "NO_QUESTION_MARK",
-                reason = "Rejected: Text does not contain a question mark '?' (Mandatory question mark check)",
+                category = "NO_QUESTION_TRIGGER",
+                reason = "Rejected: Text does not contain any enabled question trigger word or symbol",
                 extractedQuestionText = trimmed
             )
         }
 
-        // 1. Check for Math Notation / Math Prompts (Must contain '?' or math calculation keywords)
+        // 1. Check for Math Notation / Math Prompts (Must contain math calculation keywords or equation)
         val mathResult = checkMathNotation(trimmed)
         if (mathResult != null) {
             return mathResult
         }
 
-        // 2. Extract words
-        val words = extractWords(trimmed)
-
-        // Find if text contains any question words
-        val matchedQuestionWord = words.firstOrNull { it in QUESTION_WORDS }
-
-        // 3. Combined Question Word + Question Mark detection (Highest priority)
-        if (hasQuestionMark && matchedQuestionWord != null) {
+        // 2. If trigger matched, accept question
+        if (hasTriggerMatch && matchedTrigger != null) {
             return DetectionAnalysisResult(
                 isQuestion = true,
-                category = "QUESTION_WORD_AND_MARK",
-                reason = "Contains question mark '?' combined with question word '$matchedQuestionWord'",
+                category = if (matchedTrigger == "?" || matchedTrigger == "？") "QUESTION_MARK" else "TRIGGER_WORD",
+                reason = "Contains enabled question trigger '$matchedTrigger'",
                 extractedQuestionText = trimmed
             )
         }
 
-        // 4. Conversational question phrases with question mark (e.g. "let me know if...?", "are you free...?")
+        // 3. Conversational question phrases
         val lowerText = trimmed.lowercase()
         for (phrase in QUESTION_PHRASES) {
             if (lowerText.contains(phrase)) {
-                if (hasQuestionMark || !detectQuestionsOnly) {
+                if (hasTriggerMatch || !detectQuestionsOnly) {
                     return DetectionAnalysisResult(
                         isQuestion = true,
                         category = "CONVERSATIONAL_PHRASE",
-                        reason = "Detected conversational inquiry phrase '$phrase' with '?'",
+                        reason = "Detected conversational inquiry phrase '$phrase'",
                         extractedQuestionText = trimmed
                     )
                 }
             }
         }
 
-        // 5. Multi-line checks with question mark
+        // 4. Multi-line checks
         if (trimmed.contains("\n")) {
             val multiLineResult = checkMultiLineQuestion(trimmed)
             if (multiLineResult != null) {
@@ -129,26 +155,13 @@ object QuestionDetectionEngine {
             }
         }
 
-        // 6. Sentence starter with question word AND question mark
+        // 5. Sentence starter with question word
         val starterResult = checkSentenceStarters(trimmed)
-        if (starterResult != null && (hasQuestionMark || !detectQuestionsOnly)) {
+        if (starterResult != null && (hasTriggerMatch || !detectQuestionsOnly)) {
             return starterResult
         }
 
-        // 7. If text has '?' and is short (<= 6 words) and sounds like a query
-        if (hasQuestionMark && words.size in 1..6 && !isUrlOrFilePath(trimmed)) {
-            val lastWord = words.lastOrNull() ?: ""
-            if (lastWord in listOf("right", "really", "sure", "correct", "true", "ready", "ok", "okay", "yes", "no") || words.size <= 4) {
-                return DetectionAnalysisResult(
-                    isQuestion = true,
-                    category = "SHORT_QUESTION",
-                    reason = "Short conversational query with question mark '?'",
-                    extractedQuestionText = trimmed
-                )
-            }
-        }
-
-        // 8. If detectQuestionsOnly is disabled, accept all messaging text
+        // 6. If detectQuestionsOnly is disabled, accept all messaging text
         if (!detectQuestionsOnly) {
             return DetectionAnalysisResult(
                 isQuestion = true,
@@ -158,15 +171,11 @@ object QuestionDetectionEngine {
             )
         }
 
-        // 9. Otherwise, safely classify as normal non-question messaging text
+        // 7. Otherwise, safely classify as normal non-question messaging text
         return DetectionAnalysisResult(
             isQuestion = false,
             category = "NORMAL_STATEMENT",
-            reason = if (hasQuestionMark) {
-                "Punctuation '?' found but missing interrogative question words (why, what, how, who, etc.)"
-            } else {
-                "No question mark '?' or interrogative structure detected."
-            },
+            reason = "No question trigger or interrogative structure detected.",
             extractedQuestionText = trimmed
         )
     }

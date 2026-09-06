@@ -184,49 +184,34 @@ class OcrFallbackRecognitionTest {
     }
 
     @Test
-    fun testDiagnosticLogging_FlagSecureLogsClearAppLevelRestrictionReason() {
+    fun testDiagnosticLogging_GameCanvasOcrSimulation() {
         AppStateManager.clearDiagnosticLogs()
 
-        AppStateManager.simulateFlagSecureBlock("Super Sus (VM Container)")
+        AppStateManager.simulateGameCanvasOcr(null, "Super Sus")
+
+        Thread.sleep(150)
 
         val logs = AppStateManager.diagnosticLogs.value
-        assertEquals(1, logs.size)
+        assertTrue("At least one diagnostic log must be recorded from game canvas OCR", logs.isNotEmpty())
 
         val log = logs.first()
-        assertEquals("FLAG_SECURE_BLOCKED", log.category)
-        assertEquals(DetectionResultType.REJECTED, log.result)
+        assertTrue("Log source must indicate Game Canvas OCR", log.source.contains("Game Canvas OCR"))
         assertEquals(true, log.screenshotCaptured)
-        assertEquals("1080x2400", log.imageDimensions)
-        assertEquals(true, log.isImageBlank)
-        assertNotNull(log.ocrError)
+        assertEquals("900x450", log.imageDimensions)
+        assertEquals(false, log.isImageBlank)
     }
 
     @Test
-    fun testDiagnosticLogging_ExplicitOcrTelemetry_DistinguishesFlagSecureFromExtractionFailure() {
+    fun testDiagnosticLogging_ExplicitOcrTelemetry_DistinguishesActiveScreenFromExtractionFailure() {
         AppStateManager.clearDiagnosticLogs()
 
-        // 1. Scenario A: FLAG_SECURE block (screenshot captured, but 1080x2400 blank black buffer)
-        AppStateManager.addDiagnosticLog(
-            source = "Super Sus (Screen Capture)",
-            rawText = "[Blank/Black Content: 1080x2400]",
-            result = DetectionResultType.REJECTED,
-            category = "FLAG_SECURE_BLOCKED",
-            reason = "Screenshot captured successfully (1080x2400), but frame buffer is blank/black. 1080x2400 px: 100% solid uniform color (#FF000000).",
-            detectionMethod = DetectionMethod.MLKIT_OCR,
-            screenshotCaptured = true,
-            imageDimensions = "1080x2400",
-            isImageBlank = true,
-            ocrRawOutput = "[Blank Screen - ML Kit bypassed]",
-            ocrError = "FLAG_SECURE window protection detected. Android WindowManager masked game surface with solid black dummy buffer."
-        )
-
-        // 2. Scenario B: Real screenshot captured fine (1080x2400, active game pixels), raw text extracted
+        // 1. Scenario A: Real screenshot captured fine (1080x2400, active game pixels), raw text extracted
         AppStateManager.addDiagnosticLog(
             source = "Super Sus (ML Kit OCR)",
             rawText = "Who is the imposter among us?",
             result = DetectionResultType.MATCHED,
             category = "QUESTION_MARK_PRESENT",
-            reason = "Screenshot captured (1080x2400, Active game graphics). ML Kit extracted 3 blocks in 42ms.",
+            reason = "Screenshot captured (1080x2400 RGBA_8888). ML Kit extracted 3 blocks in 42ms.",
             detectionMethod = DetectionMethod.MLKIT_OCR,
             latencyMs = 42L,
             screenshotCaptured = true,
@@ -236,46 +221,39 @@ class OcrFallbackRecognitionTest {
             ocrError = null
         )
 
-        // 3. Scenario C: Real screenshot captured fine (1080x2400, active game pixels), but OCR extracted 0 text blocks
+        // 2. Scenario B: Real screenshot captured fine (1080x2400, active game pixels), but OCR extracted 0 text blocks
         AppStateManager.addDiagnosticLog(
             source = "Super Sus (ML Kit OCR)",
-            rawText = "[0 text blocks extracted]",
+            rawText = "[0 text blocks in frame (1080x2400 RGBA_8888)]",
             result = DetectionResultType.REJECTED,
             category = "OCR_ZERO_TEXT_DETECTED",
-            reason = "Screenshot captured (1080x2400, active game graphics), but ML Kit recognized 0 text blocks in 38ms.",
+            reason = "Screenshot captured (1080x2400 RGBA_8888). ML Kit recognized 0 text blocks in 38ms. Raw screen image contains no machine-readable Latin glyphs.",
             detectionMethod = DetectionMethod.MLKIT_OCR,
             latencyMs = 38L,
             screenshotCaptured = true,
             imageDimensions = "1080x2400",
             isImageBlank = false,
             ocrRawOutput = "[Empty / 0 Blocks]",
-            ocrError = "ML Kit returned 0 text blocks on active game canvas"
+            ocrError = "ML Kit recognized 0 text blocks in frame (1080x2400 RGBA_8888)"
         )
 
         val logs = AppStateManager.diagnosticLogs.value
-        assertEquals(3, logs.size)
+        assertEquals(2, logs.size)
 
         val zeroTextLog = logs[0]
         val successLog = logs[1]
-        val flagSecureLog = logs[2]
 
-        // Verify Scenario A: FLAG_SECURE
-        assertTrue("Scenario A screenshot must be captured", flagSecureLog.screenshotCaptured == true)
-        assertEquals("1080x2400", flagSecureLog.imageDimensions)
-        assertTrue("Scenario A must be identified as blank/black frame buffer", flagSecureLog.isImageBlank == true)
-        assertTrue("Scenario A ocrError must detail FLAG_SECURE", flagSecureLog.ocrError?.contains("FLAG_SECURE") == true)
-
-        // Verify Scenario B: Success OCR
-        assertTrue("Scenario B screenshot must be captured", successLog.screenshotCaptured == true)
+        // Verify Scenario A: Success OCR
+        assertTrue("Scenario A screenshot must be captured", successLog.screenshotCaptured == true)
         assertEquals("1080x2400", successLog.imageDimensions)
-        assertFalse("Scenario B image must not be blank", successLog.isImageBlank == true)
+        assertFalse("Scenario A image must not be blank", successLog.isImageBlank == true)
         assertEquals("SUPER SUS\nWho is the imposter among us?\nVoting: 20s", successLog.ocrRawOutput)
         assertEquals(null, successLog.ocrError)
 
-        // Verify Scenario C: OCR zero text
-        assertTrue("Scenario C screenshot must be captured", zeroTextLog.screenshotCaptured == true)
-        assertFalse("Scenario C image must not be blank (active canvas graphics)", zeroTextLog.isImageBlank == true)
+        // Verify Scenario B: OCR zero text
+        assertTrue("Scenario B screenshot must be captured", zeroTextLog.screenshotCaptured == true)
+        assertFalse("Scenario B image must not be blank (active canvas graphics)", zeroTextLog.isImageBlank == true)
         assertEquals("[Empty / 0 Blocks]", zeroTextLog.ocrRawOutput)
-        assertNotNull("Scenario C must specify error/issue", zeroTextLog.ocrError)
+        assertNotNull("Scenario B must specify error/issue", zeroTextLog.ocrError)
     }
 }
