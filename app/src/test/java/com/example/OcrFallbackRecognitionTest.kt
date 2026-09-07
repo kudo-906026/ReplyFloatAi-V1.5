@@ -260,4 +260,120 @@ class OcrFallbackRecognitionTest {
         assertEquals("[Empty / 0 Blocks]", zeroTextLog.ocrRawOutput)
         assertNotNull("Scenario B must specify error/issue", zeroTextLog.ocrError)
     }
+
+    @Test
+    fun testOcrAnalyzer_WhatsAppScreenWithMultipleMessages_DetectsIndividualQuestionLineNotBlob() {
+        // Simulates ML Kit OCR extraction from an active WhatsApp conversation
+        val whatsAppLines = listOf(
+            com.example.ai.OcrLine(text = "WhatsApp", bottomY = 50, topY = 20, lineIndex = 0),
+            com.example.ai.OcrLine(text = "John", bottomY = 70, topY = 52, lineIndex = 1),
+            com.example.ai.OcrLine(text = "Online", bottomY = 88, topY = 72, lineIndex = 2),
+            com.example.ai.OcrLine(text = "TODAY", bottomY = 140, topY = 120, lineIndex = 3),
+            com.example.ai.OcrLine(text = "Hey man, good morning!", bottomY = 220, topY = 190, lineIndex = 4),
+            com.example.ai.OcrLine(text = "10:14 AM", bottomY = 245, topY = 225, lineIndex = 5),
+            com.example.ai.OcrLine(text = "Yeah I saw the update", bottomY = 320, topY = 290, lineIndex = 6),
+            com.example.ai.OcrLine(text = "10:15 AM", bottomY = 345, topY = 325, lineIndex = 7),
+            com.example.ai.OcrLine(text = "Are we still meeting at the cafe at 5pm?", bottomY = 460, topY = 420, lineIndex = 8),
+            com.example.ai.OcrLine(text = "10:16 AM", bottomY = 485, topY = 465, lineIndex = 9),
+            com.example.ai.OcrLine(text = "Type a message", bottomY = 950, topY = 900, lineIndex = 10)
+        )
+
+        val whatsAppOcrResult = OcrRecognitionResult(
+            rawText = "WhatsApp\nJohn\nOnline\nTODAY\nHey man, good morning!\n10:14 AM\nYeah I saw the update\n10:15 AM\nAre we still meeting at the cafe at 5pm?\n10:16 AM\nType a message",
+            lineCount = whatsAppLines.size,
+            latencyMs = 38L,
+            isSuccess = true,
+            detectedBlocks = listOf(
+                "WhatsApp\nJohn\nOnline",
+                "TODAY",
+                "Hey man, good morning!\n10:14 AM",
+                "Yeah I saw the update\n10:15 AM",
+                "Are we still meeting at the cafe at 5pm?\n10:16 AM",
+                "Type a message"
+            ),
+            detectedLines = whatsAppLines
+        )
+
+        val analysis = OcrRecognitionEngine.analyzeOcrOutput(whatsAppOcrResult, detectQuestionsOnly = true)
+
+        assertTrue("WhatsApp screen with genuine new question must be detected", analysis.isQuestion)
+        assertEquals(
+            "Extracted question must be the exact matching question line, NOT the whole concatenated screen blob",
+            "Are we still meeting at the cafe at 5pm?",
+            analysis.extractedQuestionText
+        )
+        assertFalse("Extracted question must NOT contain timestamps", analysis.extractedQuestionText.contains("10:16 AM"))
+        assertFalse("Extracted question must NOT contain app title", analysis.extractedQuestionText.contains("WhatsApp"))
+        assertFalse("Extracted question must NOT contain older messages", analysis.extractedQuestionText.contains("good morning"))
+    }
+
+    @Test
+    fun testOcrAnalyzer_WhatsAppScreenWithHinglishQuestion_DetectsExactHinglishLine() {
+        val whatsAppHinglishLines = listOf(
+            com.example.ai.OcrLine(text = "WhatsApp", bottomY = 50, topY = 20, lineIndex = 0),
+            com.example.ai.OcrLine(text = "Group Chat", bottomY = 70, topY = 52, lineIndex = 1),
+            com.example.ai.OcrLine(text = "Priya, Rahul, You", bottomY = 88, topY = 72, lineIndex = 2),
+            com.example.ai.OcrLine(text = "TODAY", bottomY = 140, topY = 120, lineIndex = 3),
+            com.example.ai.OcrLine(text = "Sab theek hai bhai", bottomY = 220, topY = 190, lineIndex = 4),
+            com.example.ai.OcrLine(text = "11:00 AM", bottomY = 245, topY = 225, lineIndex = 5),
+            com.example.ai.OcrLine(text = "isko karo kya vote?", bottomY = 320, topY = 290, lineIndex = 6),
+            com.example.ai.OcrLine(text = "11:02 AM", bottomY = 345, topY = 325, lineIndex = 7),
+            com.example.ai.OcrLine(text = "Type a message", bottomY = 950, topY = 900, lineIndex = 8)
+        )
+
+        val ocrResult = OcrRecognitionResult(
+            rawText = "WhatsApp\nGroup Chat\nPriya, Rahul, You\nTODAY\nSab theek hai bhai\n11:00 AM\nisko karo kya vote?\n11:02 AM\nType a message",
+            lineCount = whatsAppHinglishLines.size,
+            latencyMs = 35L,
+            isSuccess = true,
+            detectedBlocks = listOf(
+                "WhatsApp\nGroup Chat",
+                "TODAY",
+                "Sab theek hai bhai\n11:00 AM",
+                "isko karo kya vote?\n11:02 AM",
+                "Type a message"
+            ),
+            detectedLines = whatsAppHinglishLines
+        )
+
+        val analysis = OcrRecognitionEngine.analyzeOcrOutput(ocrResult, detectQuestionsOnly = true)
+
+        assertTrue("Hinglish question in WhatsApp screen must be detected", analysis.isQuestion)
+        assertEquals(
+            "Extracted question must be the exact Hinglish question line",
+            "isko karo kya vote?",
+            analysis.extractedQuestionText
+        )
+    }
+
+    @Test
+    fun testOcrAnalyzer_WhatsAppScreenWithoutQuestion_RejectsScreen() {
+        val nonQuestionLines = listOf(
+            com.example.ai.OcrLine(text = "WhatsApp", bottomY = 50, topY = 20, lineIndex = 0),
+            com.example.ai.OcrLine(text = "Alice", bottomY = 70, topY = 52, lineIndex = 1),
+            com.example.ai.OcrLine(text = "10:14 AM", bottomY = 140, topY = 120, lineIndex = 2),
+            com.example.ai.OcrLine(text = "I have reached the office.", bottomY = 220, topY = 190, lineIndex = 3),
+            com.example.ai.OcrLine(text = "10:15 AM", bottomY = 245, topY = 225, lineIndex = 4),
+            com.example.ai.OcrLine(text = "See you later today.", bottomY = 320, topY = 290, lineIndex = 5),
+            com.example.ai.OcrLine(text = "10:16 AM", bottomY = 345, topY = 325, lineIndex = 6),
+            com.example.ai.OcrLine(text = "Type a message", bottomY = 950, topY = 900, lineIndex = 7)
+        )
+
+        val ocrResult = OcrRecognitionResult(
+            rawText = "WhatsApp\nAlice\n10:14 AM\nI have reached the office.\n10:15 AM\nSee you later today.\n10:16 AM\nType a message",
+            lineCount = nonQuestionLines.size,
+            latencyMs = 30L,
+            isSuccess = true,
+            detectedBlocks = listOf(
+                "WhatsApp\nAlice",
+                "10:14 AM\nI have reached the office.",
+                "10:15 AM\nSee you later today.",
+                "10:16 AM\nType a message"
+            ),
+            detectedLines = nonQuestionLines
+        )
+
+        val analysis = OcrRecognitionEngine.analyzeOcrOutput(ocrResult, detectQuestionsOnly = true)
+        assertFalse("WhatsApp screen without questions must be rejected", analysis.isQuestion)
+    }
 }

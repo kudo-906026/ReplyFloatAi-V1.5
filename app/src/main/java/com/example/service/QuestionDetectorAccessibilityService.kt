@@ -509,7 +509,7 @@ class QuestionDetectorAccessibilityService : AccessibilityService() {
                 rawText = detectedQuestionText,
                 result = DetectionResultType.MATCHED,
                 category = analysis.category,
-                reason = "Screenshot captured ($dimensions $formatName, $conversionNotes). ML Kit extracted ${ocrResult.detectedBlocks.size} blocks (${ocrResult.rawText.length} chars) in ${ocrResult.latencyMs}ms. Question pattern matched.",
+                reason = "Screenshot captured ($dimensions $formatName, $conversionNotes). ML Kit extracted ${ocrResult.detectedLines.size} lines / ${ocrResult.detectedBlocks.size} blocks in ${ocrResult.latencyMs}ms. Question pattern matched on line: '$detectedQuestionText'.",
                 detectionMethod = DetectionMethod.MLKIT_OCR,
                 latencyMs = ocrResult.latencyMs,
                 screenshotCaptured = true,
@@ -531,7 +531,7 @@ class QuestionDetectorAccessibilityService : AccessibilityService() {
                 !hasExtractedText ->
                     "Screenshot captured ($dimensions $formatName). ML Kit recognized 0 text blocks in ${ocrResult.latencyMs}ms. Raw screen image contains no machine-readable Latin glyphs ($conversionNotes)."
                 else ->
-                    "Screenshot captured ($dimensions $formatName). ML Kit successfully extracted ${ocrResult.detectedBlocks.size} blocks (${ocrResult.rawText.length} chars) in ${ocrResult.latencyMs}ms, but text was rejected: ${analysis.reason}"
+                    "Screenshot captured ($dimensions $formatName). ML Kit extracted ${ocrResult.detectedLines.size} lines / ${ocrResult.detectedBlocks.size} blocks in ${ocrResult.latencyMs}ms, but no line matched active question criteria: ${analysis.reason}"
             }
 
             val ocrErrorDesc = when {

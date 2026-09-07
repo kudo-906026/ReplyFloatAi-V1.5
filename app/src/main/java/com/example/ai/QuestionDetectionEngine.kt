@@ -31,6 +31,14 @@ object QuestionDetectionEngine {
         "have", "haven't", "havent", "has", "hasn't", "hasnt", "had", "hadn't", "hadnt"
     )
 
+    // Hinglish and South Asian interrogative keywords
+    val HINGLISH_QUESTION_WORDS = setOf(
+        "kya", "kaise", "kaisa", "kaisi", "kaha", "kahan", "kidhar",
+        "kab", "kyu", "kyun", "kitna", "kitni", "kitne", "kaun",
+        "kisko", "kisse", "kiska", "kiske", "kare", "karo", "hoga",
+        "chalega", "bhai", "yaar", "isko", "usko", "karna"
+    )
+
     // Math operation symbols & patterns
     private val MATH_OPERATOR_REGEX = Regex("[+\\-*/×÷^%=<>√π∫∑±]")
     private val MATH_ARITHMETIC_REGEX = Regex("(\\b\\d+([.,]\\d+)?\\s*[+\\-*/×÷^%]\\s*\\d+([.,]\\d+)?\\b)")
@@ -146,6 +154,9 @@ object QuestionDetectionEngine {
         // 2. Contains any Wh- word, modal verb, auxiliary verb
         if (words.any { it in QUESTION_WORDS }) return true
 
+        // 2b. Hinglish interrogative words (e.g. "kya", "karo", "isko", "kaise")
+        if (words.any { it in HINGLISH_QUESTION_WORDS }) return true
+
         // 3. Contains conversational inquiry phrase
         if (QUESTION_PHRASES.any { lowerText.contains(it) }) return true
 
@@ -157,6 +168,56 @@ object QuestionDetectionEngine {
 
         // 6. Multi-line interrogative clause
         if (text.contains("\n") && checkMultiLineQuestion(text) != null) return true
+
+        return false
+    }
+
+    fun isNonEnglishOrHinglish(text: String): Boolean {
+        val clean = text.trim()
+        val lower = clean.lowercase()
+
+        // 1. Non-Latin scripts (Devanagari, Cyrillic, Arabic, Chinese, Japanese, etc.)
+        for (char in clean) {
+            val block = Character.UnicodeBlock.of(char)
+            if (block != Character.UnicodeBlock.BASIC_LATIN &&
+                block != Character.UnicodeBlock.LATIN_1_SUPPLEMENT &&
+                block != Character.UnicodeBlock.LATIN_EXTENDED_A &&
+                block != Character.UnicodeBlock.GENERAL_PUNCTUATION &&
+                !char.isWhitespace() && !char.isDigit()
+            ) {
+                return true
+            }
+        }
+
+        // 2. Hinglish vocabulary and grammatical markers
+        val hinglishMarkers = setOf(
+            "kya", "karo", "kar", "kare", "karen", "karna", "karega", "karegi",
+            "isko", "usko", "jisko", "kisko", "kaise", "kaisa", "kaisi",
+            "kaha", "kahan", "jaha", "jahan", "bol", "bolo", "bhai", "yaar",
+            "chal", "chalo", "sun", "suno", "mat", "hoga", "hogi", "hoge",
+            "hain", "hai", "tha", "thi", "the", "kyu", "kyun", "aaj", "kal",
+            "nahi", "nahin", "haan", "theek", "thik", "accha", "achha", "achhi",
+            "batana", "batao", "bata", "dekh", "dekho", "kuch", "kuchh", "mera",
+            "meri", "mere", "tera", "teri", "tere", "apna", "apni", "apne",
+            "kab", "jab", "tab", "ab", "sab", "hum", "tum", "aap", "unka",
+            "inka", "bhejo", "bhej", "de", "do", "le", "lo", "rehne", "rehta",
+            "vote", "kidhar", "kitna", "kitni", "kitne", "kaun"
+        )
+
+        val words = extractWords(clean)
+        val hinglishWordCount = words.count { it in hinglishMarkers }
+        if (hinglishWordCount >= 1 && (words.size <= 5 || hinglishWordCount >= 2 || words.any { it in setOf("kya", "karo", "isko", "kaise", "kahan", "kyun", "nahi", "bhai", "yaar") })) {
+            return true
+        }
+
+        // 3. Foreign non-English markers (Spanish, French, etc.)
+        val foreignMarkers = setOf(
+            "como", "donde", "cuando", "porque", "hola", "amigo", "gracias",
+            "comment", "pourquoi", "bonjour", "merci"
+        )
+        if (words.any { it in foreignMarkers }) {
+            return true
+        }
 
         return false
     }
@@ -340,12 +401,12 @@ object QuestionDetectionEngine {
             val words = extractWords(sentence)
             val firstWord = words.firstOrNull() ?: continue
 
-            if (firstWord in QUESTION_WORDS) {
+            if (firstWord in QUESTION_WORDS || firstWord in HINGLISH_QUESTION_WORDS) {
                 return DetectionAnalysisResult(
                     isQuestion = true,
                     category = "QUESTION_STARTER",
                     reason = "Sentence begins with interrogative starter '$firstWord' (\"$sentence\")",
-                    extractedQuestionText = text
+                    extractedQuestionText = sentence
                 )
             }
         }
@@ -359,24 +420,24 @@ object QuestionDetectionEngine {
         for ((index, line) in lines.withIndex()) {
             val lineWords = extractWords(line)
             val hasQMark = line.contains("?") || line.contains("？") || line.contains("¿")
-            val hasQWord = lineWords.any { it in QUESTION_WORDS }
+            val hasQWord = lineWords.any { it in QUESTION_WORDS || it in HINGLISH_QUESTION_WORDS }
 
             if (hasQMark && hasQWord) {
                 return DetectionAnalysisResult(
                     isQuestion = true,
                     category = "MULTILINE_QUESTION",
                     reason = "Found interrogative clause on Line ${index + 1}: '$line'",
-                    extractedQuestionText = text
+                    extractedQuestionText = line
                 )
             }
 
             val firstWord = lineWords.firstOrNull()
-            if (firstWord != null && firstWord in QUESTION_WORDS && (hasQMark || hasAnyQMark)) {
+            if (firstWord != null && (firstWord in QUESTION_WORDS || firstWord in HINGLISH_QUESTION_WORDS) && (hasQMark || hasAnyQMark)) {
                 return DetectionAnalysisResult(
                     isQuestion = true,
                     category = "MULTILINE_QUESTION",
                     reason = "Found question starter '$firstWord' on Line ${index + 1}: '$line'",
-                    extractedQuestionText = text
+                    extractedQuestionText = line
                 )
             }
         }

@@ -47,6 +47,19 @@ jobs:
         chmod +x gradlew || true
         ./gradlew assembleDebug assembleRelease --stacktrace || ./gradlew assembleDebug --stacktrace || gradle assembleDebug --stacktrace
 
+    - name: Verify APK signing certificate
+      run: |
+        APKSIGNER=$(find $ANDROID_HOME/build-tools -name apksigner | sort -V | tail -n 1)
+        echo "Using apksigner: $APKSIGNER"
+        if [ -f app/build/outputs/apk/debug/app-debug.apk ]; then
+          echo "--- DEBUG APK SIGNATURE ---"
+          $APKSIGNER verify --print-certs app/build/outputs/apk/debug/app-debug.apk
+        fi
+        if [ -f app/build/outputs/apk/release/app-release.apk ]; then
+          echo "--- RELEASE APK SIGNATURE ---"
+          $APKSIGNER verify --print-certs app/build/outputs/apk/release/app-release.apk
+        fi
+
     - name: Upload APKs
       uses: actions/upload-artifact@v4
       with:

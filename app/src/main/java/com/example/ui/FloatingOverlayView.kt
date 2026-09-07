@@ -70,6 +70,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.ai.AiFallbackEngine
+import com.example.ai.QuestionDetectionEngine
 import com.example.model.DetectedQuestion
 import com.example.model.ReplyItem
 import com.example.model.ReplySettings
@@ -449,42 +451,100 @@ private fun MainBarExpanded(
         if (isGenerating) {
             GeneratingProgressIndicator()
         } else if (currentQuestion != null) {
-            // Detected Question Card
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(DarkSurfaceVariant)
-                    .padding(7.dp),
-                verticalArrangement = Arrangement.spacedBy(3.dp)
-            ) {
-                Text(
-                    text = currentQuestion.text,
-                    fontSize = (settings.overlayTextSizeSp - 1).sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = TextWhite,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
+            val isNonEnglish = QuestionDetectionEngine.isNonEnglishOrHinglish(currentQuestion.text) || !currentQuestion.englishMeaning.isNullOrBlank()
+            val showStructuredLang = settings.understandingMode && isNonEnglish
 
-                if (settings.understandingMode && currentQuestion.englishMeaning != null) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.AutoAwesome,
-                            contentDescription = null,
-                            tint = CrimsonLight,
-                            modifier = Modifier.size(10.dp)
-                        )
-                        Text(
-                            text = currentQuestion.englishMeaning,
-                            fontSize = 9.5.sp,
-                            color = CrimsonLight,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
+            if (showStructuredLang) {
+                // Section 1: Original (exact question as detected, in its original language/script)
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(DarkSurfaceVariant)
+                        .padding(horizontal = 9.dp, vertical = 7.dp),
+                    verticalArrangement = Arrangement.spacedBy(3.dp)
+                ) {
+                    Text(
+                        text = "Original",
+                        fontSize = 9.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = TechBlue,
+                        letterSpacing = 0.5.sp
+                    )
+                    Text(
+                        text = currentQuestion.text,
+                        fontSize = (settings.overlayTextSizeSp - 1).sp,
+                        fontWeight = FontWeight.Medium,
+                        color = TextWhite,
+                        modifier = Modifier.testTag("section_original_text")
+                    )
+                }
+
+                // Section 2: Meaning (English) (plain English translation)
+                val englishMeaning = currentQuestion.englishMeaning
+                    ?: AiFallbackEngine.generateUnderstanding(currentQuestion.text, settings.understandingSummaryLength)
+                    ?: "Translation unavailable"
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(DarkSurfaceVariant)
+                        .padding(horizontal = 9.dp, vertical = 7.dp),
+                    verticalArrangement = Arrangement.spacedBy(3.dp)
+                ) {
+                    Text(
+                        text = "Meaning (English)",
+                        fontSize = 9.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = TechGreen,
+                        letterSpacing = 0.5.sp
+                    )
+                    Text(
+                        text = englishMeaning,
+                        fontSize = (settings.overlayTextSizeSp - 1.5).sp,
+                        fontWeight = FontWeight.Normal,
+                        color = TextSecondary,
+                        modifier = Modifier.testTag("section_meaning_text")
+                    )
+                }
+            } else {
+                // Single question display when Lang mode is OFF
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(DarkSurfaceVariant)
+                        .padding(7.dp),
+                    verticalArrangement = Arrangement.spacedBy(3.dp)
+                ) {
+                    Text(
+                        text = currentQuestion.text,
+                        fontSize = (settings.overlayTextSizeSp - 1).sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = TextWhite,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+
+                    if (settings.understandingMode && currentQuestion.englishMeaning != null) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.AutoAwesome,
+                                contentDescription = null,
+                                tint = CrimsonLight,
+                                modifier = Modifier.size(10.dp)
+                            )
+                            Text(
+                                text = currentQuestion.englishMeaning,
+                                fontSize = 9.5.sp,
+                                color = CrimsonLight,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
                     }
                 }
             }
@@ -564,8 +624,20 @@ private fun MainBarExpanded(
                 }
             }
 
-            // Reply Cards
+            // Section 3: Reply Cards (clearly labeled Reply when Lang mode is ON, only Reply has copy)
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                if (showStructuredLang) {
+                    Text(
+                        text = "Reply",
+                        fontSize = 9.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = CrimsonLight,
+                        letterSpacing = 0.5.sp,
+                        modifier = Modifier
+                            .padding(start = 2.dp, top = 2.dp)
+                            .testTag("section_reply_label")
+                    )
+                }
                 activeReplies.forEach { reply ->
                     androidx.compose.runtime.key(reply.id) {
                         ReplyCardItem(
