@@ -376,4 +376,58 @@ class OcrFallbackRecognitionTest {
         val analysis = OcrRecognitionEngine.analyzeOcrOutput(ocrResult, detectQuestionsOnly = true)
         assertFalse("WhatsApp screen without questions must be rejected", analysis.isQuestion)
     }
+
+    @Test
+    fun testWhatsAppScreen_AnimeWorldHypotheticalQuestion_ExtractedAndDetected() {
+        val targetQuestion = "If you could live inside any anime world for a week, which one would you pick?"
+        val whatsAppLines = listOf(
+            com.example.ai.OcrLine(text = "WhatsApp", bottomY = 50, topY = 20, lineIndex = 0),
+            com.example.ai.OcrLine(text = "Anime Fan Club", bottomY = 75, topY = 52, lineIndex = 1),
+            com.example.ai.OcrLine(text = "TODAY", bottomY = 140, topY = 120, lineIndex = 2),
+            com.example.ai.OcrLine(text = "Naruto is legendary!", bottomY = 220, topY = 190, lineIndex = 3),
+            com.example.ai.OcrLine(text = "10:14 AM", bottomY = 245, topY = 225, lineIndex = 4),
+            com.example.ai.OcrLine(text = targetQuestion, bottomY = 460, topY = 410, lineIndex = 5),
+            com.example.ai.OcrLine(text = "10:16 AM", bottomY = 485, topY = 465, lineIndex = 6),
+            com.example.ai.OcrLine(text = "Type a message", bottomY = 950, topY = 900, lineIndex = 7)
+        )
+
+        val ocrResult = OcrRecognitionResult(
+            rawText = "WhatsApp\nAnime Fan Club\nTODAY\nNaruto is legendary!\n10:14 AM\n$targetQuestion\n10:16 AM\nType a message",
+            lineCount = whatsAppLines.size,
+            latencyMs = 42L,
+            isSuccess = true,
+            detectedBlocks = listOf(
+                "WhatsApp\nAnime Fan Club",
+                "TODAY",
+                "Naruto is legendary!\n10:14 AM",
+                "$targetQuestion\n10:16 AM",
+                "Type a message"
+            ),
+            detectedLines = whatsAppLines
+        )
+
+        val analysis = OcrRecognitionEngine.analyzeOcrOutput(ocrResult, detectQuestionsOnly = true)
+
+        assertTrue("Target anime hypothetical question in WhatsApp screen must be detected", analysis.isQuestion)
+        assertEquals("Extracted text must exactly match the target question line", targetQuestion, analysis.extractedQuestionText)
+
+        // Verify QuestionDetectionEngine directly analyzes this question
+        val directAnalysis = QuestionDetectionEngine.analyze(targetQuestion, detectQuestionsOnly = true)
+        assertTrue("QuestionDetectionEngine must validate this hypothetical question directly", directAnalysis.isQuestion)
+
+        // Verify detection triggers AppStateManager without errors and creates diagnostic log
+        AppStateManager.onQuestionDetected(
+            context = null,
+            text = targetQuestion,
+            sourceApp = "WhatsApp",
+            packageName = "com.whatsapp",
+            forcedBypass = true,
+            detectionMethod = DetectionMethod.ACCESSIBILITY
+        )
+
+        val logs = AppStateManager.diagnosticLogs.value
+        val matchedLog = logs.firstOrNull { it.rawText.contains(targetQuestion) }
+        assertNotNull("Diagnostics log must contain an entry for the anime question", matchedLog)
+        assertEquals("Log entry must be MATCHED", DetectionResultType.MATCHED, matchedLog?.result)
+    }
 }

@@ -304,6 +304,7 @@ fun defaultBuiltInProviders(): List<AiProvider> = listOf(
 
 fun defaultWhitelistedApps(): List<WhitelistedApp> = listOf(
     WhitelistedApp("com.whatsapp", "WhatsApp", "Messaging", true),
+    WhitelistedApp("com.whatsapp.w4b", "WhatsApp Business", "Messaging", true),
     WhitelistedApp("org.telegram.messenger", "Telegram", "Messaging", true),
     WhitelistedApp("com.facebook.orca", "Messenger", "Social", true),
     WhitelistedApp("com.instagram.android", "Instagram Direct", "Social", true),
