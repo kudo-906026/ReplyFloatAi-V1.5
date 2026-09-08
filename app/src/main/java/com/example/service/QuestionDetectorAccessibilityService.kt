@@ -57,6 +57,9 @@ class QuestionDetectorAccessibilityService : AccessibilityService() {
     private var lastRejectedLoggedText: String = ""
     private var lastOcrScanTime: Long = 0L
     private var isOcrProcessing: Boolean = false
+    @Volatile private var pendingOcrScanRequested: Boolean = false
+    @Volatile private var lastKnownForegroundPackage: String? = null
+    @Volatile private var lastKnownForegroundAppName: String? = null
 
     // Dedicated background executor for taking screenshots and image decoding off the main thread
     private val captureExecutor = java.util.concurrent.Executors.newSingleThreadExecutor()
@@ -68,6 +71,7 @@ class QuestionDetectorAccessibilityService : AccessibilityService() {
         lastRejectedLoggedText = ""
         lastOcrScanTime = 0L
         isOcrProcessing = false
+        pendingOcrScanRequested = false
         pendingEventScanJob?.cancel()
         pendingSettledScanJob?.cancel()
     }
@@ -86,6 +90,11 @@ class QuestionDetectorAccessibilityService : AccessibilityService() {
 
         try {
             val info = serviceInfo ?: AccessibilityServiceInfo()
+            info.eventTypes = AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED or
+                AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED or
+                AccessibilityEvent.TYPE_VIEW_SCROLLED or
+                AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED or
+                AccessibilityEvent.TYPE_NOTIFICATION_STATE_CHANGED
             info.flags = info.flags or
                 AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS or
                 AccessibilityServiceInfo.FLAG_REPORT_VIEW_IDS or
@@ -123,8 +132,15 @@ class QuestionDetectorAccessibilityService : AccessibilityService() {
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event == null) return
+
+        val eventPkg = event.packageName?.toString()
+        if (eventPkg != null && eventPkg != applicationContext.packageName && !isSystemOrKeyboardPackage(eventPkg)) {
+            lastKnownForegroundPackage = eventPkg
+            lastKnownForegroundAppName = getAppNameFromPackage(eventPkg)
+        }
+
         val type = event.eventType
-        // Only trigger scans on events that change screen text, window state, or scroll position
+        // Trigger scans on events that change screen text, window state, or scroll position
         if (type != AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED &&
             type != AccessibilityEvent.TYPE_VIEW_SCROLLED &&
             type != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED &&
@@ -135,23 +151,25 @@ class QuestionDetectorAccessibilityService : AccessibilityService() {
 
         val now = System.currentTimeMillis()
         val debounce = AppStateManager.settings.value.smartDebounceMs.toLong().coerceAtLeast(300L)
-        if (now - lastScanAttemptTime < debounce) {
-            // Trailing edge debounce: schedule deferred scan when rapid bursts subside
-            pendingEventScanJob?.cancel()
-            pendingEventScanJob = serviceScope.launch(Dispatchers.Main) {
-                delay(debounce)
-                performWindowScan(isContinuousTick = false, forcedBypass = true)
-            }
-            return
-        }
 
         // 1. Immediate scan upon accessibility event
-        performWindowScan(isContinuousTick = false, forcedBypass = false, event = event)
+        if (now - lastScanAttemptTime >= debounce) {
+            performWindowScan(isContinuousTick = false, forcedBypass = false, event = event)
+        }
 
-        // 2. Post-render settling scan (180ms trailing): guarantees that text rendered after the initial layout phase is captured
+        // 2. Post-render settling scan (250ms trailing):
+        // Essential for messaging apps like WhatsApp where newly arrived/sent message bubbles
+        // require layout measurement, list scroll animations, and drawing passes to fully render on screen.
         pendingSettledScanJob?.cancel()
         pendingSettledScanJob = serviceScope.launch(Dispatchers.Main) {
-            delay(180L)
+            delay(250L)
+            performWindowScan(isContinuousTick = false, forcedBypass = true)
+        }
+
+        // 3. Trailing edge debounce scan: guarantees that bursts of typing or rapid changes don't drop the latest state
+        pendingEventScanJob?.cancel()
+        pendingEventScanJob = serviceScope.launch(Dispatchers.Main) {
+            delay(debounce + 50L)
             performWindowScan(isContinuousTick = false, forcedBypass = true)
         }
     }
@@ -181,6 +199,8 @@ class QuestionDetectorAccessibilityService : AccessibilityService() {
         val eventPkg = event?.packageName?.toString()
         if (eventPkg != null && eventPkg != applicationContext.packageName && !isSystemOrKeyboardPackage(eventPkg)) {
             pkgName = eventPkg
+            lastKnownForegroundPackage = eventPkg
+            lastKnownForegroundAppName = getAppNameFromPackage(eventPkg)
         }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
@@ -213,7 +233,7 @@ class QuestionDetectorAccessibilityService : AccessibilityService() {
         }
 
         if (pkgName == null) {
-            pkgName = targetRootNode?.packageName?.toString() ?: eventPkg
+            pkgName = targetRootNode?.packageName?.toString() ?: eventPkg ?: lastKnownForegroundPackage
         }
 
         if (pkgName == null || pkgName == applicationContext.packageName || isSystemOrKeyboardPackage(pkgName)) {
@@ -221,7 +241,7 @@ class QuestionDetectorAccessibilityService : AccessibilityService() {
         }
 
         val whitelistedApp = settings.appsWhitelist.find { it.packageName == pkgName && it.isEnabled }
-        val appName = whitelistedApp?.appName ?: getAppNameFromPackage(pkgName)
+        val appName = whitelistedApp?.appName ?: lastKnownForegroundAppName ?: getAppNameFromPackage(pkgName)
 
         if (whitelistedApp == null && !forcedBypass) {
             return
@@ -384,7 +404,21 @@ class QuestionDetectorAccessibilityService : AccessibilityService() {
     }
 
     private fun triggerOcrFallbackIfEligible(appName: String, pkgName: String, now: Long, ocrDebounceMs: Int) {
-        if (isOcrProcessing || (now - lastOcrScanTime < ocrDebounceMs)) {
+        if (isOcrProcessing) {
+            // A previous OCR pass is currently executing. Queue follow-up scan so newly rendered text isn't missed!
+            pendingOcrScanRequested = true
+            return
+        }
+
+        // Android OS enforces a minimum interval between takeScreenshot calls (INTERVAL_TIME_SHORT).
+        // For forced bypass/event triggers, require at least 250ms elapsed since last screenshot;
+        // otherwise enforce the user configured ocrDebounceMs.
+        val effectiveDebounce = if (ocrDebounceMs == 0) 250L else ocrDebounceMs.toLong()
+        if (now - lastOcrScanTime < effectiveDebounce) {
+            if (ocrDebounceMs == 0) {
+                // If this was an event or post-settle scan, schedule it to run right after debounce cooldown
+                pendingOcrScanRequested = true
+            }
             return
         }
 
@@ -393,14 +427,8 @@ class QuestionDetectorAccessibilityService : AccessibilityService() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             isOcrProcessing = true
 
-            val targetDisplayId = runCatching {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                    windows.firstOrNull { it.isActive || it.isFocused }?.displayId
-                        ?: Display.DEFAULT_DISPLAY
-                } else {
-                    Display.DEFAULT_DISPLAY
-                }
-            }.getOrNull() ?: Display.DEFAULT_DISPLAY
+            // In Android, Display.DEFAULT_DISPLAY represents the main physical screen
+            val targetDisplayId = Display.DEFAULT_DISPLAY
 
             try {
                 takeScreenshot(
@@ -486,6 +514,14 @@ class QuestionDetectorAccessibilityService : AccessibilityService() {
                                         try { softwareBitmap?.recycle() } catch (_: Exception) {}
                                         try { hwBitmap?.recycle() } catch (_: Exception) {}
                                         try { hardwareBuffer.close() } catch (_: Exception) {}
+
+                                        if (pendingOcrScanRequested) {
+                                            pendingOcrScanRequested = false
+                                            serviceScope.launch(Dispatchers.Main) {
+                                                delay(150L) // Wait for screen settling
+                                                performWindowScan(isContinuousTick = false, forcedBypass = true)
+                                            }
+                                        }
                                     }
                                 }
                                 return
@@ -494,6 +530,14 @@ class QuestionDetectorAccessibilityService : AccessibilityService() {
                             // If conversion completely failed
                             isOcrProcessing = false
                             try { hardwareBuffer.close() } catch (_: Exception) {}
+
+                            if (pendingOcrScanRequested) {
+                                pendingOcrScanRequested = false
+                                serviceScope.launch(Dispatchers.Main) {
+                                    delay(250L)
+                                    performWindowScan(isContinuousTick = false, forcedBypass = true)
+                                }
+                            }
 
                             AppStateManager.addDiagnosticLog(
                                 source = "$appName (Screen Capture)",
@@ -512,6 +556,15 @@ class QuestionDetectorAccessibilityService : AccessibilityService() {
 
                         override fun onFailure(errorCode: Int) {
                             isOcrProcessing = false
+
+                            if (pendingOcrScanRequested) {
+                                pendingOcrScanRequested = false
+                                serviceScope.launch(Dispatchers.Main) {
+                                    delay(250L)
+                                    performWindowScan(isContinuousTick = false, forcedBypass = true)
+                                }
+                            }
+
                             val (errorName, errorExplanation) = when (errorCode) {
                                 1 -> "INTERNAL_ERROR (1)" to "Android OS internal screen capture error or compositor synchronization issue."
                                 2 -> "NO_ACCESSIBILITY_ACCESS (2)" to "Screenshot permission not granted to Accessibility Service by Android OS. Verify service is enabled in Android Accessibility settings."
@@ -539,6 +592,13 @@ class QuestionDetectorAccessibilityService : AccessibilityService() {
                 )
             } catch (e: Exception) {
                 isOcrProcessing = false
+                if (pendingOcrScanRequested) {
+                    pendingOcrScanRequested = false
+                    serviceScope.launch(Dispatchers.Main) {
+                        delay(250L)
+                        performWindowScan(isContinuousTick = false, forcedBypass = true)
+                    }
+                }
                 AppStateManager.addDiagnosticLog(
                     source = "$appName (Screen Capture)",
                     rawText = "[Capture Exception: ${e.javaClass.simpleName}]",
@@ -635,8 +695,12 @@ class QuestionDetectorAccessibilityService : AccessibilityService() {
             val evaluatedCandidateLine = if (ocrResult.detectedLines.isNotEmpty()) {
                 ocrResult.detectedLines.asReversed().firstOrNull { line ->
                     val t = line.text.trim()
-                    t.contains("?") || t.contains("？") || t.contains("¿") ||
-                    QuestionDetectionEngine.matchesAnyTrigger(t, settings.triggers).first
+                    val cleaned = OcrRecognitionEngine.cleanCandidateLine(t)
+                    cleaned.contains("?") || cleaned.contains("？") || cleaned.contains("¿") ||
+                    QuestionDetectionEngine.matchesAnyTrigger(cleaned, settings.triggers).first
+                }?.text?.trim()
+                ?: ocrResult.detectedLines.asReversed().firstOrNull {
+                    !OcrRecognitionEngine.isIgnoredUiOrTimestampLine(it.text)
                 }?.text?.trim()
                 ?: ocrResult.detectedLines.lastOrNull()?.text?.trim()
             } else {
@@ -698,11 +762,6 @@ class QuestionDetectorAccessibilityService : AccessibilityService() {
     ) {
         if (node == null || currentDepth > maxDepth || outList.size >= maxNodes) return
 
-        // CRITICAL: Only consider nodes that are currently visible to the user on screen
-        if (!node.isVisibleToUser) {
-            return
-        }
-
         val bounds = Rect()
         try {
             node.getBoundsInScreen(bounds)
@@ -718,10 +777,6 @@ class QuestionDetectorAccessibilityService : AccessibilityService() {
                 bounds.right > 0 &&
                 bounds.left < screenWidth
 
-        if (!isWithinViewport) {
-            return
-        }
-
         // Skip non-message interactive controls such as buttons, seekbars, progress bars
         val className = node.className?.toString() ?: ""
         val isActionButton = className.contains("Button") ||
@@ -731,7 +786,7 @@ class QuestionDetectorAccessibilityService : AccessibilityService() {
                 className.contains("Switch") ||
                 className.contains("CheckBox")
 
-        if (!isActionButton) {
+        if (isWithinViewport && !isActionButton) {
             val text = node.text?.toString()?.trim()
             if (!text.isNullOrBlank() && text.length >= 3 && !isIgnoredUiString(text)) {
                 outList.add(
@@ -779,7 +834,7 @@ class QuestionDetectorAccessibilityService : AccessibilityService() {
             "calls", "chats", "status", "settings", "camera", "online",
             "typing...", "today", "yesterday", "delivered", "read", "photo", "video",
             "reply", "forward", "copy", "delete", "info"
-        ) || lower.matches(Regex("^\\d{1,2}:\\d{2}(\\s*(am|pm))?$"))
+        ) || lower.matches(Regex("(?i)^\\s*\\[?\\d{1,2}:\\d{2}(:\\d{2})?(\\s*(am|pm))?\\]?(\\s*[✓✔•]+|\\s*(delivered|read|sent))?\\s*$"))
     }
 
     override fun onInterrupt() {

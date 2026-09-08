@@ -434,7 +434,48 @@ object OcrRecognitionEngine {
                 .thenByDescending { it.lineIndex }
         )
 
-        // Pass 1: Check each individual line separately (priority to newest message at the bottom)
+        // Pass 1: Check detected message blocks / bubbles from bottom to top (most recent message first)
+        // In messaging apps like WhatsApp, a multi-line message is contained within a single text block.
+        // Evaluating the coherent block first preserves full questions across line wraps (e.g. "If you could live inside any anime world for a week, which one would you pick?").
+        val blocksFromBottom = if (ocrResult.structuredBlocks.isNotEmpty()) {
+            ocrResult.structuredBlocks.sortedByDescending { it.bottomY }
+        } else {
+            emptyList()
+        }
+
+        for (sBlock in blocksFromBottom) {
+            val combinedText = sBlock.lines.joinToString(" ") { it.text.trim() }
+            val rawBlockText = if (combinedText.isNotBlank()) combinedText else sBlock.text.replace("\n", " ").trim()
+            if (isIgnoredUiOrTimestampLine(rawBlockText)) continue
+            if (rawBlockText.length < 3) continue
+
+            val cleanedBlock = cleanCandidateLine(rawBlockText)
+            if (cleanedBlock.length >= 3 && !isIgnoredUiOrTimestampLine(cleanedBlock)) {
+                val blockAnalysis = QuestionDetectionEngine.analyze(cleanedBlock, detectQuestionsOnly, triggers)
+                if (blockAnalysis.isQuestion) {
+                    return blockAnalysis.copy(extractedQuestionText = cleanedBlock)
+                }
+            }
+        }
+
+        // Pass 2: Fallback for detected string blocks if structuredBlocks was empty
+        if (blocksFromBottom.isEmpty() && ocrResult.detectedBlocks.isNotEmpty()) {
+            for (block in ocrResult.detectedBlocks.asReversed()) {
+                val flatBlock = block.replace("\n", " ").trim()
+                if (isIgnoredUiOrTimestampLine(flatBlock)) continue
+                if (flatBlock.length < 3) continue
+
+                val cleanedBlock = cleanCandidateLine(flatBlock)
+                if (cleanedBlock.length >= 3 && !isIgnoredUiOrTimestampLine(cleanedBlock)) {
+                    val blockAnalysis = QuestionDetectionEngine.analyze(cleanedBlock, detectQuestionsOnly, triggers)
+                    if (blockAnalysis.isQuestion) {
+                        return blockAnalysis.copy(extractedQuestionText = cleanedBlock)
+                    }
+                }
+            }
+        }
+
+        // Pass 3: Check each individual line separately (priority to newest message at the bottom)
         for (line in sortedLines) {
             val rawLineText = line.text.trim()
             if (isIgnoredUiOrTimestampLine(rawLineText)) continue
@@ -445,7 +486,6 @@ object OcrRecognitionEngine {
             if (cleaned.length >= 3 && !isIgnoredUiOrTimestampLine(cleaned)) {
                 val cleanedAnalysis = QuestionDetectionEngine.analyze(cleaned, detectQuestionsOnly, triggers)
                 if (cleanedAnalysis.isQuestion) {
-                    // Match found in this specific line!
                     return cleanedAnalysis.copy(extractedQuestionText = cleaned)
                 }
             }
@@ -459,10 +499,10 @@ object OcrRecognitionEngine {
             }
         }
 
-        // Pass 2: Check adjacent lines that belong to the same block (for questions wrapped across 2 lines)
+        // Pass 4: Check adjacent line groups within the same block
         val blockGroups = sortedLines.groupBy { it.blockIndex }
         for ((_, bLines) in blockGroups) {
-            if (bLines.size in 2..3) {
+            if (bLines.size in 2..5) {
                 val inOrder = bLines.sortedBy { it.lineIndex }
                 val combinedText = inOrder.joinToString(" ") { it.text.trim() }
                 val cleanedCombined = cleanCandidateLine(combinedText)
@@ -475,25 +515,31 @@ object OcrRecognitionEngine {
             }
         }
 
-        // Pass 3: Check detected blocks (if any short block was not covered above)
-        for (block in ocrResult.detectedBlocks.asReversed()) {
-            val blockLines = block.split("\n").map { it.trim() }.filter { it.isNotBlank() }
-            if (blockLines.size in 2..3 && block.length <= 250) {
-                val cleanedBlock = cleanCandidateLine(block.replace("\n", " "))
-                if (cleanedBlock.length >= 3 && !isIgnoredUiOrTimestampLine(cleanedBlock)) {
-                    val blockAnalysis = QuestionDetectionEngine.analyze(cleanedBlock, detectQuestionsOnly, triggers)
-                    if (blockAnalysis.isQuestion) {
-                        return blockAnalysis.copy(extractedQuestionText = cleanedBlock)
-                    }
-                }
-            }
+        // If no individual line or block matched, evaluate the best candidate line for diagnostics
+        val candidateForDiag = sortedLines.firstOrNull { line ->
+            val txt = line.text.trim()
+            txt.contains("?") || txt.contains("？") || txt.contains("¿") ||
+            QuestionDetectionEngine.matchesAnyTrigger(txt, triggers).first
+        }?.text?.trim()
+            ?: sortedLines.firstOrNull { !isIgnoredUiOrTimestampLine(it.text) }?.text?.trim()
+            ?: ""
+
+        val diagReason = if (candidateForDiag.isNotBlank()) {
+            val cleanedDiag = cleanCandidateLine(candidateForDiag)
+            val a = QuestionDetectionEngine.analyze(
+                if (cleanedDiag.length >= 3) cleanedDiag else candidateForDiag,
+                detectQuestionsOnly,
+                triggers
+            )
+            "Evaluated candidate '${if (cleanedDiag.length >= 3) cleanedDiag else candidateForDiag}': ${a.reason}"
+        } else {
+            "Evaluated ${candidateLines.size} individual OCR line(s) on screen, but none matched an active question trigger or question mark."
         }
 
-        // If no individual line or block matched
         return DetectionAnalysisResult(
             isQuestion = false,
             category = "NO_QUESTION_TRIGGER",
-            reason = "Evaluated ${candidateLines.size} individual OCR line(s) on screen, but none matched an active question trigger or question mark.",
+            reason = diagReason,
             extractedQuestionText = ""
         )
     }
@@ -504,13 +550,22 @@ object OcrRecognitionEngine {
         // 1. Strip leading timestamp: e.g. "10:45 AM - ", "[10:45 AM] ", "10:45: "
         clean = clean.replace(Regex("(?i)^\\s*\\[?\\d{1,2}:\\d{2}(:\\d{2})?(\\s*(?:am|pm))?\\]?\\s*[:-]?\\s*"), "").trim()
 
-        // 2. Strip trailing timestamp: e.g. " 10:45 AM", " [10:45]", " 10:45"
-        clean = clean.replace(Regex("(?i)\\s*\\[?\\d{1,2}:\\d{2}(:\\d{2})?(\\s*(?:am|pm))?\\]?\\s*$"), "").trim()
+        // 2. Iteratively strip trailing checkmarks, delivery markers, and timestamps in any order
+        var changed = true
+        var passes = 0
+        while (changed && passes < 5) {
+            val before = clean
+            // Strip trailing delivery/read receipt markers: e.g. "✓✓", "✓", "•"
+            clean = clean.replace(Regex("[✓✔•\\s]+$"), "").trim()
+            // Strip trailing timestamp: e.g. " 10:45 AM", " [10:45]", " 10:45"
+            clean = clean.replace(Regex("(?i)\\s*\\[?\\d{1,2}:\\d{2}(:\\d{2})?(\\s*(?:am|pm))?\\]?\\s*$"), "").trim()
+            // Strip trailing status keywords
+            clean = clean.replace(Regex("(?i)\\s*\\b(delivered|read|sent)\\s*$"), "").trim()
+            changed = (clean != before)
+            passes++
+        }
 
-        // 3. Strip trailing delivery/read receipt markers: e.g. "✓✓", "✓", "•"
-        clean = clean.replace(Regex("[✓✔•]+\\s*$"), "").trim()
-
-        // 4. Strip chat sender prefix: "Alice: Where are we going?" -> "Where are we going?"
+        // 3. Strip chat sender prefix: "Alice: Where are we going?" -> "Where are we going?"
         val strippedSender = stripChatSenderPrefix(clean)
         if (strippedSender.length >= 3) {
             clean = strippedSender
@@ -547,8 +602,8 @@ object OcrRecognitionEngine {
         if (trimmed.length < 2) return true
         val lower = trimmed.lowercase()
 
-        // Pure timestamps: "10:15", "10:15 AM", "10:15 PM", "10:15:30", "12:00 am"
-        if (trimmed.matches(Regex("(?i)^\\s*\\[?\\d{1,2}:\\d{2}(:\\d{2})?(\\s*(am|pm))?\\]?\\s*$"))) return true
+        // Pure timestamps or timestamps with checkmarks: "10:15", "10:15 AM", "10:15 PM ✓✓", "10:15:30", "12:00 am ✓"
+        if (trimmed.matches(Regex("(?i)^\\s*\\[?\\d{1,2}:\\d{2}(:\\d{2})?(\\s*(am|pm))?\\]?(\\s*[✓✔•]+|\\s*(delivered|read|sent))?\\s*$"))) return true
 
         // Date headers
         if (lower in setOf("yesterday", "today", "tomorrow", "unread messages", "messages", "new messages")) return true

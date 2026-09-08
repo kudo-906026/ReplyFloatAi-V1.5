@@ -27,10 +27,13 @@ import com.example.model.WhitelistedApp
 import com.example.model.defaultBuiltInProviders
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.util.UUID
 
@@ -70,12 +73,25 @@ object AppStateManager {
 
     private val processedQuestionsCache = mutableMapOf<String, Long>()
     private val answeredQuestions = mutableSetOf<String>()
+    private val answeredQuestionsTimestamps = mutableMapOf<String, Long>()
+    private var autoPurgeJob: Job? = null
 
     @Volatile
     private var appContext: Context? = null
 
     init {
         _activeProvider.value = _settings.value.preferredProvider
+        startAutoPurgeTicker()
+    }
+
+    fun startAutoPurgeTicker() {
+        autoPurgeJob?.cancel()
+        autoPurgeJob = scope.launch {
+            while (isActive) {
+                delay(3000L) // evaluate every 3 seconds for expired replies & history
+                purgeExpiredData()
+            }
+        }
     }
 
     fun init(context: Context) {
@@ -84,6 +100,7 @@ object AppStateManager {
         val loaded = SettingsStorage.loadSettings(appCtx)
         _settings.value = loaded
         _activeProvider.value = loaded.preferredProvider
+        startAutoPurgeTicker()
     }
 
     private fun saveCurrentSettings(settingsToSave: ReplySettings = _settings.value) {
@@ -116,12 +133,44 @@ object AppStateManager {
     }
 
     fun purgeExpiredData() {
-        val minutes = _settings.value.autoPurgeTimerMinutes
-        if (minutes <= 0) return
-        val cutoff = System.currentTimeMillis() - (minutes * 60 * 1000L)
-        _questionsHistory.value = _questionsHistory.value.filter { it.timestamp >= cutoff }
-        val expiredKeys = processedQuestionsCache.filter { it.value < cutoff }.keys
-        expiredKeys.forEach { processedQuestionsCache.remove(it) }
+        val now = System.currentTimeMillis()
+        val settings = _settings.value
+
+        // 1. Purge / Hide active replies and current question once configured duration passes
+        val replyMinutes = settings.replyAutoDeleteMinutes
+        val replyCutoff = if (replyMinutes in 1..10) {
+            now - (replyMinutes * 60 * 1000L)
+        } else {
+            // When reply auto-delete is 0, fall back to history purge cutoff so content doesn't linger indefinitely
+            val fallbackMin = (if (settings.historyPurgeMinutes in 1..10) settings.historyPurgeMinutes else settings.autoPurgeTimerMinutes).coerceIn(1, 10)
+            now - (fallbackMin * 60 * 1000L)
+        }
+        val activeQ = _currentQuestion.value
+        if (activeQ != null && activeQ.timestamp < replyCutoff) {
+            _currentQuestion.value = null
+            _activeReplies.value = emptyList()
+            _errorMessage.value = null
+        }
+
+        // 2. Purge History questions older than historyPurgeMinutes / autoPurgeTimerMinutes
+        val historyMinutes = (if (settings.historyPurgeMinutes in 1..10) settings.historyPurgeMinutes else settings.autoPurgeTimerMinutes).coerceIn(1, 10)
+        val historyCutoff = now - (historyMinutes * 60 * 1000L)
+        val curHistory = _questionsHistory.value
+        val filteredHistory = curHistory.filter { it.timestamp >= historyCutoff }
+        if (filteredHistory.size != curHistory.size) {
+            _questionsHistory.value = filteredHistory
+        }
+
+        // 3. Purge processedQuestionsCache older than historyCutoff
+        val expiredCache = processedQuestionsCache.filter { it.value < historyCutoff }.keys
+        expiredCache.forEach { processedQuestionsCache.remove(it) }
+
+        // 4. Purge answeredQuestions older than historyCutoff
+        val expiredAnswered = answeredQuestionsTimestamps.filter { it.value < historyCutoff }.keys
+        expiredAnswered.forEach {
+            answeredQuestionsTimestamps.remove(it)
+            answeredQuestions.remove(it)
+        }
     }
 
     fun refreshServiceStatuses(context: Context) {
@@ -565,8 +614,32 @@ object AppStateManager {
         saveCurrentSettings()
     }
 
+    fun setSmallBarOpacity(opacity: Float) {
+        val clamped = opacity.coerceIn(0.20f, 1.0f)
+        _settings.value = _settings.value.copy(smallBarOpacity = clamped)
+        saveCurrentSettings()
+    }
+
+    fun setMainBarOpacity(opacity: Float) {
+        val clamped = opacity.coerceIn(0.20f, 1.0f)
+        _settings.value = _settings.value.copy(mainBarOpacity = clamped)
+        saveCurrentSettings()
+    }
+
+    fun setLangBarOpacity(opacity: Float) {
+        val clamped = opacity.coerceIn(0.20f, 1.0f)
+        _settings.value = _settings.value.copy(langBarOpacity = clamped)
+        saveCurrentSettings()
+    }
+
     fun setOverlayOpacity(opacity: Float) {
-        _settings.value = _settings.value.copy(overlayOpacity = opacity)
+        val clamped = opacity.coerceIn(0.20f, 1.0f)
+        _settings.value = _settings.value.copy(
+            overlayOpacity = clamped,
+            smallBarOpacity = clamped,
+            mainBarOpacity = clamped,
+            langBarOpacity = clamped
+        )
         saveCurrentSettings()
     }
 
@@ -605,6 +678,7 @@ object AppStateManager {
         _errorMessage.value = null
         processedQuestionsCache.clear()
         answeredQuestions.clear()
+        answeredQuestionsTimestamps.clear()
         com.example.service.QuestionDetectorAccessibilityService.resetLastProcessedText()
     }
 
@@ -626,7 +700,9 @@ object AppStateManager {
         Toast.makeText(context, "Copied to clipboard: \"${reply.text}\"", Toast.LENGTH_SHORT).show()
         
         _currentQuestion.value?.text?.let { qText ->
-            answeredQuestions.add(normalizeQuestionText(qText))
+            val norm = normalizeQuestionText(qText)
+            answeredQuestions.add(norm)
+            answeredQuestionsTimestamps[norm] = System.currentTimeMillis()
         }
         dismissReply(reply.id)
     }

@@ -86,6 +86,9 @@ fun OverlayTab(
     onSetAutoHideDelaySec: (Int) -> Unit,
     onSetScreenIdleTimeoutSec: (Int) -> Unit,
     onSetOverlayOpacity: (Float) -> Unit,
+    onSetSmallBarOpacity: (Float) -> Unit = {},
+    onSetMainBarOpacity: (Float) -> Unit = {},
+    onSetLangBarOpacity: (Float) -> Unit = {},
     onSetOverlayCornerRadius: (Int) -> Unit,
     onSetOverlayTextSizeSp: (Int) -> Unit,
     onDeleteSavedPosition: (String) -> Unit,
@@ -564,23 +567,61 @@ fun OverlayTab(
                         accentColor = CrimsonPrimary
                     )
 
-                    // Opacity Slider
+                    // 1. Small Collapsed Bar (Pill) Opacity
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        val opacityPercent = (settings.overlayOpacity * 100).toInt()
+                        val pillPercent = (settings.smallBarOpacity * 100).toInt()
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Text("Surface Opacity", fontSize = 12.sp, color = TextSecondary)
-                            MonospaceValue(text = "$opacityPercent%", color = TechBlue)
+                            Text("Small Bar (Pill) Opacity", fontSize = 12.sp, color = TextSecondary)
+                            MonospaceValue(text = "$pillPercent%", color = TechBlue)
                         }
                         Slider(
-                            value = settings.overlayOpacity,
-                            onValueChange = { onSetOverlayOpacity(it) },
-                            valueRange = 0.50f..1.0f,
+                            value = settings.smallBarOpacity,
+                            onValueChange = { onSetSmallBarOpacity(it) },
+                            valueRange = 0.20f..1.0f,
+                            colors = SliderDefaults.colors(thumbColor = TechBlue, activeTrackColor = TechBlue, inactiveTrackColor = DarkSurfaceVariant)
+                        )
+                    }
+
+                    // 2. Main Bar Opacity
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        val mainPercent = (settings.mainBarOpacity * 100).toInt()
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text("Main Bar Opacity", fontSize = 12.sp, color = TextSecondary)
+                            MonospaceValue(text = "$mainPercent%", color = CrimsonLight)
+                        }
+                        Slider(
+                            value = settings.mainBarOpacity,
+                            onValueChange = { onSetMainBarOpacity(it) },
+                            valueRange = 0.20f..1.0f,
                             colors = SliderDefaults.colors(thumbColor = CrimsonPrimary, activeTrackColor = CrimsonPrimary, inactiveTrackColor = DarkSurfaceVariant)
                         )
                     }
+
+                    // 3. Lang Bar Opacity
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        val langPercent = (settings.langBarOpacity * 100).toInt()
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text("Lang Bar Opacity", fontSize = 12.sp, color = TextSecondary)
+                            MonospaceValue(text = "$langPercent%", color = TechGreen)
+                        }
+                        Slider(
+                            value = settings.langBarOpacity,
+                            onValueChange = { onSetLangBarOpacity(it) },
+                            valueRange = 0.20f..1.0f,
+                            colors = SliderDefaults.colors(thumbColor = TechGreen, activeTrackColor = TechGreen, inactiveTrackColor = DarkSurfaceVariant)
+                        )
+                    }
+
+                    HorizontalDivider(color = DarkCardBorder)
 
                     // Corner Radius Slider
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {

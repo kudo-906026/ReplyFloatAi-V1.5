@@ -151,6 +151,9 @@ object SettingsStorage {
         root.put("autoHideDelaySec", settings.autoHideDelaySec)
         root.put("screenIdleTimeoutSec", settings.screenIdleTimeoutSec)
         root.put("overlayOpacity", settings.overlayOpacity.toDouble())
+        root.put("smallBarOpacity", settings.smallBarOpacity.toDouble())
+        root.put("mainBarOpacity", settings.mainBarOpacity.toDouble())
+        root.put("langBarOpacity", settings.langBarOpacity.toDouble())
         root.put("overlayCornerRadius", settings.overlayCornerRadius)
         root.put("overlayTextSizeSp", settings.overlayTextSizeSp)
         root.put("enableOcrFallback", settings.enableOcrFallback)
@@ -373,6 +376,9 @@ object SettingsStorage {
             autoHideDelaySec = root.optInt("autoHideDelaySec", 12),
             screenIdleTimeoutSec = root.optInt("screenIdleTimeoutSec", 30),
             overlayOpacity = root.optDouble("overlayOpacity", 0.95).toFloat(),
+            smallBarOpacity = root.optDouble("smallBarOpacity", root.optDouble("overlayOpacity", 0.95)).toFloat(),
+            mainBarOpacity = root.optDouble("mainBarOpacity", root.optDouble("overlayOpacity", 0.95)).toFloat(),
+            langBarOpacity = root.optDouble("langBarOpacity", root.optDouble("overlayOpacity", 0.95)).toFloat(),
             overlayCornerRadius = root.optInt("overlayCornerRadius", 18),
             overlayTextSizeSp = root.optInt("overlayTextSizeSp", 13),
             savedPositions = savedPositions,
