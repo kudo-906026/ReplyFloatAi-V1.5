@@ -25,6 +25,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Apps
 import androidx.compose.material.icons.filled.BugReport
+import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Layers
@@ -94,9 +95,10 @@ import com.example.ui.theme.TextWhite
 
 enum class ControlPanelTab(val title: String, val icon: ImageVector, val tag: String) {
     CONTROLS("Controls", Icons.Default.Dashboard, "tab_controls"),
+    BRAIN("Brain", Icons.Default.Psychology, "tab_brain"),
     DIAGNOSTICS("Diagnostics", Icons.Default.BugReport, "tab_diagnostics"),
     HISTORY("History", Icons.Default.History, "tab_history"),
-    PROVIDERS("Providers", Icons.Default.Psychology, "tab_providers"),
+    PROVIDERS("Providers", Icons.Default.Cloud, "tab_providers"),
     OVERLAY("Overlay", Icons.Default.Layers, "tab_overlay"),
     SETTINGS("Settings", Icons.Default.Tune, "tab_settings"),
     APPS("Apps", Icons.Default.Apps, "tab_apps")
@@ -344,6 +346,15 @@ fun MainScreen() {
                             context.startActivity(intent)
                             Toast.makeText(context, "Enable 'ReplyFloat Detector' in Accessibility list", Toast.LENGTH_LONG).show()
                         }
+                    )
+                }
+                ControlPanelTab.BRAIN -> {
+                    BrainTab(
+                        settings = settings,
+                        onAddEntry = { AppStateManager.addBrainEntry(it) },
+                        onUpdateEntry = { AppStateManager.updateBrainEntry(it) },
+                        onDeleteEntry = { AppStateManager.deleteBrainEntry(it) },
+                        onToggleEntry = { id, enabled -> AppStateManager.toggleBrainEntry(id, enabled) }
                     )
                 }
                 ControlPanelTab.DIAGNOSTICS -> {

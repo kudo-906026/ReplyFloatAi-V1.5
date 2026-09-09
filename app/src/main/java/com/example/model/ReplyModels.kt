@@ -254,7 +254,46 @@ data class ReplySettings(
     val appsWhitelist: List<WhitelistedApp> = defaultWhitelistedApps(),
     val customProviders: List<AiProvider> = emptyList(),
     val enableOcrFallback: Boolean = true,
-    val ocrDebounceMs: Int = 1200
+    val ocrDebounceMs: Int = 1200,
+    val brainEntries: List<BrainKnowledgeEntry> = defaultBrainKnowledgeEntries()
+)
+
+data class BrainKnowledgeEntry(
+    val id: String = UUID.randomUUID().toString(),
+    val title: String,
+    val content: String,
+    val category: String = "General",
+    val tags: List<String> = emptyList(),
+    val source: String = "Manual",
+    val timestamp: Long = System.currentTimeMillis(),
+    val isEnabled: Boolean = true
+)
+
+fun defaultBrainKnowledgeEntries(): List<BrainKnowledgeEntry> = listOf(
+    BrainKnowledgeEntry(
+        id = "brain_supersus_1",
+        title = "Super Sus - Spacecrew Roles & Skills",
+        content = "Sheriff can eliminate Impostors. Doctor can revive dead crewmates in Medbay. Seer can inspect player alignments. Spacecrew win by finishing all tasks or voting out all Impostors.",
+        category = "Super Sus Quiz",
+        tags = listOf("supersus", "roles", "quiz", "doctor", "sheriff"),
+        source = "Preset"
+    ),
+    BrainKnowledgeEntry(
+        id = "brain_personal_1",
+        title = "Personal Preferences & Trivia",
+        content = "Favorite food: Pepperoni pizza with extra mushrooms. Favorite drink: Iced matcha latte. Weekend activities: Mobile gaming, sci-fi movies, and coding.",
+        category = "Personal Facts",
+        tags = listOf("personal", "favorites", "food", "hobbies"),
+        source = "Preset"
+    ),
+    BrainKnowledgeEntry(
+        id = "brain_gaming_1",
+        title = "Gaming Strategy & Terminology",
+        content = "Sus means suspicious. Venting is restricted to Impostors. Self-report means the Impostor reported a kill they committed. GG means Good Game.",
+        category = "Gaming Trivia",
+        tags = listOf("gaming", "terms", "supersus", "slang"),
+        source = "Preset"
+    )
 )
 
 fun defaultBuiltInProviders(): List<AiProvider> = listOf(

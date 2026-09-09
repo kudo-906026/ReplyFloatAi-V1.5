@@ -4,6 +4,7 @@ import android.content.Context
 import com.example.model.AiModelTier
 import com.example.model.AiProvider
 import com.example.model.AiProviderType
+import com.example.model.BrainKnowledgeEntry
 import com.example.model.OverlayBarStyle
 import com.example.model.OverlayInteractionMode
 import com.example.model.ReplySettings
@@ -12,6 +13,7 @@ import com.example.model.ResponseLengthPreset
 import com.example.model.SavedOverlayPosition
 import com.example.model.UnderstandingSummaryLength
 import com.example.model.WhitelistedApp
+import com.example.model.defaultBrainKnowledgeEntries
 import com.example.model.defaultBuiltInProviders
 import com.example.model.defaultWhitelistedApps
 import org.json.JSONArray
@@ -159,6 +161,25 @@ object SettingsStorage {
         root.put("overlayTextSizeSp", settings.overlayTextSizeSp)
         root.put("enableOcrFallback", settings.enableOcrFallback)
         root.put("ocrDebounceMs", settings.ocrDebounceMs)
+
+        // Brain knowledge entries
+        val brainArray = JSONArray()
+        settings.brainEntries.forEach { entry ->
+            val bObj = JSONObject().apply {
+                put("id", entry.id)
+                put("title", entry.title)
+                put("content", entry.content)
+                put("category", entry.category)
+                val tagsArr = JSONArray()
+                entry.tags.forEach { tagsArr.put(it) }
+                put("tags", tagsArr)
+                put("source", entry.source)
+                put("timestamp", entry.timestamp)
+                put("isEnabled", entry.isEnabled)
+            }
+            brainArray.put(bObj)
+        }
+        root.put("brainEntries", brainArray)
 
         return root.toString()
     }
@@ -345,6 +366,35 @@ object SettingsStorage {
         }
         val finalTriggers = if (triggers.isNotEmpty()) triggers else com.example.model.defaultTriggers()
 
+        // 9. Brain knowledge entries
+        val brainEntries = mutableListOf<BrainKnowledgeEntry>()
+        if (root.has("brainEntries")) {
+            val brainArray = root.getJSONArray("brainEntries")
+            for (i in 0 until brainArray.length()) {
+                val bObj = brainArray.getJSONObject(i)
+                val tagsList = mutableListOf<String>()
+                val tagsArr = bObj.optJSONArray("tags")
+                if (tagsArr != null) {
+                    for (t in 0 until tagsArr.length()) {
+                        tagsList.add(tagsArr.getString(t))
+                    }
+                }
+                brainEntries.add(
+                    BrainKnowledgeEntry(
+                        id = bObj.optString("id", UUID.randomUUID().toString()),
+                        title = bObj.getString("title"),
+                        content = bObj.getString("content"),
+                        category = bObj.optString("category", "General"),
+                        tags = tagsList,
+                        source = bObj.optString("source", "Manual"),
+                        timestamp = bObj.optLong("timestamp", System.currentTimeMillis()),
+                        isEnabled = bObj.optBoolean("isEnabled", true)
+                    )
+                )
+            }
+        }
+        val finalBrainEntries = if (brainEntries.isNotEmpty()) brainEntries else defaultBrainKnowledgeEntries()
+
         return ReplySettings(
             preferredProvider = preferredProvider,
             fallbackOrder = finalFallbackOrder,
@@ -387,7 +437,8 @@ object SettingsStorage {
             appsWhitelist = finalApps,
             customProviders = customProviders,
             enableOcrFallback = root.optBoolean("enableOcrFallback", true),
-            ocrDebounceMs = root.optInt("ocrDebounceMs", 1200)
+            ocrDebounceMs = root.optInt("ocrDebounceMs", 1200),
+            brainEntries = finalBrainEntries
         )
     }
 }

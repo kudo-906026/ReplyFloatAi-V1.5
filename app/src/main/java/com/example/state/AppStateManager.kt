@@ -11,6 +11,7 @@ import com.example.ai.QuestionDetectionEngine
 import com.example.model.AiModelTier
 import com.example.model.AiProvider
 import com.example.model.AiProviderType
+import com.example.model.BrainKnowledgeEntry
 import com.example.model.DetectionMethod
 import com.example.model.DetectionResultType
 import com.example.model.DiagnosticLogEntry
@@ -539,6 +540,63 @@ object AppStateManager {
         saveCurrentSettings()
     }
 
+    fun addBrainEntry(entry: BrainKnowledgeEntry) {
+        val current = _settings.value.brainEntries.toMutableList()
+        current.add(0, entry)
+        _settings.value = _settings.value.copy(brainEntries = current)
+        saveCurrentSettings()
+        addDiagnosticLog(
+            source = "Brain Knowledge",
+            rawText = entry.title,
+            result = DetectionResultType.MATCHED,
+            category = "BRAIN_ENTRY_ADDED",
+            reason = "Saved new Brain entry: '${entry.title}' in category '${entry.category}' (Source: ${entry.source})"
+        )
+    }
+
+    fun updateBrainEntry(updated: BrainKnowledgeEntry) {
+        val current = _settings.value.brainEntries.toMutableList()
+        val index = current.indexOfFirst { it.id == updated.id }
+        if (index != -1) {
+            current[index] = updated
+            _settings.value = _settings.value.copy(brainEntries = current)
+            saveCurrentSettings()
+            addDiagnosticLog(
+                source = "Brain Knowledge",
+                rawText = updated.title,
+                result = DetectionResultType.MATCHED,
+                category = "BRAIN_ENTRY_UPDATED",
+                reason = "Updated Brain entry: '${updated.title}' (${updated.category})"
+            )
+        }
+    }
+
+    fun deleteBrainEntry(id: String) {
+        val entry = _settings.value.brainEntries.firstOrNull { it.id == id }
+        val current = _settings.value.brainEntries.filter { it.id != id }
+        _settings.value = _settings.value.copy(brainEntries = current)
+        saveCurrentSettings()
+        if (entry != null) {
+            addDiagnosticLog(
+                source = "Brain Knowledge",
+                rawText = entry.title,
+                result = DetectionResultType.MATCHED,
+                category = "BRAIN_ENTRY_DELETED",
+                reason = "Deleted Brain entry: '${entry.title}'"
+            )
+        }
+    }
+
+    fun toggleBrainEntry(id: String, isEnabled: Boolean) {
+        val current = _settings.value.brainEntries.toMutableList()
+        val index = current.indexOfFirst { it.id == id }
+        if (index != -1) {
+            current[index] = current[index].copy(isEnabled = isEnabled)
+            _settings.value = _settings.value.copy(brainEntries = current)
+            saveCurrentSettings()
+        }
+    }
+
     fun setContinuousScreenAnalysis(enabled: Boolean) {
         _settings.value = _settings.value.copy(continuousScreenAnalysis = enabled)
         saveCurrentSettings()
@@ -869,6 +927,7 @@ object AppStateManager {
                 val fallbackResult = AiFallbackEngine.generateRepliesWithFallback(
                     question = cleanText,
                     settings = _settings.value,
+                    sourceApp = sourceApp,
                     onLog = { src, raw, res, cat, rsn, lat ->
                         addDiagnosticLog(
                             source = src,

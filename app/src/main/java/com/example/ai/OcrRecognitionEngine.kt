@@ -1,10 +1,12 @@
 package com.example.ai
 
+import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Typeface
+import android.net.Uri
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.Text
 import com.google.mlkit.vision.text.TextRecognition
@@ -271,6 +273,98 @@ object OcrRecognitionEngine {
                 latencyMs = latency,
                 isSuccess = false,
                 errorMessage = e.localizedMessage ?: e.message ?: "OCR Recognition Exception",
+                detectedBlocks = emptyList(),
+                structuredBlocks = emptyList(),
+                detectedLines = emptyList()
+            )
+        }
+    }
+
+    /**
+     * Executes On-Device ML Kit Text Recognition on an image Uri (e.g. from gallery screenshot picker).
+     */
+    suspend fun recognizeTextFromUri(context: Context, uri: Uri): OcrRecognitionResult = withContext(Dispatchers.Default) {
+        val startTime = System.currentTimeMillis()
+        try {
+            val inputImage = InputImage.fromFilePath(context, uri)
+
+            val visionText = suspendCancellableCoroutine<Text> { continuation ->
+                recognizer.process(inputImage)
+                    .addOnSuccessListener { text ->
+                        if (continuation.isActive) {
+                            continuation.resume(text)
+                        }
+                    }
+                    .addOnFailureListener { exception ->
+                        if (continuation.isActive) {
+                            continuation.resumeWith(Result.failure(exception))
+                        }
+                    }
+            }
+
+            val latency = System.currentTimeMillis() - startTime
+            val blockStrings = mutableListOf<String>()
+            val structuredBlocksList = mutableListOf<OcrBlock>()
+            val allLinesList = mutableListOf<OcrLine>()
+
+            var globalLineIndex = 0
+            for ((blockIdx, block) in visionText.textBlocks.withIndex()) {
+                val bText = block.text.trim()
+                if (bText.isNotBlank()) {
+                    blockStrings.add(bText)
+                }
+
+                val bBox = block.boundingBox
+                val blockLines = mutableListOf<OcrLine>()
+                for (line in block.lines) {
+                    val lText = line.text.trim()
+                    if (lText.isNotBlank()) {
+                        val lBox = line.boundingBox
+                        val ocrLine = OcrLine(
+                            text = lText,
+                            boundingBox = lBox,
+                            bottomY = lBox?.bottom ?: 0,
+                            topY = lBox?.top ?: 0,
+                            leftX = lBox?.left ?: 0,
+                            rightX = lBox?.right ?: 0,
+                            lineIndex = globalLineIndex++,
+                            blockIndex = blockIdx
+                        )
+                        blockLines.add(ocrLine)
+                        allLinesList.add(ocrLine)
+                    }
+                }
+
+                structuredBlocksList.add(
+                    OcrBlock(
+                        text = bText,
+                        lines = blockLines,
+                        boundingBox = bBox,
+                        bottomY = bBox?.bottom ?: 0,
+                        topY = bBox?.top ?: 0,
+                        blockIndex = blockIdx
+                    )
+                )
+            }
+
+            OcrRecognitionResult(
+                rawText = visionText.text.trim(),
+                lineCount = allLinesList.size,
+                latencyMs = latency,
+                isSuccess = true,
+                errorMessage = null,
+                detectedBlocks = blockStrings,
+                structuredBlocks = structuredBlocksList,
+                detectedLines = allLinesList
+            )
+        } catch (e: Exception) {
+            val latency = System.currentTimeMillis() - startTime
+            OcrRecognitionResult(
+                rawText = "",
+                lineCount = 0,
+                latencyMs = latency,
+                isSuccess = false,
+                errorMessage = e.localizedMessage ?: e.message ?: "Failed to process screenshot",
                 detectedBlocks = emptyList(),
                 structuredBlocks = emptyList(),
                 detectedLines = emptyList()

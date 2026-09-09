@@ -4,6 +4,7 @@ import com.example.model.AiModelTier
 import com.example.model.AiProvider
 import com.example.model.AiProviderType
 import com.example.model.AiQuestionVerificationResult
+import com.example.model.BrainKnowledgeEntry
 import com.example.model.DetectionResultType
 import com.example.model.ReplyItem
 import com.example.model.ReplySettings
@@ -66,9 +67,29 @@ object AiFallbackEngine {
     suspend fun generateRepliesWithFallback(
         question: String,
         settings: ReplySettings,
+        sourceApp: String? = null,
         onLog: ((source: String, rawText: String, result: DetectionResultType, category: String, reason: String, latencyMs: Long?) -> Unit)? = null
     ): FallbackGenerationResult = withContext(Dispatchers.IO) {
         val qId = UUID.randomUUID().toString()
+
+        // 0. Search Brain Knowledge Base for relevant verified facts/notes
+        val relevantBrainEntries = BrainKnowledgeMatcher.findRelevantEntries(
+            question = question,
+            sourceApp = sourceApp,
+            entries = settings.brainEntries
+        )
+        val brainKnowledgePrompt = BrainKnowledgeMatcher.formatKnowledgePrompt(relevantBrainEntries)
+        if (relevantBrainEntries.isNotEmpty()) {
+            val titles = relevantBrainEntries.joinToString(", ") { "'${it.title}'" }
+            onLog?.invoke(
+                "Brain Knowledge",
+                question,
+                DetectionResultType.MATCHED,
+                "BRAIN_KNOWLEDGE_APPLIED",
+                "Matched ${relevantBrainEntries.size} Brain entry/entries ($titles). Injected into AI prompt context.",
+                2L
+            )
+        }
 
         // Generate meaning / understanding if enabled
         val understanding = if (settings.understandingMode) {
@@ -133,10 +154,10 @@ object AiFallbackEngine {
 
             try {
                 val result: ProviderReplyResult = when (provider.type) {
-                    AiProviderType.GEMINI_API -> callGeminiRestApi(provider, question, settings, qId)
-                    AiProviderType.OPENAI, AiProviderType.GROQ, AiProviderType.CUSTOM_REST -> callOpenAiCompatibleRest(provider, question, settings, qId)
-                    AiProviderType.ANTHROPIC -> callAnthropicRest(provider, question, settings, qId)
-                    AiProviderType.GEMINI_BUILTIN -> generateSmartLocalReplies(question, settings, qId, provider)
+                    AiProviderType.GEMINI_API -> callGeminiRestApi(provider, question, settings, qId, brainKnowledgePrompt)
+                    AiProviderType.OPENAI, AiProviderType.GROQ, AiProviderType.CUSTOM_REST -> callOpenAiCompatibleRest(provider, question, settings, qId, brainKnowledgePrompt)
+                    AiProviderType.ANTHROPIC -> callAnthropicRest(provider, question, settings, qId, brainKnowledgePrompt)
+                    AiProviderType.GEMINI_BUILTIN -> generateSmartLocalReplies(question, settings, qId, provider, relevantBrainEntries)
                     else -> ProviderReplyResult(emptyList())
                 }
                 val replies = result.replies
@@ -210,7 +231,7 @@ object AiFallbackEngine {
         }
 
         // 4. If all preceding providers failed, use local built-in engine
-        val localResult = generateSmartLocalReplies(question, settings, qId, builtIn)
+        val localResult = generateSmartLocalReplies(question, settings, qId, builtIn, relevantBrainEntries)
         val localReplies = localResult.replies
         val effectiveLocalUnderstanding = if (settings.understandingMode) {
             localResult.meaning?.takeIf { it.isNotBlank() } ?: understanding
@@ -245,9 +266,10 @@ object AiFallbackEngine {
     suspend fun generateReplies(
         question: String,
         settings: ReplySettings,
-        activeProvider: AiProvider
+        activeProvider: AiProvider,
+        sourceApp: String? = null
     ): Pair<List<ReplyItem>, String?> = withContext(Dispatchers.IO) {
-        val result = generateRepliesWithFallback(question, settings)
+        val result = generateRepliesWithFallback(question, settings, sourceApp)
         Pair(result.replies, result.understanding)
     }
 
@@ -774,7 +796,8 @@ object AiFallbackEngine {
         question: String,
         settings: ReplySettings,
         questionId: String,
-        provider: AiProvider
+        provider: AiProvider,
+        relevantBrainEntries: List<BrainKnowledgeEntry> = emptyList()
     ): ProviderReplyResult {
         val tone = settings.tone
         val preset = settings.responseLengthPreset
@@ -783,6 +806,37 @@ object AiFallbackEngine {
         val lower = clean.lowercase()
 
         val meaning = if (settings.understandingMode) generateUnderstanding(question, settings.understandingSummaryLength) else null
+
+        // 0. Brain Knowledge Base matching (Highest priority verified user facts)
+        val matchedBrain = if (relevantBrainEntries.isNotEmpty()) {
+            relevantBrainEntries
+        } else {
+            BrainKnowledgeMatcher.findRelevantEntries(clean, null, settings.brainEntries)
+        }
+        if (matchedBrain.isNotEmpty()) {
+            val topEntry = matchedBrain.first()
+            val brainReplies = BrainKnowledgeMatcher.buildLocalRepliesFromKnowledge(
+                question = clean,
+                entry = topEntry,
+                tone = tone,
+                preset = preset,
+                count = count
+            )
+            if (brainReplies.isNotEmpty()) {
+                return ProviderReplyResult(
+                    replies = brainReplies.take(count).map { text ->
+                        ReplyItem(
+                            questionId = questionId,
+                            text = text,
+                            tone = tone,
+                            generatedByProvider = provider
+                        )
+                    },
+                    original = question,
+                    meaning = meaning ?: "Answered from Brain Knowledge Base: ${topEntry.title} (${topEntry.category})"
+                )
+            }
+        }
 
         // 1. Math / Scientific / Symbolic calculations
         val mathReplies = trySolveMathQuestion(question, tone, preset)
@@ -2030,7 +2084,8 @@ object AiFallbackEngine {
         provider: AiProvider,
         question: String,
         settings: ReplySettings,
-        questionId: String
+        questionId: String,
+        brainKnowledgePrompt: String = ""
     ): ProviderReplyResult {
         var rawModel = provider.modelName.trim()
         if (rawModel.startsWith("models/")) {
@@ -2076,7 +2131,7 @@ object AiFallbackEngine {
             "${lengthPreset.promptInstruction}\n" +
             "Maximum character ceiling: $charCeiling characters.\n" +
             "Output ONLY a valid JSON array of ${settings.count} strings, e.g. [\"reply 1\", \"reply 2\"]. No markdown code fences, no extra text."
-        }
+        } + brainKnowledgePrompt
 
         val jsonBody = JSONObject().apply {
             put("contents", JSONArray().apply {
@@ -2209,7 +2264,8 @@ object AiFallbackEngine {
         provider: AiProvider,
         question: String,
         settings: ReplySettings,
-        questionId: String
+        questionId: String,
+        brainKnowledgePrompt: String = ""
     ): Pair<ProviderReplyResult, String> {
         val defaultEndpoint = if (provider.type == AiProviderType.GROQ) {
             "https://api.groq.com/openai/v1/chat/completions"
@@ -2257,7 +2313,7 @@ object AiFallbackEngine {
             "Length Requirement: ${lengthPreset.title} (${lengthPreset.subtitle}). ${lengthPreset.promptInstruction}\n" +
             "Maximum character limit: $charCeiling chars per reply.\n" +
             "Format output strictly as a JSON array of strings: [\"reply 1\", \"reply 2\"]."
-        }
+        } + brainKnowledgePrompt
 
         val userPrompt = if (isLangMode) {
             "Incoming question: \"$question\"\n" +
@@ -2337,16 +2393,18 @@ object AiFallbackEngine {
         provider: AiProvider,
         question: String,
         settings: ReplySettings,
-        questionId: String
+        questionId: String,
+        brainKnowledgePrompt: String = ""
     ): ProviderReplyResult {
-        return callOpenAiCompatibleRestWithRaw(provider, question, settings, questionId).first
+        return callOpenAiCompatibleRestWithRaw(provider, question, settings, questionId, brainKnowledgePrompt).first
     }
 
     private fun callAnthropicRest(
         provider: AiProvider,
         question: String,
         settings: ReplySettings,
-        questionId: String
+        questionId: String,
+        brainKnowledgePrompt: String = ""
     ): ProviderReplyResult {
         val url = URL("https://api.anthropic.com/v1/messages")
         val conn = (url.openConnection() as HttpURLConnection).apply {
@@ -2381,7 +2439,7 @@ object AiFallbackEngine {
             "${lengthPreset.promptInstruction}\n" +
             "Max chars: $charCeiling.\n" +
             "Return ONLY a JSON array of strings: [\"reply1\", \"reply2\"]."
-        }
+        } + brainKnowledgePrompt
 
         val body = JSONObject().apply {
             put("model", provider.modelName.ifBlank { "claude-3-5-haiku-20241022" })
