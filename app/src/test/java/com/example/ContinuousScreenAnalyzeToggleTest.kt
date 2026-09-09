@@ -78,4 +78,20 @@ class ContinuousScreenAnalyzeToggleTest {
         assertEquals(3, resumeCount)
         assertEquals(3, pauseCount)
     }
+
+    @Test
+    fun testOverlayNotRunning_PreventsScanning() {
+        // Overlay is closed
+        AppStateManager.setOverlayRunning(false)
+        assertFalse(AppStateManager.isOverlayRunning.value)
+
+        // Even if continuousScreenAnalysis is true in settings, scanning must not run if overlay is closed
+        AppStateManager.setContinuousScreenAnalysis(true)
+        assertTrue(AppStateManager.settings.value.continuousScreenAnalysis)
+        assertFalse("Overlay running flag must remain false", AppStateManager.isOverlayRunning.value)
+
+        // Overlay open
+        AppStateManager.setOverlayRunning(true)
+        assertTrue(AppStateManager.isOverlayRunning.value)
+    }
 }

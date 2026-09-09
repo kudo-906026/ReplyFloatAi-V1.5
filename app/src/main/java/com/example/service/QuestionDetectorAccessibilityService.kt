@@ -112,7 +112,9 @@ class QuestionDetectorAccessibilityService : AccessibilityService() {
             while (isActive) {
                 try {
                     val settings = AppStateManager.settings.value
-                    if (settings.continuousScreenAnalysis) {
+                    // CRITICAL: Continuous background scanning only proceeds when explicitly enabled
+                    // AND the floating overlay bar is visibly open/running on screen!
+                    if (settings.continuousScreenAnalysis && AppStateManager.isOverlayRunning.value) {
                         withContext(Dispatchers.Main) {
                             performWindowScan(isContinuousTick = true, forcedBypass = false)
                         }
@@ -125,6 +127,7 @@ class QuestionDetectorAccessibilityService : AccessibilityService() {
     }
 
     fun scanActiveWindowNow() {
+        if (!AppStateManager.isOverlayRunning.value) return
         serviceScope.launch(Dispatchers.Main) {
             performWindowScan(isContinuousTick = false, forcedBypass = true)
         }
@@ -132,6 +135,15 @@ class QuestionDetectorAccessibilityService : AccessibilityService() {
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event == null) return
+
+        // CRITICAL REQUIREMENT:
+        // Background scanning MUST ONLY occur when:
+        // 1. "Continuous Screen Analyze" is explicitly enabled by the user
+        // 2. The floating overlay bar is actively open / running on screen
+        val settings = AppStateManager.settings.value
+        if (!settings.continuousScreenAnalysis || !AppStateManager.isOverlayRunning.value) {
+            return
+        }
 
         val eventPkg = event.packageName?.toString()
         if (eventPkg != null && eventPkg != applicationContext.packageName && !isSystemOrKeyboardPackage(eventPkg)) {
@@ -163,14 +175,14 @@ class QuestionDetectorAccessibilityService : AccessibilityService() {
         pendingSettledScanJob?.cancel()
         pendingSettledScanJob = serviceScope.launch(Dispatchers.Main) {
             delay(250L)
-            performWindowScan(isContinuousTick = false, forcedBypass = true)
+            performWindowScan(isContinuousTick = false, forcedBypass = false)
         }
 
         // 3. Trailing edge debounce scan: guarantees that bursts of typing or rapid changes don't drop the latest state
         pendingEventScanJob?.cancel()
         pendingEventScanJob = serviceScope.launch(Dispatchers.Main) {
             delay(debounce + 50L)
-            performWindowScan(isContinuousTick = false, forcedBypass = true)
+            performWindowScan(isContinuousTick = false, forcedBypass = false)
         }
     }
 
@@ -180,8 +192,10 @@ class QuestionDetectorAccessibilityService : AccessibilityService() {
         event: AccessibilityEvent? = null
     ) {
         val settings = AppStateManager.settings.value
-        if (!settings.continuousScreenAnalysis && !forcedBypass) {
-            return
+        if (!forcedBypass) {
+            if (!settings.continuousScreenAnalysis || !AppStateManager.isOverlayRunning.value) {
+                return
+            }
         }
 
         val now = System.currentTimeMillis()
@@ -404,6 +418,11 @@ class QuestionDetectorAccessibilityService : AccessibilityService() {
     }
 
     private fun triggerOcrFallbackIfEligible(appName: String, pkgName: String, now: Long, ocrDebounceMs: Int) {
+        val settings = AppStateManager.settings.value
+        if (!settings.continuousScreenAnalysis || !AppStateManager.isOverlayRunning.value) {
+            return
+        }
+
         if (isOcrProcessing) {
             // A previous OCR pass is currently executing. Queue follow-up scan so newly rendered text isn't missed!
             pendingOcrScanRequested = true
@@ -517,9 +536,11 @@ class QuestionDetectorAccessibilityService : AccessibilityService() {
 
                                         if (pendingOcrScanRequested) {
                                             pendingOcrScanRequested = false
-                                            serviceScope.launch(Dispatchers.Main) {
-                                                delay(150L) // Wait for screen settling
-                                                performWindowScan(isContinuousTick = false, forcedBypass = true)
+                                            if (AppStateManager.isOverlayRunning.value && AppStateManager.settings.value.continuousScreenAnalysis) {
+                                                serviceScope.launch(Dispatchers.Main) {
+                                                    delay(150L) // Wait for screen settling
+                                                    performWindowScan(isContinuousTick = false, forcedBypass = false)
+                                                }
                                             }
                                         }
                                     }
@@ -533,9 +554,11 @@ class QuestionDetectorAccessibilityService : AccessibilityService() {
 
                             if (pendingOcrScanRequested) {
                                 pendingOcrScanRequested = false
-                                serviceScope.launch(Dispatchers.Main) {
-                                    delay(250L)
-                                    performWindowScan(isContinuousTick = false, forcedBypass = true)
+                                if (AppStateManager.isOverlayRunning.value && AppStateManager.settings.value.continuousScreenAnalysis) {
+                                    serviceScope.launch(Dispatchers.Main) {
+                                        delay(250L)
+                                        performWindowScan(isContinuousTick = false, forcedBypass = false)
+                                    }
                                 }
                             }
 

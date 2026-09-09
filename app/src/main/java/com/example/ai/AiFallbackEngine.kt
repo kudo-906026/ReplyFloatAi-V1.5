@@ -38,6 +38,31 @@ data class ProviderReplyResult(
 
 object AiFallbackEngine {
 
+    fun resolveEffectiveApiKey(provider: AiProvider, settings: ReplySettings): String {
+        val settingsKey = settings.providerApiKeys[provider.id]?.trim() ?: ""
+        if (settingsKey.isNotBlank()) return settingsKey
+
+        if (settings.preferredProvider.id == provider.id && settings.preferredProvider.apiKey.isNotBlank()) {
+            return settings.preferredProvider.apiKey.trim()
+        }
+
+        if (provider.apiKey.isNotBlank()) {
+            return provider.apiKey.trim()
+        }
+
+        return try {
+            when (provider.type) {
+                AiProviderType.GEMINI_API -> com.example.BuildConfig.GEMINI_API_KEY.trim()
+                AiProviderType.OPENAI -> com.example.BuildConfig.OPENAI_API_KEY.trim()
+                AiProviderType.ANTHROPIC -> com.example.BuildConfig.ANTHROPIC_API_KEY.trim()
+                AiProviderType.GROQ -> com.example.BuildConfig.GROK_API_KEY.trim()
+                else -> ""
+            }
+        } catch (_: Throwable) {
+            ""
+        }
+    }
+
     suspend fun generateRepliesWithFallback(
         question: String,
         settings: ReplySettings,
@@ -52,21 +77,14 @@ object AiFallbackEngine {
 
         // 1. Build the map of all registered providers with their stored API keys and model overrides
         val allMap = (defaultBuiltInProviders() + settings.customProviders).associateBy { it.id }.toMutableMap()
-        settings.providerApiKeys.forEach { (id, key) ->
-            allMap[id]?.let { allMap[id] = it.copy(apiKey = key) }
-        }
-        settings.providerModelOverrides.forEach { (id, model) ->
-            allMap[id]?.let { allMap[id] = it.copy(modelName = model) }
-        }
-        if (settings.preferredProvider.apiKey.isNotBlank()) {
-            allMap[settings.preferredProvider.id]?.let {
-                allMap[settings.preferredProvider.id] = it.copy(apiKey = settings.preferredProvider.apiKey)
-            }
-        }
-        if (settings.preferredProvider.modelName.isNotBlank()) {
-            allMap[settings.preferredProvider.id]?.let {
-                allMap[settings.preferredProvider.id] = it.copy(modelName = settings.preferredProvider.modelName)
-            }
+        for ((id, prov) in allMap.entries.toList()) {
+            val effKey = resolveEffectiveApiKey(prov, settings)
+            val modelOverride = settings.providerModelOverrides[id]
+                ?: (if (settings.preferredProvider.id == id) settings.preferredProvider.modelName else "")
+            allMap[id] = prov.copy(
+                apiKey = if (effKey.isNotBlank()) effKey else prov.apiKey,
+                modelName = if (modelOverride.isNotBlank()) modelOverride else prov.modelName
+            )
         }
 
         // 2. Build ordered provider chain according to settings.fallbackOrder
@@ -77,6 +95,13 @@ object AiFallbackEngine {
         }
 
         val chain = orderedIds.mapNotNull { allMap[it] }.toMutableList()
+
+        // Prioritize preferred provider at position 1 if configured
+        val preferred = allMap[settings.preferredProvider.id]
+        if (preferred != null) {
+            chain.removeAll { it.id == preferred.id }
+            chain.add(0, preferred)
+        }
 
         // Ensure built-in provider always exists as a fail-safe at the end
         val builtIn = allMap["gemini-builtin"] ?: defaultBuiltInProviders().first { it.type == AiProviderType.GEMINI_BUILTIN }
@@ -239,11 +264,14 @@ object AiFallbackEngine {
         val clean = text.trim()
 
         val allMap = (defaultBuiltInProviders() + settings.customProviders).associateBy { it.id }.toMutableMap()
-        settings.providerApiKeys.forEach { (id, key) ->
-            allMap[id]?.let { allMap[id] = it.copy(apiKey = key) }
-        }
-        settings.providerModelOverrides.forEach { (id, model) ->
-            allMap[id]?.let { allMap[id] = it.copy(modelName = model) }
+        for ((id, prov) in allMap.entries.toList()) {
+            val effKey = resolveEffectiveApiKey(prov, settings)
+            val modelOverride = settings.providerModelOverrides[id]
+                ?: (if (settings.preferredProvider.id == id) settings.preferredProvider.modelName else "")
+            allMap[id] = prov.copy(
+                apiKey = if (effKey.isNotBlank()) effKey else prov.apiKey,
+                modelName = if (modelOverride.isNotBlank()) modelOverride else prov.modelName
+            )
         }
 
         // Rank available providers by latency & cost for classification (Groq/Gemini Flash Lite/OpenAI 4o-mini)
@@ -309,7 +337,11 @@ object AiFallbackEngine {
         var rawModel = provider.modelName.trim()
         if (rawModel.startsWith("models/")) rawModel = rawModel.removePrefix("models/")
         rawModel = rawModel.replace(" ", "-")
-        val model = if (rawModel.isBlank()) "gemini-3.1-flash-lite" else rawModel
+        val model = when (rawModel) {
+            "", "gemini-3.1-flash-lite", "gemini-3.1-flash-lite-preview", "gemini-2.0-flash", "gemini-1.5-flash" -> "gemini-2.5-flash"
+            "gemini-flash-latest" -> "gemini-flash-latest"
+            else -> rawModel
+        }
         val url = URL("https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=${provider.apiKey.trim()}")
         val conn = (url.openConnection() as HttpURLConnection).apply {
             requestMethod = "POST"
@@ -478,14 +510,17 @@ object AiFallbackEngine {
         val testQuestion = "Are you available for a quick chat today?"
         val qId = "test_conn_${System.currentTimeMillis()}"
 
+        val effKey = resolveEffectiveApiKey(provider, settings)
+        val activeProvider = if (effKey.isNotBlank()) provider.copy(apiKey = effKey) else provider
+
         try {
-            when (provider.type) {
+            when (activeProvider.type) {
                 AiProviderType.GEMINI_BUILTIN -> {
-                    val replies = generateSmartLocalReplies(testQuestion, settings, qId, provider).replies
+                    val replies = generateSmartLocalReplies(testQuestion, settings, qId, activeProvider).replies
                     val latency = System.currentTimeMillis() - startTime
                     val sample = replies.firstOrNull()?.text ?: "I am ready."
                     onLog?.invoke(
-                        provider.displayName,
+                        activeProvider.displayName,
                         testQuestion,
                         DetectionResultType.MATCHED,
                         "TEST_CONNECTION_SUCCESS",
@@ -495,10 +530,10 @@ object AiFallbackEngine {
                     Result.success("Success: Built-in Engine verified (${latency}ms)\nSample: \"$sample\"")
                 }
                 AiProviderType.GEMINI_API -> {
-                    if (provider.apiKey.isBlank()) {
+                    if (activeProvider.apiKey.isBlank()) {
                         val err = "Gemini API Key is missing. Enter key in Settings > Providers."
                         onLog?.invoke(
-                            provider.displayName,
+                            activeProvider.displayName,
                             testQuestion,
                             DetectionResultType.REJECTED,
                             "TEST_CONNECTION_FAILED",
@@ -508,16 +543,16 @@ object AiFallbackEngine {
                         Result.failure(Exception(err))
                     } else {
                         // Execute EXACT same request format, endpoint, model, and JSON body as real generation
-                        val replies = callGeminiRestApi(provider, testQuestion, settings, qId).replies
+                        val replies = callGeminiRestApi(activeProvider, testQuestion, settings, qId).replies
                         val latency = System.currentTimeMillis() - startTime
                         if (replies.isNotEmpty()) {
                             val sample = replies.first().text
                             onLog?.invoke(
-                                provider.displayName,
+                                activeProvider.displayName,
                                 testQuestion,
                                 DetectionResultType.MATCHED,
                                 "TEST_CONNECTION_SUCCESS",
-                                "[Test Connection Passed]: Verified HTTP 200 via model '${provider.modelName}' (${latency}ms). Sample reply: \"$sample\"",
+                                "[Test Connection Passed]: Verified HTTP 200 via model '${activeProvider.modelName}' (${latency}ms). Sample reply: \"$sample\"",
                                 latency
                             )
                             Result.success("Success: Verified Gemini '${provider.modelName}' (${latency}ms)\nSample: \"$sample\"")
@@ -783,7 +818,24 @@ object AiFallbackEngine {
             )
         }
 
-        // 3. Conversational Context Templates scaled strictly by ResponseLengthPreset and Tone
+        // 3. Semantic, Hypothetical, Entertainment & Creative Questions
+        val semanticReplies = trySolveSemanticAndHypotheticalQuestion(clean, tone, preset)
+        if (semanticReplies.isNotEmpty()) {
+            return ProviderReplyResult(
+                replies = semanticReplies.take(count).map { text ->
+                    ReplyItem(
+                        questionId = questionId,
+                        text = text,
+                        tone = tone,
+                        generatedByProvider = provider
+                    )
+                },
+                original = question,
+                meaning = meaning
+            )
+        }
+
+        // 4. Conversational Context Templates scaled strictly by ResponseLengthPreset and Tone
         val isHinglish = QuestionDetectionEngine.isNonEnglishOrHinglish(clean) ||
                 lower.contains("bhai") || lower.contains("kya") || lower.contains("kaha") ||
                 lower.contains("kaisa") || lower.contains("bol") || lower.contains("yaar") ||
@@ -792,6 +844,11 @@ object AiFallbackEngine {
                 lower.contains("kar") || lower.contains("kyu") || lower.contains("kyun") ||
                 lower.contains("aaj") || lower.contains("kal") || lower.contains("isko") ||
                 lower.contains("vote")
+
+        val isActionRequest = lower.contains("send") || lower.contains("do this") || lower.contains("handle") ||
+                lower.contains("fix") || lower.contains("update") || lower.contains("prepare") ||
+                lower.contains("task") || lower.contains("finish") || lower.contains("work on") ||
+                lower.contains("execute")
 
         val templates: List<String> = when (preset) {
             ResponseLengthPreset.VERY_SHORT -> {
@@ -844,12 +901,20 @@ object AiFallbackEngine {
                         "Great idea, proceed!",
                         "Makes total sense."
                     )
-                    else -> when (tone) {
+                    isActionRequest -> when (tone) {
                         ReplyTone.CONCISE -> listOf("Confirmed.", "Got it.", "Will do.")
                         ReplyTone.WITTY -> listOf("Game on!", "You bet!", "Always ready.")
                         ReplyTone.PROFESSIONAL -> listOf("Acknowledged.", "Understood.", "Confirmed.")
                         ReplyTone.TRASH_TALK -> listOf("Keep dreaming! 😂", "Nice try, amateur.", "In your dreams!")
                         else -> listOf("Yes, definitely!", "On it!", "Sounds good.")
+                    }
+                    else -> when (tone) {
+                        ReplyTone.CONCISE -> listOf("First option.", "Agreed.", "Yes.")
+                        ReplyTone.WITTY -> listOf("Option one, easily!", "Great question!", "No doubt about it.")
+                        ReplyTone.PROFESSIONAL -> listOf("Under review.", "Primary option.", "Confirmed.")
+                        ReplyTone.EMPATHETIC -> listOf("Wonderful thought!", "Love that idea!", "Sounds great!")
+                        ReplyTone.TRASH_TALK -> listOf("Keep dreaming! 😂", "Nice try, amateur.", "In your dreams!")
+                        else -> listOf("Definitely option one!", "Great choice!", "Sounds great.")
                     }
                 }
             }
@@ -927,7 +992,7 @@ object AiFallbackEngine {
                         "I think it's a solid approach and great idea.",
                         "Makes total sense, let's go for it!"
                     )
-                    else -> when (tone) {
+                    isActionRequest -> when (tone) {
                         ReplyTone.PROFESSIONAL -> listOf(
                             "Thank you for reaching out, I will follow up promptly.",
                             "Confirmed. I have noted this and will coordinate accordingly.",
@@ -948,6 +1013,34 @@ object AiFallbackEngine {
                             "Yes, definitely! Let's get that done.",
                             "Got your message, working on that right now!",
                             "Sure thing, I'll take care of it."
+                        )
+                    }
+                    else -> when (tone) {
+                        ReplyTone.PROFESSIONAL -> listOf(
+                            "That is a pertinent inquiry; evaluating key criteria will clarify the optimal path.",
+                            "I would recommend evaluating the strategic advantages before concluding.",
+                            "A relevant question—I will review the parameters and provide guidance."
+                        )
+                        ReplyTone.CONCISE -> listOf("Option one.", "The first choice.", "Depends on preference.")
+                        ReplyTone.WITTY -> listOf(
+                            "That's a fantastic question—I'd pick the option that makes the best story!",
+                            "Hands down the most adventurous option, without a doubt!",
+                            "Tough dilemma! But the fun choice always wins."
+                        )
+                        ReplyTone.EMPATHETIC -> listOf(
+                            "What a thoughtful question! I'd love to hear your perspective on this too.",
+                            "That sounds like such a wonderful idea to consider!",
+                            "I really love that thought—it opens up such great possibilities."
+                        )
+                        ReplyTone.TRASH_TALK -> listOf(
+                            "Keep dreaming! You're gonna need backup for that one.",
+                            "Bold words from someone who just got schooled!",
+                            "Nice try, but you're playing in the wrong league."
+                        )
+                        else -> listOf(
+                            "That's a really great question! I'd definitely lean toward the most rewarding choice.",
+                            "Tough call! Weighing the options, the most interesting and fulfilling one makes sense.",
+                            "I would choose the option that offers the best experience without hesitation."
                         )
                     }
                 }
@@ -1026,7 +1119,7 @@ object AiFallbackEngine {
                         "I think it is a very solid approach with a clear roadmap. We should move forward with it.",
                         "Makes total sense from an architecture perspective, let's implement it."
                     )
-                    else -> when (tone) {
+                    isActionRequest -> when (tone) {
                         ReplyTone.PROFESSIONAL -> listOf(
                             "Thank you for the update. I will review the documentation and coordinate next steps promptly.",
                             "Confirmed. The deliverables have been logged and scheduled in accordance with our project timeline.",
@@ -1051,6 +1144,33 @@ object AiFallbackEngine {
                             "Yes, definitely! I will take care of this and keep you updated on our progress.",
                             "Received your note, I am actively working on the requested items right now.",
                             "Understood. I will follow up with the completed details shortly."
+                        )
+                    }
+                    else -> when (tone) {
+                        ReplyTone.PROFESSIONAL -> listOf(
+                            "That is a thought-provoking inquiry. Balancing functional viability and long-term value points toward the most sustainable approach.",
+                            "Assessing both strategic impact and feasibility provides the clearest rationale for this decision.",
+                            "A pertinent question that merits careful consideration; prioritizing core goals clarifies the ideal choice."
+                        )
+                        ReplyTone.EMPATHETIC -> listOf(
+                            "That is such a wonderful question to reflect on! I would choose the path that brings the deepest sense of fulfillment and happiness.",
+                            "What a beautiful thought experiment. It really encourages thinking about what matters most in experiences like that.",
+                            "I love this question so much! Imagining the possibilities brings such a warm and inspiring perspective."
+                        )
+                        ReplyTone.WITTY -> listOf(
+                            "Without a doubt, I'm picking whichever option guarantees maximum entertainment and zero regrets tomorrow!",
+                            "That's the kind of dilemma I live for! Definitely going with the most adventurous outcome.",
+                            "An absolute classic question—my vote goes to the boldest choice every single time!"
+                        )
+                        ReplyTone.TRASH_TALK -> listOf(
+                            "Bold claim coming from someone whose entire argument is held together by hope and duct tape!",
+                            "I would agree with you, but then we'd both be completely wrong.",
+                            "You have an uncanny ability to be so confident and yet so wrong at the same time!"
+                        )
+                        else -> listOf(
+                            "That's a fantastic question to consider! Taking everything into perspective, I would choose whichever option offers the greatest sense of adventure, creativity, and lasting positive memories.",
+                            "That's an intriguing thought experiment! Evaluating the possibilities, the most balanced and rewarding choice stands out as the clear favorite.",
+                            "A really engaging question! I'd love to explore that idea further, as both angles offer unique and compelling possibilities."
                         )
                     }
                 }
@@ -1129,7 +1249,7 @@ object AiFallbackEngine {
                         "In my assessment, this strategy provides the optimal balance of performance and reliability. It addresses our core requirements thoroughly and sets us up for long-term scalability.",
                         "The plan looks excellent. The proposed architecture simplifies our integration overhead significantly while maintaining high reliability, so I fully endorse moving forward."
                     )
-                    else -> when (tone) {
+                    isActionRequest -> when (tone) {
                         ReplyTone.TRASH_TALK -> listOf(
                             "I would love to agree with your point, but unfortunately I have this strict personal policy against agreeing with completely nonsensical claims. Better luck next round!",
                             "You bring a lot of energy and zero valid arguments to the table. I suggest taking a short walk, drinking water, and coming back when you have actual facts.",
@@ -1139,6 +1259,33 @@ object AiFallbackEngine {
                             "Confirmed and understood. I will begin work on this immediately, ensure all specifications are satisfied, and provide you with a comprehensive status update once completed.",
                             "Thank you for the update. I have logged the action items, coordinated with the relevant team members, and will deliver the requested output promptly.",
                             "I will take full ownership of this request and follow up with documented results as soon as the task is executed."
+                        )
+                    }
+                    else -> when (tone) {
+                        ReplyTone.PROFESSIONAL -> listOf(
+                            "Considering this inquiry comprehensively, balancing empirical criteria with long-term strategic impact points toward the most sustainable and well-founded outcome.",
+                            "A thorough analysis of both potential risks and measurable advantages supports selecting the option that delivers maximum operational efficiency and reliability.",
+                            "Evaluating this question requires balancing practical constraints against strategic objectives, resulting in a clear and defensible decision."
+                        )
+                        ReplyTone.EMPATHETIC -> listOf(
+                            "Reflecting on this question invites a deeply meaningful perspective. I would choose the path that nurtures genuine connection, inner peace, and personal growth above all else.",
+                            "What a beautiful and imaginative question. In situations like this, prioritizing experiences that create lasting happiness and cherished memories is always the most rewarding path.",
+                            "That is such an inspiring dilemma to consider! It reminds us of the power of imagination and the joy that comes from embracing unique, life-enriching adventures."
+                        )
+                        ReplyTone.WITTY -> listOf(
+                            "After rigorous intellectual deliberation and zero consultation with common sense, I am decisively picking the option that produces the greatest story and the most entertainment!",
+                            "Life is far too short to pick the boring answer to a hypothetical question. Go with the boldest, most chaotic, and most memorable choice every single time!",
+                            "Evaluating all factors with extreme scientific precision, the option with the most flair and the least paperwork wins hands down!"
+                        )
+                        ReplyTone.TRASH_TALK -> listOf(
+                            "I would love to agree with your point, but unfortunately I have this strict personal policy against agreeing with completely nonsensical claims. Better luck next round!",
+                            "You bring a lot of energy and zero valid arguments to the table. I suggest taking a short walk, drinking water, and coming back when you have actual facts.",
+                            "Your confidence is truly unmatched by your evidence. Next time, bring some data before stepping into this arena with the champions!"
+                        )
+                        else -> listOf(
+                            "Examining this question thoroughly reveals multiple interconnected dimensions. At its core, evaluating both practical considerations and creative potential makes the most fulfilling and adventurous choice the clear winner.",
+                            "That is a compelling thought experiment to weigh. Balancing immediate excitement with enduring value, I would confidently pick the option that opens up the greatest new horizons.",
+                            "A truly engaging question! Looking at all the possibilities, the option that offers the richest personal experience and the best stories is definitely the way to go."
                         )
                     }
                 }
@@ -1374,6 +1521,259 @@ object AiFallbackEngine {
         return emptyList()
     }
 
+    private fun trySolveSemanticAndHypotheticalQuestion(
+        question: String,
+        tone: ReplyTone,
+        preset: ResponseLengthPreset
+    ): List<String> {
+        val lower = question.lowercase()
+
+        // 1. Anime / Manga / Animation / Isekai / Studio Ghibli
+        if (lower.contains("anime") || lower.contains("manga") || lower.contains("isekai") || lower.contains("ghibli")) {
+            // Live inside an anime world / pick an anime world for a week
+            if (lower.contains("live") || lower.contains("world") || lower.contains("pick") || lower.contains("choose") || lower.contains("visit") || lower.contains("week")) {
+                return when (preset) {
+                    ResponseLengthPreset.VERY_SHORT -> when (tone) {
+                        ReplyTone.WITTY -> listOf("Pokémon! Zero doubts.", "Ghibli bathhouse!", "My Hero Academia.")
+                        ReplyTone.PROFESSIONAL -> listOf("The Pokémon universe.", "Studio Ghibli's world.", "Aria's Neo-Venezia.")
+                        ReplyTone.EMPATHETIC -> listOf("A peaceful Studio Ghibli town.", "The Pokémon world with a Pikachu.", "Totoro's lush countryside.")
+                        ReplyTone.TRASH_TALK -> listOf("Dragon Ball! I'd carry the squad.", "Attack on Titan, obviously survive day one.", "Pokémon, unbeatable gym leader.")
+                        else -> listOf("The Pokémon world!", "Studio Ghibli's universe.", "My Hero Academia!")
+                    }
+                    ResponseLengthPreset.SHORT -> when (tone) {
+                        ReplyTone.WITTY -> listOf(
+                            "Hands down the Pokémon universe—exploring scenic trails and napping with Snorlax sounds unbeatable!",
+                            "Studio Ghibli's world: incredible food, flying contraptions, and absolutely zero spreadsheets.",
+                            "My Hero Academia, but only if my quirk isn't something useless like turning into a desk lamp."
+                        )
+                        ReplyTone.PROFESSIONAL -> listOf(
+                            "I would select the Pokémon universe for its harmonious human-creature ecosystem and scenic exploration.",
+                            "Studio Ghibli's world presents an ideal balance of architectural beauty, tranquility, and natural wonder.",
+                            "Aria's Neo-Venezia offers an exceptional model of sustainable, peaceful civic life."
+                        )
+                        ReplyTone.EMPATHETIC -> listOf(
+                            "I'd love to spend a week in a cozy Studio Ghibli village—warm bakery bread, gentle rolling hills, and pure peace.",
+                            "The Pokémon world! Traveling along sunlit routes with a loyal companion sounds so comforting.",
+                            "The world of Laid-Back Camp, stargazing by the campfire with warm hotpot."
+                        )
+                        ReplyTone.TRASH_TALK -> listOf(
+                            "Dragon Ball Z! I'd collect the dragon balls before lunch while everyone else is still charging up.",
+                            "Pokémon, easily. I'd sweep the Elite Four on day two and retire undefeated.",
+                            "Sword Art Online—straight to the front lines, clearing floors while you're still in the safe zone!"
+                        )
+                        else -> listOf(
+                            "Definitely the Pokémon world! Exploring routes, camping out, and catching cute companion Pokémon would be an incredible week.",
+                            "Studio Ghibli's universe—walking through cobblestone towns, eating delicious cozy meals, and soaring in Howl's Moving Castle.",
+                            "My Hero Academia! Experiencing a superpower society with exciting quirks would be unforgettable."
+                        )
+                    }
+                    ResponseLengthPreset.NORMAL -> when (tone) {
+                        ReplyTone.WITTY -> listOf(
+                            "Without a shadow of a doubt, I'm picking the Pokémon universe. You get free healthcare at Pokémon Centers, infinite scenic hiking routes, and your biggest weekly dilemma is deciding whether to challenge the local gym or take a nap next to a friendly Snorlax.",
+                            "I'd choose Howl's Moving Castle or Spirited Away in the Studio Ghibli universe. The bread looks absurdly delicious, the landscapes are hand-painted perfection, and having a magic door that opens into four different cities saves so much on commute time.",
+                            "My Hero Academia would be an absolute blast, provided I roll a top-tier quirk. If I end up with the ability to bend spoons with my eyebrows, I might renegotiate for a quiet bakery in Kiki's Delivery Service."
+                        )
+                        ReplyTone.PROFESSIONAL -> listOf(
+                            "From an experiential standpoint, the Pokémon world provides an optimal balance of environmental harmony, technological convenience, and adventurous exploration without existential peril.",
+                            "I would choose Studio Ghibli's aesthetic universe—specifically Neo-Venezia or the coastal towns of Kiki's Delivery Service—which prioritize pastoral beauty, craftsmanship, and community wellness.",
+                            "The setting of Aria or Frieren: Beyond Journey's End offers an extraordinary study in architectural preservation, philosophical depth, and contemplative landscapes."
+                        )
+                        ReplyTone.EMPATHETIC -> listOf(
+                            "I would choose a tranquil week in Studio Ghibli's world. Waking up to dew-kissed meadows, listening to the soft rustling wind, and enjoying warm homemade soup in a peaceful countryside cottage sounds like the ultimate restorative getaway.",
+                            "The Pokémon world would be so heartwarming! Imagine walking along sunny forest paths with your favorite companion Pokémon, sharing camp meals under the stars, and making kind friends in every town you visit.",
+                            "A cozy, serene week in the Laid-Back Camp universe would be heavenly—crisp mountain air, quiet lake views, and warm cocoa by the fire."
+                        )
+                        ReplyTone.TRASH_TALK -> listOf(
+                            "Dragon Ball Z without question! I'd hit the Hyperbolic Time Chamber on Monday, achieve Super Saiyan by Wednesday, and be running the entire galaxy before the week expires. Anyone picking a slice-of-life anime clearly fears true power!",
+                            "Pokémon, zero competition. I'd challenge all eight gyms in a single afternoon, defeat the champion with a Magikarp just to flex, and claim my throne before the week wraps up.",
+                            "Attack on Titan—straight to the Scout Regiment because some of us thrive on high stakes and glory while everyone else hides behind walls!"
+                        )
+                        else -> listOf(
+                            "If I had one week, I would definitely pick the Pokémon world! The chance to travel across scenic routes, bond with a team of favorite Pokémon, camp out in nature, and enjoy the peaceful small-town community vibes would make for an unforgettable adventure.",
+                            "I'd pick the Studio Ghibli universe—either Howl's Moving Castle or Kiki's coastal town of Koriko. The enchanting hand-crafted landscapes, magical trains over the ocean, and cozy bakeries would be pure magic to experience firsthand.",
+                            "My Hero Academia! Spending a week experiencing a society where nearly everyone has superpowers and training alongside aspiring heroes would be an exhilarating ride."
+                        )
+                    }
+                    ResponseLengthPreset.LONG -> listOf(
+                        "If I could live inside any anime world for a full week, my immediate first choice would be the Pokémon universe. The setting offers an unmatched blend of wholesome adventure, breathtaking diverse geography—from vibrant beaches to snowy mountain passes—and the unique companionship of traveling alongside Pokémon. There is virtually no modern existential stress: healthcare at Pokémon Centers is universal and instantaneous, towns welcome travelers with open arms, and each day consists of discovering new species, sharing campfire meals under the stars, and training in friendly gym competitions. It captures the pure spirit of childhood wonder and boundless outdoor exploration.",
+                        "I would immerse myself in the Studio Ghibli cinematic universe, specifically the world of Howl's Moving Castle and Spirited Away. Spending seven days wandering through picturesque European cobblestone streets, taking a magical steam train skimming across glass-calm ocean shallows, and enjoying the sensory feasts of freshly baked hearth breads and hot steaming broths would be deeply restorative. The hand-painted aesthetic, gentle pacing, and whimsical blend of gentle enchantment and cozy daily rituals make it the ultimate dream escape.",
+                        "For high-octane excitement, spending a week in the world of My Hero Academia would be thrilling beyond words. Enrolling for a temporary guest stint at U.A. High School, testing out unique quirk abilities in specialized training arenas, and witnessing professional heroes manage emergency response across futuristic metropolitan cities would provide an adrenaline rush like nothing else."
+                    )
+                }
+            }
+            // General favorite or recommendation anime
+            return when (preset) {
+                ResponseLengthPreset.VERY_SHORT -> listOf("Frieren: Beyond Journey's End.", "Fullmetal Alchemist: Brotherhood.", "Steins;Gate.")
+                ResponseLengthPreset.SHORT -> listOf(
+                    "Frieren: Beyond Journey's End and Fullmetal Alchemist: Brotherhood are absolute masterpieces!",
+                    "Steins;Gate if you love sci-fi thrillers, or Spy x Family for pure wholesome fun!",
+                    "Attack on Titan for gripping storytelling and incredible plot twists."
+                )
+                ResponseLengthPreset.NORMAL -> listOf(
+                    "I highly recommend Frieren: Beyond Journey's End for its breathtaking animation and touching reflection on time and human connection, alongside Fullmetal Alchemist: Brotherhood for unmatched narrative pacing.",
+                    "If you enjoy intricate sci-fi and time travel, Steins;Gate is phenomenal. For rich world-building and character journeys, Hunter x Hunter and Vinland Saga are top-tier.",
+                    "For stunning visual artistry and emotional storytelling, Violet Evergarden and Studio Ghibli films like Spirited Away and Princess Mononoke remain gold standards."
+                )
+                ResponseLengthPreset.LONG -> listOf(
+                    "My top recommendation is Frieren: Beyond Journey's End. It masterfully turns the traditional fantasy genre on its head by following an elven mage after the demon king has already been defeated, meditating on the passage of time, cherished memories, and the beauty of quiet human bonds. Paired with timeless classics like Fullmetal Alchemist: Brotherhood and Steins;Gate, they represent the absolute pinnacle of anime storytelling."
+                )
+            }
+        }
+
+        // 2. Video Game Worlds & RPGs
+        if (lower.contains("video game") || lower.contains("gaming world") || lower.contains("game world")) {
+            return when (preset) {
+                ResponseLengthPreset.VERY_SHORT -> listOf("Hyrule from Zelda!", "Animal Crossing island.", "Minecraft creative mode.")
+                ResponseLengthPreset.SHORT -> listOf(
+                    "Hyrule from Zelda: Breath of the Wild—climbing mountains and gliding over rolling plains would be incredible!",
+                    "An Animal Crossing island for total relaxation, fruit picking, and zero mortgage stress!",
+                    "Minecraft in creative mode: boundless imagination and infinite building."
+                )
+                ResponseLengthPreset.NORMAL -> listOf(
+                    "I would choose Hyrule from Zelda: Breath of the Wild. Exploring its sweeping grassy plateaus, discovering hidden shrines, and gliding from towering peaks into tranquil villages would be the ultimate adventure.",
+                    "An Animal Crossing tropical island would be the perfect low-stress getaway—catching exotic fish, decorating a seaside villa, and relaxing to acoustic guitar by the ocean.",
+                    "Skyrim or The Witcher 3's Toussaint for picturesque sunlit vineyards, historic stone castles, and grand mythical quests."
+                )
+                ResponseLengthPreset.LONG -> listOf(
+                    "If I could live in any video game world, I would choose Hyrule as depicted in Zelda: Breath of the Wild and Tears of the Kingdom. The sheer sense of scale, the breathtaking vistas from Mount Lanayru down to the Akkala highlands, the peaceful atmosphere of Hateno Village, and the joy of parasailing through the clouds capture the quintessential spirit of open-world discovery without modern digital distractions."
+                )
+            }
+        }
+
+        // 3. Superpowers
+        if (lower.contains("superpower") || lower.contains("super power") || (lower.contains("power") && (lower.contains("have") || lower.contains("pick") || lower.contains("choose")))) {
+            return when (preset) {
+                ResponseLengthPreset.VERY_SHORT -> listOf("Teleportation!", "Time manipulation.", "Flight.")
+                ResponseLengthPreset.SHORT -> listOf(
+                    "Teleportation! Instant travel anywhere on Earth with zero airport security lines or morning traffic.",
+                    "Time manipulation: pausing moments to catch your breath or rewinding little mistakes.",
+                    "Flight! The unmatched freedom of soaring through open blue skies above the clouds."
+                )
+                ResponseLengthPreset.NORMAL -> listOf(
+                    "Teleportation is the ultimate superpower. You could have breakfast in Paris, spend the afternoon snorkeling in Hawaii, and sleep in your own bed every night with zero commute time or transit stress.",
+                    "Time manipulation would be phenomenal—having the ability to pause time when life gets overwhelming, give yourself infinite time to think, and rewind whenever you need a do-over.",
+                    "The power of flight or telekinesis: effortless mobility, absolute physical freedom, and a whole new perspective on the world."
+                )
+                ResponseLengthPreset.LONG -> listOf(
+                    "I would choose instantaneous teleportation without hesitation. Beyond completely eliminating the wasted hours spent in traffic, airports, and crowded commutes, it unlocks the ability to experience every corner of the planet effortlessly. You could spontaneously watch the sunrise over the Himalayas, meet friends across the globe for dinner, and return home in the blink of an eye, making the entire world your backyard."
+                )
+            }
+        }
+
+        // 4. Travel & Vacation Destinations
+        if (lower.contains("travel anywhere") || lower.contains("vacation") || lower.contains("holiday destination") || lower.contains("dream trip")) {
+            return when (preset) {
+                ResponseLengthPreset.VERY_SHORT -> listOf("Kyoto, Japan!", "The Swiss Alps.", "The Amalfi Coast.")
+                ResponseLengthPreset.SHORT -> listOf(
+                    "Kyoto in autumn—tranquil wooden temples, bamboo forests, and stunning vibrant red maples!",
+                    "The Swiss Alps in Zermatt: dramatic alpine peaks, scenic cogwheel trains, and crisp mountain air.",
+                    "The Amalfi Coast: colorful cliffside towns, Mediterranean sunshine, and fresh handmade pasta."
+                )
+                ResponseLengthPreset.NORMAL -> listOf(
+                    "Kyoto, Japan would be my top choice. Wandering through historic wooden machiya lanes in Gion, visiting moss gardens at tranquil Zen temples, and enjoying seasonal matcha during autumn foliage is a deeply magical experience.",
+                    "The Swiss Alps—specifically Lauterbrunnen and Zermatt—offering sheer glacial waterfalls, panoramic mountain views, and quiet alpine hiking trails.",
+                    "The Amalfi Coast in Italy for breathtaking seaside cliffs, sparkling turquoise waters, and long leisurely dinners overlooking the Mediterranean."
+                )
+                ResponseLengthPreset.LONG -> listOf(
+                    "My ultimate dream trip would be spending several weeks traveling across Japan, beginning in Tokyo's bustling neon districts before taking the bullet train to Kyoto and the Japanese Alps. Exploring centuries-old Zen shrines, soaking in natural geothermal onsen surrounded by cedar forests, and savoring world-class culinary craftsmanship from street takoyaki to multi-course kaiseki is an unmatched journey."
+                )
+            }
+        }
+
+        // 5. Time Travel (Past vs Future)
+        if (lower.contains("time travel") || (lower.contains("past") && lower.contains("future")) || lower.contains("time machine")) {
+            return when (preset) {
+                ResponseLengthPreset.VERY_SHORT -> listOf("100 years into the future!", "The Italian Renaissance.", "The future!")
+                ResponseLengthPreset.SHORT -> listOf(
+                    "Definitely 100 years into the future to see what incredible science, medicine, and space tech we invent!",
+                    "The Italian Renaissance in Florence to watch Leonardo da Vinci and Michelangelo at work!",
+                    "The future—the curiosity of seeing how civilization evolves is too exciting to pass up."
+                )
+                ResponseLengthPreset.NORMAL -> listOf(
+                    "I would travel 100 to 200 years into the future. Seeing how humanity solves climate challenges, cures diseases, and explores deep space would satisfy my deepest curiosity far more than looking backward.",
+                    "Traveling back to the High Renaissance in Florence would be extraordinary—witnessing the explosion of art, architecture, and scientific philosophy firsthand.",
+                    "The future wins every time: technology, interstellar discoveries, and the realization of clean energy make the tomorrow vastly more intriguing."
+                )
+                ResponseLengthPreset.LONG -> listOf(
+                    "I would choose to travel 150 years into the future. While history holds immense romantic allure, the prospect of witnessing humanity's greatest upcoming breakthroughs—fusion energy, interstellar probes, synthetic biology, and advanced artificial intelligence integrated harmoniously into sustainable cities—is overwhelmingly compelling. Seeing how the questions of our era are resolved would be the adventure of a lifetime."
+                )
+            }
+        }
+
+        // 6. Would You Rather (Dilemmas & Decisions)
+        if (lower.contains("would you rather") || lower.contains("prefer")) {
+            return when (preset) {
+                ResponseLengthPreset.VERY_SHORT -> when (tone) {
+                    ReplyTone.WITTY -> listOf("Option A, easily!", "Option B makes the best story.", "Neither, I choose chaos!")
+                    else -> listOf("Definitely the first option!", "I'd lean toward the second one.", "Both have great perks!")
+                }
+                ResponseLengthPreset.SHORT -> when (tone) {
+                    ReplyTone.WITTY -> listOf(
+                        "I'm picking whichever option results in the better story and the least amount of regret tomorrow morning!",
+                        "Definitely the bolder choice—playing it safe in a hypothetical question is a wasted wish.",
+                        "Tough dilemma! But if forced to pick, go with the one that brings the most laughs."
+                    )
+                    ReplyTone.PROFESSIONAL -> listOf(
+                        "Weighing both alternatives, the first option offers superior upside while minimizing unnecessary risk.",
+                        "The second option provides greater long-term flexibility and aligns better with practical goals.",
+                        "Both have distinct merits, though prioritizing sustainable value makes the decision clear."
+                    )
+                    else -> listOf(
+                        "That's a classic dilemma! I'd definitely lean toward whichever choice brings the most genuine joy and peace of mind.",
+                        "Tough call! Weighing the pros and cons, the more exciting and rewarding path is the clear winner.",
+                        "I'd go with the option that offers the best blend of adventure and comfort."
+                    )
+                }
+                ResponseLengthPreset.NORMAL -> listOf(
+                    "That is a great dilemma! Between the two, I would decisively pick the option that provides the richer experience and the greatest freedom. When weighing hypotheticals, prioritizing long-term memories over short-term comfort is always the winning play.",
+                    "That's a fascinating trade-off! Evaluating both sides, the option with the most creative potential and lowest stress is definitely the way to go.",
+                    "Tough choice, but my vote goes to whichever option makes you look back in a year and smile about having chosen it!"
+                )
+                ResponseLengthPreset.LONG -> listOf(
+                    "Evaluating this classic dilemma requires balancing immediate appeal against enduring satisfaction. When you compare both scenarios, the choice that grants greater autonomy, positive experiences, and memorable stories consistently proves superior to the alternative that merely minimizes friction. If faced with the decision, lean boldly into the choice that expands your horizon!"
+                )
+            }
+        }
+
+        // 7. General Inquiry / Interrogative Starter ("Why", "How", "Where", "Which")
+        if (lower.startsWith("why") || lower.startsWith("how") || lower.startsWith("where") || lower.startsWith("which")) {
+            return when (preset) {
+                ResponseLengthPreset.VERY_SHORT -> when (tone) {
+                    ReplyTone.WITTY -> listOf("Because life's too short not to!", "Simple: confidence and coffee.", "The fun one!")
+                    ReplyTone.PROFESSIONAL -> listOf("Due to key operational factors.", "Through structured execution.", "Based on core criteria.")
+                    else -> listOf("A combination of key factors.", "Step by step works best.", "The most reliable option.")
+                }
+                ResponseLengthPreset.SHORT -> when (tone) {
+                    ReplyTone.WITTY -> listOf(
+                        "That's the million-dollar question! Usually the answer comes down to caffeine, timing, and a bit of luck.",
+                        "Great question—the short answer is that keeping things simple usually beats out the complicated plan.",
+                        "Why make it complicated? Stick to whatever makes the most sense right now!"
+                    )
+                    ReplyTone.PROFESSIONAL -> listOf(
+                        "That depends largely on strategic alignment and operational priorities. Identifying core milestones clarifies the approach.",
+                        "A methodical evaluation of the underlying drivers provides the most accurate rationale.",
+                        "Focusing on measurable impact and systematic execution delivers the most dependable outcome."
+                    )
+                    else -> listOf(
+                        "That's a really good question! Taking a balanced perspective and looking at the main factors usually makes the answer clear.",
+                        "It comes down to what you value most in this situation—focus on the essentials and everything else falls into place.",
+                        "Looking at it practically, starting with the simplest and most effective step is the best approach."
+                    )
+                }
+                ResponseLengthPreset.NORMAL -> listOf(
+                    "That's an insightful question to consider! Taking all the variables into account, the most compelling rationale centers on balancing practical execution with long-term effectiveness. When you break it down into core components, the right direction becomes straightforward.",
+                    "Understanding the reasoning behind this requires looking at both immediate causes and broader patterns. When you weigh the practical benefits against the effort required, the optimal choice reveals itself clearly.",
+                    "A thoughtful inquiry! Approaching this step-by-step—clarifying expectations first and executing with focus—consistently yields the strongest result."
+                )
+                ResponseLengthPreset.LONG -> listOf(
+                    "Examining this question thoroughly reveals multiple interconnected dimensions. At its core, the solution involves understanding the fundamental motivations and practical constraints at play. By aligning immediate actions with long-term objectives, you ensure that the chosen path is both sustainable and impactful, turning a complex challenge into a clear, structured roadmap."
+                )
+            }
+        }
+
+        return emptyList()
+    }
+
     private fun callGeminiRestApi(
         provider: AiProvider,
         question: String,
@@ -1386,8 +1786,8 @@ object AiFallbackEngine {
         }
         rawModel = rawModel.replace(" ", "-")
         val model = when (rawModel) {
-            "", "gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash" -> "gemini-3.1-flash-lite"
-            "gemini-3.1-flash-lite-preview", "gemini-3.1-flash-lite", "gemini-flash-lite" -> "gemini-3.1-flash-lite"
+            "", "gemini-3.1-flash-lite", "gemini-3.1-flash-lite-preview", "gemini-2.0-flash", "gemini-1.5-flash" -> "gemini-2.5-flash"
+            "gemini-flash-latest" -> "gemini-flash-latest"
             else -> rawModel
         }
         val url = URL("https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=${provider.apiKey.trim()}")

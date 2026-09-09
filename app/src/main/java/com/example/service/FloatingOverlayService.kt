@@ -228,6 +228,7 @@ class FloatingOverlayService : Service(), LifecycleOwner, ViewModelStoreOwner, S
             windowManager?.removeView(it)
             overlayComposeView = null
         }
+        QuestionDetectorAccessibilityService.resetScanningState()
         AppStateManager.setOverlayRunning(false)
         super.onDestroy()
     }

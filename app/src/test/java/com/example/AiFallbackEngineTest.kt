@@ -185,4 +185,44 @@ class AiFallbackEngineTest {
             reply.contains("Bhai", ignoreCase = true) || reply.contains("logic", ignoreCase = true) || reply.contains("WhatsApp", ignoreCase = true) || reply.contains("chai", ignoreCase = true)
         )
     }
+
+    @Test
+    fun testAnimeHypotheticalQuestionAnswering() = runBlocking {
+        val settings = ReplySettings(tone = ReplyTone.CASUAL)
+        val question = "If you could live inside any anime world for a week, which one would you pick?"
+        val result = AiFallbackEngine.generateRepliesWithFallback(question, settings)
+
+        assertTrue("Expected replies to not be empty", result.replies.isNotEmpty())
+        val reply = result.replies.first().text
+        assertTrue(
+            "Reply should NOT be a stale canned task completion response like 'Let's get that done', was: $reply",
+            !reply.contains("Let's get that done", ignoreCase = true) &&
+                    !reply.contains("working on that right now", ignoreCase = true)
+        )
+        assertTrue(
+            "Expected anime world answer (e.g. Pokémon, Spirited Away, anime), was: $reply",
+            reply.contains("anime", ignoreCase = true) ||
+                    reply.contains("Pokémon", ignoreCase = true) ||
+                    reply.contains("Pokemon", ignoreCase = true) ||
+                    reply.contains("world", ignoreCase = true) ||
+                    reply.contains("Ghibli", ignoreCase = true) ||
+                    reply.contains("Titan", ignoreCase = true) ||
+                    reply.contains("Demon Slayer", ignoreCase = true)
+        )
+    }
+
+    @Test
+    fun testGeneralQuestionFallbackDoesNotReturnActionCompletion() = runBlocking {
+        val settings = ReplySettings(tone = ReplyTone.CASUAL)
+        val question = "What is your favorite weekend activity?"
+        val result = AiFallbackEngine.generateRepliesWithFallback(question, settings)
+
+        assertTrue(result.replies.isNotEmpty())
+        val reply = result.replies.first().text
+        assertTrue(
+            "General question should not return action completion template, was: $reply",
+            !reply.contains("Let's get that done", ignoreCase = true) &&
+                    !reply.contains("working on that right now", ignoreCase = true)
+        )
+    }
 }

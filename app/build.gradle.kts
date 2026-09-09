@@ -1,4 +1,20 @@
 import java.util.Base64
+import java.util.Properties
+
+val envFile = rootProject.file(".env")
+val envProps = Properties()
+if (envFile.exists()) {
+    envFile.inputStream().use { input -> envProps.load(input) }
+}
+val rawGemini = envProps.getProperty("GEMINI_API_KEY") ?: System.getenv("GEMINI_API_KEY") ?: ""
+val rawOpenAi = envProps.getProperty("OPENAI_API_KEY") ?: System.getenv("OPENAI_API_KEY") ?: ""
+val rawAnthropic = envProps.getProperty("ANTHROPIC_API_KEY") ?: System.getenv("ANTHROPIC_API_KEY") ?: ""
+val rawGrok = envProps.getProperty("GROK_API_KEY") ?: System.getenv("GROK_API_KEY") ?: ""
+
+val safeGemini = rawGemini.replace("\\", "\\\\").replace("\"", "\\\"")
+val safeOpenAi = rawOpenAi.replace("\\", "\\\\").replace("\"", "\\\"")
+val safeAnthropic = rawAnthropic.replace("\\", "\\\\").replace("\"", "\\\"")
+val safeGrok = rawGrok.replace("\\", "\\\\").replace("\"", "\\\"")
 
 plugins {
     alias(libs.plugins.android.application)
@@ -16,6 +32,11 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "1.0"
+
+        buildConfigField("String", "GEMINI_API_KEY", "\"$safeGemini\"")
+        buildConfigField("String", "OPENAI_API_KEY", "\"$safeOpenAi\"")
+        buildConfigField("String", "ANTHROPIC_API_KEY", "\"$safeAnthropic\"")
+        buildConfigField("String", "GROK_API_KEY", "\"$safeGrok\"")
 
         vectorDrawables {
             useSupportLibrary = true
