@@ -225,6 +225,7 @@ data class ReplySettings(
     val triggers: List<TriggerItem> = defaultTriggers(),
     val prefetchOnAppFocus: Boolean = true,
     val autoCopySingleReply: Boolean = false,
+    val langModeEnabled: Boolean = true,
     val understandingMode: Boolean = true,
     val understandingSummaryLength: UnderstandingSummaryLength = UnderstandingSummaryLength.BALANCED,
     val expandableReplies: Boolean = true,

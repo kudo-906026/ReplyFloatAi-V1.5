@@ -132,6 +132,7 @@ object SettingsStorage {
         root.put("smartDetectionAiVerified", settings.smartDetectionAiVerified)
         root.put("prefetchOnAppFocus", settings.prefetchOnAppFocus)
         root.put("autoCopySingleReply", settings.autoCopySingleReply)
+        root.put("langModeEnabled", settings.langModeEnabled)
         root.put("understandingMode", settings.understandingMode)
         root.put("understandingSummaryLength", settings.understandingSummaryLength.name)
         root.put("expandableReplies", settings.expandableReplies)
@@ -357,6 +358,7 @@ object SettingsStorage {
             triggers = finalTriggers,
             prefetchOnAppFocus = root.optBoolean("prefetchOnAppFocus", true),
             autoCopySingleReply = root.optBoolean("autoCopySingleReply", false),
+            langModeEnabled = root.optBoolean("langModeEnabled", true),
             understandingMode = root.optBoolean("understandingMode", true),
             understandingSummaryLength = underLength,
             expandableReplies = root.optBoolean("expandableReplies", true),

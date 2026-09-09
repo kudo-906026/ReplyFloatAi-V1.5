@@ -37,6 +37,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -50,6 +52,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.model.AiProvider
 import com.example.model.ReplySettings
+import com.example.state.AppStateManager
 import com.example.ui.theme.AccentBlue
 import com.example.ui.theme.AccentGreen
 import com.example.ui.theme.AccentPurple
@@ -176,6 +179,44 @@ fun DashboardTab(
                             text = if (isOverlayRunning) "Stop Floating Overlay" else "Start Floating Assistant",
                             fontSize = 13.5.sp,
                             fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    // Continuous Screen Analyze Quick Toggle
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(DarkSurfaceVariant)
+                            .padding(horizontal = 10.dp, vertical = 7.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Continuous Screen Analyze",
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 12.sp,
+                                color = TextWhite
+                            )
+                            Text(
+                                text = if (settings.continuousScreenAnalysis) "Active live scanning" else "Live scanning paused",
+                                fontSize = 10.sp,
+                                color = if (settings.continuousScreenAnalysis) TechGreen else TextMuted
+                            )
+                        }
+                        Switch(
+                            checked = settings.continuousScreenAnalysis,
+                            onCheckedChange = { AppStateManager.setContinuousScreenAnalysis(it) },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = TechGreen,
+                                checkedTrackColor = TechGreen.copy(alpha = 0.4f),
+                                uncheckedThumbColor = TextMuted,
+                                uncheckedTrackColor = DarkBg
+                            ),
+                            modifier = Modifier
+                                .size(width = 38.dp, height = 24.dp)
+                                .testTag("dashboard_continuous_analysis_switch")
                         )
                     }
                 }

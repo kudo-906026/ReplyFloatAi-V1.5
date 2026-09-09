@@ -419,6 +419,7 @@ fun MainScreen() {
                         onSetAutoGenerateReplies = { AppStateManager.setAutoGenerateReplies(it) },
                         onSetDetectQuestionsOnly = { AppStateManager.setDetectQuestionsOnly(it) },
                         onSetSmartDetectionAiVerified = { AppStateManager.setSmartDetectionAiVerified(it) },
+                        onSetContinuousAnalysis = { AppStateManager.setContinuousScreenAnalysis(it) },
                         onSetPrefetchOnAppFocus = { AppStateManager.setPrefetchOnAppFocus(it) },
                         onSetAutoCopySingleReply = { AppStateManager.setAutoCopySingleReply(it) },
                         onSetExpandableReplies = { AppStateManager.setExpandableReplies(it) },

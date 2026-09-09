@@ -94,6 +94,7 @@ fun RepliesTab(
     onSetAutoGenerateReplies: (Boolean) -> Unit,
     onSetDetectQuestionsOnly: (Boolean) -> Unit,
     onSetSmartDetectionAiVerified: (Boolean) -> Unit = { AppStateManager.setSmartDetectionAiVerified(it) },
+    onSetContinuousAnalysis: (Boolean) -> Unit = { AppStateManager.setContinuousScreenAnalysis(it) },
     onSetPrefetchOnAppFocus: (Boolean) -> Unit,
     onSetAutoCopySingleReply: (Boolean) -> Unit,
     onSetExpandableReplies: (Boolean) -> Unit,
@@ -338,6 +339,25 @@ fun RepliesTab(
                         icon = Icons.Default.FilterAlt,
                         accentColor = CrimsonPrimary
                     )
+
+                    // Continuous Screen Analysis
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Continuous Screen Analyze", fontWeight = FontWeight.SemiBold, fontSize = 12.5.sp, color = TextWhite)
+                            Text("Real-time accessibility background screen question analysis", fontSize = 10.5.sp, color = TextSecondary)
+                        }
+                        ControlPanelSwitch(
+                            checked = settings.continuousScreenAnalysis,
+                            onCheckedChange = onSetContinuousAnalysis,
+                            activeColor = TechGreen
+                        )
+                    }
+
+                    HorizontalDivider(color = DarkCardBorder)
 
                     // Auto-Generate
                     Row(

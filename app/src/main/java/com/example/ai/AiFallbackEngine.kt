@@ -818,6 +818,23 @@ object AiFallbackEngine {
             )
         }
 
+        // 2b. Choice, Dilemma & Multiple-Option Questions (e.g. "What are you craving right now — food, sleep, or attention?")
+        val choiceReplies = trySolveChoiceOrOptionQuestion(clean, tone, preset)
+        if (choiceReplies.isNotEmpty()) {
+            return ProviderReplyResult(
+                replies = choiceReplies.take(count).map { text ->
+                    ReplyItem(
+                        questionId = questionId,
+                        text = text,
+                        tone = tone,
+                        generatedByProvider = provider
+                    )
+                },
+                original = question,
+                meaning = meaning
+            )
+        }
+
         // 3. Semantic, Hypothetical, Entertainment & Creative Questions
         val semanticReplies = trySolveSemanticAndHypotheticalQuestion(clean, tone, preset)
         if (semanticReplies.isNotEmpty()) {
@@ -1017,20 +1034,20 @@ object AiFallbackEngine {
                     }
                     else -> when (tone) {
                         ReplyTone.PROFESSIONAL -> listOf(
-                            "That is a pertinent inquiry; evaluating key criteria will clarify the optimal path.",
-                            "I would recommend evaluating the strategic advantages before concluding.",
-                            "A relevant question—I will review the parameters and provide guidance."
+                            "Yes, confirmed. I recommend proceeding with that plan.",
+                            "That is the most effective approach; let's move forward.",
+                            "Understood. Moving ahead with that direction."
                         )
-                        ReplyTone.CONCISE -> listOf("Option one.", "The first choice.", "Depends on preference.")
+                        ReplyTone.CONCISE -> listOf("Yes, definitely.", "Sounds good.", "Agreed.")
                         ReplyTone.WITTY -> listOf(
-                            "That's a fantastic question—I'd pick the option that makes the best story!",
-                            "Hands down the most adventurous option, without a doubt!",
-                            "Tough dilemma! But the fun choice always wins."
+                            "100% yes, let's make it happen!",
+                            "Count me in, that sounds like a great plan.",
+                            "I'm on board! What's our next move?"
                         )
                         ReplyTone.EMPATHETIC -> listOf(
-                            "What a thoughtful question! I'd love to hear your perspective on this too.",
-                            "That sounds like such a wonderful idea to consider!",
-                            "I really love that thought—it opens up such great possibilities."
+                            "I completely agree with that, sounds like a wonderful idea!",
+                            "That makes total sense to me, I support you completely.",
+                            "I love that! Let me know how I can help."
                         )
                         ReplyTone.TRASH_TALK -> listOf(
                             "Keep dreaming! You're gonna need backup for that one.",
@@ -1038,9 +1055,9 @@ object AiFallbackEngine {
                             "Nice try, but you're playing in the wrong league."
                         )
                         else -> listOf(
-                            "That's a really great question! I'd definitely lean toward the most rewarding choice.",
-                            "Tough call! Weighing the options, the most interesting and fulfilling one makes sense.",
-                            "I would choose the option that offers the best experience without hesitation."
+                            "Yes, absolutely! I think that's the best way to go.",
+                            "Sounds great to me, let's do it!",
+                            "I'm totally down for that, let's make it happen."
                         )
                     }
                 }
@@ -1168,9 +1185,9 @@ object AiFallbackEngine {
                             "You have an uncanny ability to be so confident and yet so wrong at the same time!"
                         )
                         else -> listOf(
-                            "That's a fantastic question to consider! Taking everything into perspective, I would choose whichever option offers the greatest sense of adventure, creativity, and lasting positive memories.",
-                            "That's an intriguing thought experiment! Evaluating the possibilities, the most balanced and rewarding choice stands out as the clear favorite.",
-                            "A really engaging question! I'd love to explore that idea further, as both angles offer unique and compelling possibilities."
+                            "I definitely agree with that direction! Taking everything into account, it offers the most practical and positive outcome. Let's move forward with it.",
+                            "That sounds like the best approach to me. It keeps things straightforward, saves time, and gets us the exact result we want.",
+                            "I'm completely on board with that plan! It makes total sense and works out really well for everyone involved."
                         )
                     }
                 }
@@ -1719,15 +1736,15 @@ object AiFallbackEngine {
                         "Both have distinct merits, though prioritizing sustainable value makes the decision clear."
                     )
                     else -> listOf(
-                        "That's a classic dilemma! I'd definitely lean toward whichever choice brings the most genuine joy and peace of mind.",
-                        "Tough call! Weighing the pros and cons, the more exciting and rewarding path is the clear winner.",
-                        "I'd go with the option that offers the best blend of adventure and comfort."
+                        "The first option without a doubt! Between the two, it brings the most fun and best outcome.",
+                        "Definitely the bolder choice! It's easily the more memorable and exciting path.",
+                        "I'd go with the first option—it offers the best blend of adventure and comfort."
                     )
                 }
                 ResponseLengthPreset.NORMAL -> listOf(
-                    "That is a great dilemma! Between the two, I would decisively pick the option that provides the richer experience and the greatest freedom. When weighing hypotheticals, prioritizing long-term memories over short-term comfort is always the winning play.",
-                    "That's a fascinating trade-off! Evaluating both sides, the option with the most creative potential and lowest stress is definitely the way to go.",
-                    "Tough choice, but my vote goes to whichever option makes you look back in a year and smile about having chosen it!"
+                    "Between the two, I would decisively pick the first option! It provides the richer experience and the greatest freedom, making it the clear winner.",
+                    "The first option without hesitation! Evaluating both sides, it delivers the most creative potential and positive energy.",
+                    "My vote goes straight to the bolder choice! It makes you look back and smile about having chosen it."
                 )
                 ResponseLengthPreset.LONG -> listOf(
                     "Evaluating this classic dilemma requires balancing immediate appeal against enduring satisfaction. When you compare both scenarios, the choice that grants greater autonomy, positive experiences, and memorable stories consistently proves superior to the alternative that merely minimizes friction. If faced with the decision, lean boldly into the choice that expands your horizon!"
@@ -1755,18 +1772,253 @@ object AiFallbackEngine {
                         "Focusing on measurable impact and systematic execution delivers the most dependable outcome."
                     )
                     else -> listOf(
-                        "That's a really good question! Taking a balanced perspective and looking at the main factors usually makes the answer clear.",
-                        "It comes down to what you value most in this situation—focus on the essentials and everything else falls into place.",
-                        "Looking at it practically, starting with the simplest and most effective step is the best approach."
+                        "Starting with the simplest and most effective step is definitely the best approach here.",
+                        "It comes down to prioritizing what matters most in this situation—focus on the essentials.",
+                        "Looking at it practically, tackling the immediate priority first will get the job done."
                     )
                 }
                 ResponseLengthPreset.NORMAL -> listOf(
-                    "That's an insightful question to consider! Taking all the variables into account, the most compelling rationale centers on balancing practical execution with long-term effectiveness. When you break it down into core components, the right direction becomes straightforward.",
-                    "Understanding the reasoning behind this requires looking at both immediate causes and broader patterns. When you weigh the practical benefits against the effort required, the optimal choice reveals itself clearly.",
-                    "A thoughtful inquiry! Approaching this step-by-step—clarifying expectations first and executing with focus—consistently yields the strongest result."
+                    "Taking all the variables into account, the most compelling approach centers on balancing practical execution with immediate effectiveness.",
+                    "When you break it down into core components, addressing the primary goal first consistently yields the strongest result.",
+                    "Focusing on what works best right now delivers the cleanest and most dependable outcome."
                 )
                 ResponseLengthPreset.LONG -> listOf(
                     "Examining this question thoroughly reveals multiple interconnected dimensions. At its core, the solution involves understanding the fundamental motivations and practical constraints at play. By aligning immediate actions with long-term objectives, you ensure that the chosen path is both sustainable and impactful, turning a complex challenge into a clear, structured roadmap."
+                )
+            }
+        }
+
+        return emptyList()
+    }
+
+    private const val DIRECT_ANSWER_INSTRUCTION =
+        "CRITICAL INSTRUCTION - DIRECT & SPECIFIC REPLIES ONLY:\n" +
+        "- You must directly, genuinely, and specifically answer the question's content or choice asked.\n" +
+        "- STRICTLY FORBIDDEN: Do NOT output generic conversational filler, evasive platitudes, or non-answers such as \"That's a really great question!\", \"I'd definitely lean toward the most rewarding choice.\", \"Tough call!\", \"Weighing the options\", \"Good point\", or generic pleasantries.\n" +
+        "- MULTIPLE-CHOICE & OPTIONS: If the question offers choices or alternatives (e.g., \"What are you craving right now — food, sleep, or attention?\" or \"coffee or tea?\"), each generated reply MUST pick or commit to a specific choice from the prompt (e.g. food, sleep, attention) with authentic, natural phrasing. Never say \"I'd choose the best option\"—actually pick the specific choice!\n" +
+        "- FACTUAL / OPINION / HYPOTHETICAL: State the concrete answer, name, decision, or opinion immediately without hedging.\n" +
+        "- DIVERSITY: Provide distinct, realistic messaging replies that directly address what was asked."
+
+    internal fun extractQuestionChoices(question: String): List<String> {
+        val clean = question.trim()
+        val candidate = when {
+            clean.contains(" — ") -> clean.substringAfter(" — ")
+            clean.contains("—") && clean.substringAfter("—").contains(" or ", ignoreCase = true) -> clean.substringAfter("—")
+            clean.contains(" -- ") -> clean.substringAfter(" -- ")
+            clean.contains(": ") && clean.substringAfter(": ").contains(" or ", ignoreCase = true) -> clean.substringAfter(": ")
+            else -> clean
+        }
+
+        if (!candidate.contains(" or ", ignoreCase = true) &&
+            !candidate.contains(" vs ", ignoreCase = true) &&
+            !candidate.contains(" vs. ", ignoreCase = true)
+        ) {
+            return emptyList()
+        }
+
+        val rawParts = candidate.split(Regex("(?i)\\s*(?:,|\\bor\\b|\\bvs\\.?\\b)\\s*"))
+            .map { part ->
+                part.replace(Regex("(?i)^(?:either|neither|whether|or)\\s+"), "")
+                    .replace(Regex("[?!.,;\"'\\-—]+$"), "")
+                    .trim()
+            }
+            .filter { it.isNotBlank() && it.length in 1..45 }
+
+        if (rawParts.size < 2) return emptyList()
+
+        var first = rawParts[0]
+        val preludes = listOf(
+            "do you prefer", "would you prefer", "would you rather", "do you want",
+            "should we get", "should we do", "should i get", "should i do",
+            "are we going to", "which is better", "is it better to", "are you a",
+            "are you into", "are you", "is it"
+        )
+        for (p in preludes) {
+            if (first.startsWith(p, ignoreCase = true)) {
+                first = first.substring(p.length).trim()
+                break
+            }
+        }
+
+        val result = mutableListOf<String>()
+        if (first.isNotBlank() && !first.equals("what", ignoreCase = true) && !first.equals("which", ignoreCase = true)) {
+            result.add(first)
+        }
+        for (i in 1 until rawParts.size) {
+            val p = rawParts[i]
+            if (p.isNotBlank() && !p.equals("what", ignoreCase = true) && !p.equals("which", ignoreCase = true)) {
+                result.add(p)
+            }
+        }
+
+        return if (result.size >= 2) result else emptyList()
+    }
+
+    internal fun trySolveChoiceOrOptionQuestion(
+        question: String,
+        tone: ReplyTone,
+        preset: ResponseLengthPreset
+    ): List<String> {
+        val lower = question.lowercase()
+
+        // 1. Specific craving questions (e.g. "What are you craving right now — food, sleep, or attention?")
+        if (lower.contains("craving") || lower.contains("crave")) {
+            val mentionsFood = lower.contains("food")
+            val mentionsSleep = lower.contains("sleep")
+            val mentionsAttention = lower.contains("attention")
+
+            if (mentionsFood && (mentionsSleep || mentionsAttention)) {
+                return when (preset) {
+                    ResponseLengthPreset.VERY_SHORT -> when (tone) {
+                        ReplyTone.WITTY -> listOf("Food, 100%!", "Sleep, my bed misses me.", "Attention, come say hi!")
+                        ReplyTone.CONCISE -> listOf("Food.", "Sleep.", "Attention.")
+                        ReplyTone.PROFESSIONAL -> listOf("Food to recharge.", "Sleep is the priority.", "A brief conversation.")
+                        else -> listOf("Definitely food!", "Sleep, without a doubt.", "Attention, honestly!")
+                    }
+                    ResponseLengthPreset.SHORT -> when (tone) {
+                        ReplyTone.WITTY -> listOf(
+                            "Food, 100%! If pizza or snacks are involved, it's not even a debate.",
+                            "Sleep without a doubt—my bed and I have a serious date right now.",
+                            "Attention, obviously! Come entertain me and distract me from work."
+                        )
+                        ReplyTone.CONCISE -> listOf(
+                            "Definitely food right now.",
+                            "Sleep, desperately need to recharge.",
+                            "Honestly, attention and a good chat."
+                        )
+                        ReplyTone.PROFESSIONAL -> listOf(
+                            "I would prioritize food to restore energy and focus.",
+                            "Rest and sleep are definitely the top priority at this moment.",
+                            "Taking time for positive social engagement would be ideal."
+                        )
+                        ReplyTone.TRASH_TALK -> listOf(
+                            "Food, obviously! Unlike your jokes, a good meal never disappoints.",
+                            "Sleep, so I don't have to listen to more questionable takes today!",
+                            "Attention? Only if it's from someone with better conversation!"
+                        )
+                        ReplyTone.EMPATHETIC -> listOf(
+                            "Definitely craving some comforting warm food right now!",
+                            "Sleep sounds so heavenly right now, desperately need some rest.",
+                            "Honestly, some genuine attention and a heartfelt chat would be amazing."
+                        )
+                        else -> listOf(
+                            "Definitely food right now, starving!",
+                            "Sleep without a doubt—I'm completely exhausted and need to recharge.",
+                            "Honestly, some attention and good company right now!"
+                        )
+                    }
+                    ResponseLengthPreset.NORMAL -> when (tone) {
+                        ReplyTone.WITTY -> listOf(
+                            "Food, without a shadow of a doubt! Bring on the hot pizza, tacos, or dessert. Anyone choosing sleep over food hasn't had proper snacks today!",
+                            "Sleep! I am running on 2% battery and sheer optimism. My pillow is calling my name and I must answer.",
+                            "Honestly, attention! I crave quality entertainment, top-tier gossip, and good vibes right now."
+                        )
+                        else -> listOf(
+                            "Definitely food right now! I am absolutely starving and craving a really hearty, delicious meal to hit the spot.",
+                            "Sleep without a doubt. It has been such a long stretch and getting a solid, uninterrupted nap sounds like absolute heaven.",
+                            "Honestly, some attention and great conversation right now! Catching up with someone and sharing a laugh would make my day."
+                        )
+                    }
+                    ResponseLengthPreset.LONG -> listOf(
+                        "If I have to choose between the three, I am picking food without hesitation! There is nothing better right now than sitting down with a great meal, unwinding, and enjoying some fantastic comfort food.",
+                        "Sleep is the definitive winner for me. Energy levels are running low, and an uninterrupted, deeply restorative rest is honestly the greatest gift imaginable right now.",
+                        "Honestly, I would choose attention and genuine connection. Sharing quality time, having an engaging conversation, and feeling appreciated beats everything else today."
+                    )
+                }
+            }
+        }
+
+        // 2. Generic multiple-choice / option extraction
+        val choices = extractQuestionChoices(question)
+        if (choices.size >= 2) {
+            val optA = choices[0].trim().replaceFirstChar { it.uppercase() }
+            val optB = choices[1].trim().replaceFirstChar { it.uppercase() }
+            val optC = if (choices.size >= 3) choices[2].trim().replaceFirstChar { it.uppercase() } else null
+
+            return when (preset) {
+                ResponseLengthPreset.VERY_SHORT -> when (tone) {
+                    ReplyTone.WITTY -> listOf(
+                        "$optA, easily!",
+                        "$optB makes the best story.",
+                        optC?.let { "$it, galaxy-brain pick!" } ?: "$optA all day."
+                    )
+                    ReplyTone.CONCISE -> listOf(
+                        optA,
+                        optB,
+                        optC ?: "Definitely $optA."
+                    )
+                    ReplyTone.PROFESSIONAL -> listOf(
+                        "I recommend $optA.",
+                        "$optB is optimal.",
+                        optC?.let { "$it is viable." } ?: "$optA aligns best."
+                    )
+                    ReplyTone.TRASH_TALK -> listOf(
+                        "$optA, obviously.",
+                        "$optB, no contest.",
+                        optC?.let { "$it by a mile." } ?: "Only an amateur picks $optB!"
+                    )
+                    else -> listOf(
+                        "Definitely $optA!",
+                        "$optB, 100%.",
+                        optC?.let { "$it for sure!" } ?: "I'd lean toward $optA."
+                    )
+                }
+                ResponseLengthPreset.SHORT -> when (tone) {
+                    ReplyTone.WITTY -> listOf(
+                        "100% $optA! Anyone picking $optB is living dangerously.",
+                        "$optB, because I have impeccable taste and zero regrets.",
+                        optC?.let { "Honestly $it—that's the true galaxy-brain choice!" }
+                            ?: "Tough dilemma, but $optA wins every single time."
+                    )
+                    ReplyTone.CONCISE -> listOf(
+                        "Definitely $optA.",
+                        "$optB without question.",
+                        optC?.let { "$it." } ?: "Between the two, $optA."
+                    )
+                    ReplyTone.PROFESSIONAL -> listOf(
+                        "I would recommend $optA as the most effective and dependable choice.",
+                        "$optB presents the stronger alternative given current priorities.",
+                        optC?.let { "$it offers the most balanced resolution based on the requirements." }
+                            ?: "Evaluating the options, $optA provides the clearer advantage."
+                    )
+                    ReplyTone.TRASH_TALK -> listOf(
+                        "$optA, obviously! Only someone with zero taste would choose $optB.",
+                        "$optB, no debate. Don't embarrass yourself by picking anything else.",
+                        optC?.let { "$it, and it's not even a competition!" }
+                            ?: "Anyone who doesn't pick $optA needs their judgment examined."
+                    )
+                    ReplyTone.EMPATHETIC -> listOf(
+                        "I'd definitely pick $optA, but whatever feels right to you is wonderful!",
+                        "$optB sounds so lovely and comforting right now.",
+                        optC?.let { "$it would bring such good energy and comfort today!" }
+                            ?: "Both are great, but $optA would bring the most peace of mind."
+                    )
+                    else -> listOf(
+                        "Definitely $optA right now!",
+                        "$optB without a doubt, every time.",
+                        optC?.let { "Honestly, $it would hit the spot perfectly!" }
+                            ?: "I'd definitely go with $optA—it's the clear winner for me."
+                    )
+                }
+                ResponseLengthPreset.NORMAL -> when (tone) {
+                    ReplyTone.WITTY -> listOf(
+                        "I am picking $optA without hesitation! When you look at the options, $optA delivers the absolute best experience with zero regrets tomorrow.",
+                        "Definitely $optB! Choosing anything else would be a questionable life choice that I am simply not willing to make today.",
+                        optC?.let { "My vote goes straight to $it! It's easily the smartest, most fun option on the table." }
+                            ?: "Between both choices, $optA takes the crown. It's bolder, more entertaining, and the obvious winner!"
+                    )
+                    else -> listOf(
+                        "I would definitely choose $optA! Between the options presented, it stands out as the most appealing and satisfying choice right now.",
+                        "$optB without a doubt! It's the clear winner for me and fits the situation so much better.",
+                        optC?.let { "Honestly, I'd go with $it! Out of the three, $it would hit the spot and feel the most rewarding." }
+                            ?: "I would lean strongly toward $optA, though $optB is definitely a close second depending on the day."
+                    )
+                }
+                ResponseLengthPreset.LONG -> listOf(
+                    "If I have to choose among these alternatives, I am decisively picking $optA. Comparing the possibilities, $optA offers the greatest overall satisfaction, aligns perfectly with what works best, and delivers the most dependable and enjoyable outcome.",
+                    "Without hesitation, my vote goes to $optB. When you weigh the practical benefits and the experience it brings, $optB clearly emerges as the superior choice that I would commit to every time.",
+                    optC?.let { "I would actually select $it! Out of the three options, $it provides the most refreshing and distinctive result, making it the most compelling path forward." }
+                        ?: "Between the two options, $optA is the definitive choice for me. It strikes the perfect balance of quality and satisfaction, making it an easy decision."
                 )
             }
         }
@@ -1804,23 +2056,25 @@ object AiFallbackEngine {
         val isLangMode = settings.understandingMode
 
         val systemPrompt = if (isLangMode) {
-            "You are an intelligent multilingual assistant. " +
-            "The user received this question / incoming message: \"$question\". " +
+            "You are an intelligent multilingual assistant.\n" +
+            "The user received this question / incoming message: \"$question\".\n" +
+            "$DIRECT_ANSWER_INSTRUCTION\n" +
             "If the question is in a non-English language or dialect (including Hinglish, Hindi, Spanish, or any other language), you must output a structured JSON object with three fields:\n" +
             "1. \"original\": The exact question as detected, in its original language and script.\n" +
             "2. \"meaning\": A plain, clear English translation and meaning of the question.\n" +
-            "3. \"replies\": An array of exactly ${settings.count} generated reply strings, in the SAME language/dialect as the original question, following tone '${settings.tone.systemPromptHint}' and length preset '${lengthPreset.title}' (${lengthPreset.promptInstruction}, max $charCeiling chars each).\n" +
+            "3. \"replies\": An array of exactly ${settings.count} generated reply strings, in the SAME language/dialect as the original question, directly and specifically answering the question content, following tone '${settings.tone.systemPromptHint}' and length preset '${lengthPreset.title}' (${lengthPreset.promptInstruction}, max $charCeiling chars each).\n" +
             "If the question is already plain English, provide \"original\", \"meaning\" (plain English translation/summary), and \"replies\".\n" +
             "Output ONLY valid JSON in format: {\"original\": \"...\", \"meaning\": \"...\", \"replies\": [\"...\"]}. No markdown code fences, no extra text."
         } else {
-            "You are an intelligent quick reply assistant. " +
-            "The user received this question / incoming message: \"$question\". " +
-            "Directly and accurately answer or reply to this inquiry. " +
-            "Tone: ${settings.tone.systemPromptHint}. " +
-            "Language & Cultural Style: When the incoming message is in Hinglish, Hindi, Spanish, or any other language, reply in that EXACT same language/script using natural casual slang and authentic banter appropriate to that dialect rather than a stiff literal translation. " +
-            "Selected Length Preset: ${lengthPreset.title} (${lengthPreset.subtitle}). " +
-            "${lengthPreset.promptInstruction} " +
-            "Maximum character ceiling: $charCeiling characters. " +
+            "You are an intelligent quick reply assistant.\n" +
+            "The user received this question / incoming message: \"$question\".\n" +
+            "$DIRECT_ANSWER_INSTRUCTION\n" +
+            "Directly, specifically, and accurately answer or reply to this inquiry without generic filler.\n" +
+            "Tone: ${settings.tone.systemPromptHint}.\n" +
+            "Language & Cultural Style: When the incoming message is in Hinglish, Hindi, Spanish, or any other language, reply in that EXACT same language/script using natural casual slang and authentic banter appropriate to that dialect rather than a stiff literal translation.\n" +
+            "Selected Length Preset: ${lengthPreset.title} (${lengthPreset.subtitle}).\n" +
+            "${lengthPreset.promptInstruction}\n" +
+            "Maximum character ceiling: $charCeiling characters.\n" +
             "Output ONLY a valid JSON array of ${settings.count} strings, e.g. [\"reply 1\", \"reply 2\"]. No markdown code fences, no extra text."
         }
 
@@ -1986,7 +2240,8 @@ object AiFallbackEngine {
         val isLangMode = settings.understandingMode
 
         val systemRolePrompt = if (isLangMode) {
-            "You are an intelligent multilingual assistant. " +
+            "You are an intelligent multilingual assistant.\n" +
+            "$DIRECT_ANSWER_INSTRUCTION\n" +
             "When the incoming question is in a non-English language or dialect (including Hinglish, Hindi, Spanish, etc.), you must output a structured JSON object with three fields:\n" +
             "1. \"original\": The exact question as detected, in its original language and script.\n" +
             "2. \"meaning\": A plain English translation of the question.\n" +
@@ -1994,23 +2249,26 @@ object AiFallbackEngine {
             "If the question is plain English, provide \"original\", \"meaning\" (plain summary/translation), and \"replies\".\n" +
             "Output ONLY valid JSON: {\"original\": \"...\", \"meaning\": \"...\", \"replies\": [\"...\"]}."
         } else {
-            "You are an accurate quick reply assistant. " +
-            "You generate direct, helpful answers and contextual replies that directly resolve the incoming question or message. " +
-            "Tone instructions: ${settings.tone.systemPromptHint}. " +
-            "Language/Script Matching: When the incoming message is in Hinglish, Hindi, Spanish, or any other non-English language, reply in that EXACT same language/script using natural casual vernacular and slang matching the tone persona rather than a formal literal translation. " +
-            "Length Requirement: ${lengthPreset.title} (${lengthPreset.subtitle}). ${lengthPreset.promptInstruction} " +
-            "Maximum character limit: $charCeiling chars per reply. " +
+            "You are an accurate quick reply assistant.\n" +
+            "$DIRECT_ANSWER_INSTRUCTION\n" +
+            "You generate direct, specific answers and contextual replies that directly resolve the incoming question or message without generic filler.\n" +
+            "Tone instructions: ${settings.tone.systemPromptHint}.\n" +
+            "Language/Script Matching: When the incoming message is in Hinglish, Hindi, Spanish, or any other non-English language, reply in that EXACT same language/script using natural casual vernacular and slang matching the tone persona rather than a formal literal translation.\n" +
+            "Length Requirement: ${lengthPreset.title} (${lengthPreset.subtitle}). ${lengthPreset.promptInstruction}\n" +
+            "Maximum character limit: $charCeiling chars per reply.\n" +
             "Format output strictly as a JSON array of strings: [\"reply 1\", \"reply 2\"]."
         }
 
         val userPrompt = if (isLangMode) {
             "Incoming question: \"$question\"\n" +
+            "CRITICAL: Answer specifically with zero conversational filler or evasion.\n" +
             "Tone: ${settings.tone.systemPromptHint}\n" +
             "Length preset: ${lengthPreset.title} (${lengthPreset.promptInstruction})\n" +
             "Max length: $charCeiling characters per reply\n" +
             "Output ONLY a structured JSON object: {\"original\": \"...\", \"meaning\": \"...\", \"replies\": [\"...\"]}"
         } else {
             "Incoming message/question: \"$question\"\n" +
+            "CRITICAL: Directly and specifically answer the question or pick the choices asked. Do NOT respond with generic filler like 'That's a great question'.\n" +
             "Requested tone: ${settings.tone.systemPromptHint}\n" +
             "Language requirement: Match incoming language/script directly (use natural Hinglish/slang if applicable).\n" +
             "Length preset: ${lengthPreset.title} (${lengthPreset.promptInstruction})\n" +
@@ -2107,18 +2365,21 @@ object AiFallbackEngine {
 
         val prompt = if (isLangMode) {
             "Question: \"$question\".\n" +
+            "$DIRECT_ANSWER_INSTRUCTION\n" +
             "Output a structured JSON object with three fields:\n" +
             "1. \"original\": the exact question in original language/script.\n" +
             "2. \"meaning\": a plain English translation.\n" +
-            "3. \"replies\": a JSON array of ${settings.count} replies in the SAME language/dialect (e.g. Hinglish) matching tone '${settings.tone.systemPromptHint}' and length '${lengthPreset.title}' (max $charCeiling chars).\n" +
+            "3. \"replies\": a JSON array of ${settings.count} replies in the SAME language/dialect (e.g. Hinglish) directly and specifically answering the question content, matching tone '${settings.tone.systemPromptHint}' and length '${lengthPreset.title}' (max $charCeiling chars).\n" +
             "Return ONLY JSON: {\"original\": \"...\", \"meaning\": \"...\", \"replies\": [\"...\"]}."
         } else {
-            "Generate ${settings.count} quick replies answering: \"$question\". " +
-            "Tone: ${settings.tone.systemPromptHint}. " +
-            "Language/Script Matching: When the incoming message is in Hinglish, Hindi, Spanish, or another language, reply in that EXACT same language/script with natural casual slang matching the tone rather than a literal translation. " +
-            "Selected Length Preset: ${lengthPreset.title} (${lengthPreset.subtitle}). " +
-            "${lengthPreset.promptInstruction} " +
-            "Max chars: $charCeiling. " +
+            "Question: \"$question\".\n" +
+            "$DIRECT_ANSWER_INSTRUCTION\n" +
+            "Generate ${settings.count} quick replies directly and specifically answering this inquiry.\n" +
+            "Tone: ${settings.tone.systemPromptHint}.\n" +
+            "Language/Script Matching: When the incoming message is in Hinglish, Hindi, Spanish, or another language, reply in that EXACT same language/script with natural casual slang matching the tone rather than a literal translation.\n" +
+            "Selected Length Preset: ${lengthPreset.title} (${lengthPreset.subtitle}).\n" +
+            "${lengthPreset.promptInstruction}\n" +
+            "Max chars: $charCeiling.\n" +
             "Return ONLY a JSON array of strings: [\"reply1\", \"reply2\"]."
         }
 

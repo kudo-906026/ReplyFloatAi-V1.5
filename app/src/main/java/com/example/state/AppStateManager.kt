@@ -409,6 +409,11 @@ object AppStateManager {
         saveCurrentSettings()
     }
 
+    fun setLangModeEnabled(enabled: Boolean) {
+        _settings.value = _settings.value.copy(langModeEnabled = enabled)
+        saveCurrentSettings()
+    }
+
     fun setUnderstandingMode(enabled: Boolean) {
         _settings.value = _settings.value.copy(understandingMode = enabled)
         saveCurrentSettings()
@@ -843,10 +848,15 @@ object AppStateManager {
             _errorMessage.value = null
             _activeReplies.value = emptyList()
 
+            val preUnderstanding = if (_settings.value.understandingMode) {
+                AiFallbackEngine.generateUnderstanding(cleanText, _settings.value.understandingSummaryLength)
+            } else null
+
             val initialQuestion = DetectedQuestion(
                 text = cleanText,
                 sourceApp = sourceApp,
                 packageName = packageName,
+                englishMeaning = preUnderstanding,
                 generatedByProvider = _activeProvider.value ?: _settings.value.preferredProvider,
                 detectionMethod = detectionMethod,
                 ocrLatencyMs = ocrLatencyMs
@@ -903,7 +913,7 @@ object AppStateManager {
                 }
 
                 val finalQuestion = initialQuestion.copy(
-                    englishMeaning = fallbackResult.understanding,
+                    englishMeaning = fallbackResult.understanding ?: preUnderstanding,
                     generatedByProvider = usedProvider,
                     fallbackNotice = fallbackResult.fallbackNotice
                 )

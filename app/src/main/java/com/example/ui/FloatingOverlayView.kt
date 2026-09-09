@@ -301,7 +301,7 @@ private fun SmallBarPill(
             Icon(
                 imageVector = Icons.Default.Language,
                 contentDescription = "Open Lang Bar",
-                tint = if (settings.understandingMode) TechBlue else TextMuted,
+                tint = if (settings.langModeEnabled) TechBlue else TextMuted,
                 modifier = Modifier.size(13.dp)
             )
         }
@@ -425,7 +425,7 @@ private fun MainBarExpanded(
                     Icon(
                         imageVector = Icons.Default.Language,
                         contentDescription = "Lang Bar",
-                        tint = if (settings.understandingMode) TechBlue else TextMuted,
+                        tint = if (settings.langModeEnabled) TechBlue else TextMuted,
                         modifier = Modifier.size(14.dp)
                     )
                 }
@@ -918,147 +918,40 @@ private fun LangBarPanel(
 
         HorizontalDivider(color = DarkCardBorder)
 
-        // Lang / Understanding Mode Toggle
+        // Lang Mode On/Off Toggle
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("lang_bar_mode_row"),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "Understanding & Intent Mode",
+                    text = "Lang Mode",
                     fontSize = 11.5.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = TextWhite
                 )
                 Text(
-                    text = "Synthesizes contextual meaning preview",
+                    text = "Translate & explain incoming text in English",
                     fontSize = 9.5.sp,
                     color = TextSecondary
                 )
             }
 
             Switch(
-                checked = settings.understandingMode,
-                onCheckedChange = { AppStateManager.setUnderstandingMode(it) },
+                checked = settings.langModeEnabled,
+                onCheckedChange = { AppStateManager.setLangModeEnabled(it) },
                 colors = SwitchDefaults.colors(
                     checkedThumbColor = TechBlue,
                     checkedTrackColor = TechBlue.copy(alpha = 0.4f),
                     uncheckedThumbColor = TextMuted,
                     uncheckedTrackColor = DarkSurfaceVariant
                 ),
-                modifier = Modifier.size(width = 38.dp, height = 24.dp)
-            )
-        }
-
-        // Granularity options if understanding mode on
-        if (settings.understandingMode) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                UnderstandingSummaryLength.entries.forEach { len ->
-                    val isSelected = settings.understandingSummaryLength == len
-                    Surface(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(4.dp))
-                            .clickable { AppStateManager.setUnderstandingSummaryLength(len) },
-                        shape = RoundedCornerShape(4.dp),
-                        color = if (isSelected) TechBlue else DarkSurfaceCard,
-                        border = BorderStroke(0.5.dp, if (isSelected) TechBlue else DarkCardBorder)
-                    ) {
-                        Text(
-                            text = len.label.split(" ").first(),
-                            fontSize = 8.5.sp,
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                            color = if (isSelected) TextWhite else TextSecondary,
-                            modifier = Modifier
-                                .padding(vertical = 3.dp)
-                                .fillMaxWidth(),
-                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                        )
-                    }
-                }
-            }
-        }
-
-        HorizontalDivider(color = DarkCardBorder)
-
-        // Continuous Screen Analyze On/Off Toggle
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(6.dp)
-                            .clip(CircleShape)
-                            .background(if (settings.continuousScreenAnalysis) TechGreen else TextMuted)
-                    )
-                    Text(
-                        text = "Continuous Screen Analyze",
-                        fontSize = 11.5.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = TextWhite
-                    )
-                }
-                Text(
-                    text = "Live background question detection",
-                    fontSize = 9.5.sp,
-                    color = TextSecondary
-                )
-            }
-
-            Switch(
-                checked = settings.continuousScreenAnalysis,
-                onCheckedChange = { AppStateManager.setContinuousScreenAnalysis(it) },
-                colors = SwitchDefaults.colors(
-                    checkedThumbColor = TechGreen,
-                    checkedTrackColor = TechGreen.copy(alpha = 0.4f),
-                    uncheckedThumbColor = TextMuted,
-                    uncheckedTrackColor = DarkSurfaceVariant
-                ),
-                modifier = Modifier.size(width = 38.dp, height = 24.dp)
-            )
-        }
-
-        // Strict Question Filter Toggle
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "Strict Question Filtering",
-                    fontSize = 11.5.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = TextWhite
-                )
-                Text(
-                    text = "Only trigger on '?' + question words",
-                    fontSize = 9.5.sp,
-                    color = TextSecondary
-                )
-            }
-
-            Switch(
-                checked = settings.detectQuestionsOnly,
-                onCheckedChange = { AppStateManager.setDetectQuestionsOnly(it) },
-                colors = SwitchDefaults.colors(
-                    checkedThumbColor = CrimsonPrimary,
-                    checkedTrackColor = CrimsonPrimary.copy(alpha = 0.4f),
-                    uncheckedThumbColor = TextMuted,
-                    uncheckedTrackColor = DarkSurfaceVariant
-                ),
-                modifier = Modifier.size(width = 38.dp, height = 24.dp)
+                modifier = Modifier
+                    .size(width = 38.dp, height = 24.dp)
+                    .testTag("lang_bar_mode_switch")
             )
         }
 
