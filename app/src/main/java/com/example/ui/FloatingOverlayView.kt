@@ -78,7 +78,6 @@ import com.example.model.DetectedQuestion
 import com.example.model.ReplyItem
 import com.example.model.ReplySettings
 import com.example.model.ResponseLengthPreset
-import com.example.model.UnderstandingSummaryLength
 import com.example.state.AppStateManager
 import com.example.ui.theme.AccentBlue
 import com.example.ui.theme.AccentGreen
@@ -100,8 +99,7 @@ import com.example.ui.theme.TextWhite
 
 enum class OverlayBarMode {
     SMALL_PILL, // Collapsed floating pill
-    MAIN_BAR,   // Expanded bar with question, controls, and reply cards
-    LANG_BAR    // Language mode and continuous analyze toggle bar
+    MAIN_BAR    // Expanded bar with question, controls, and reply cards
 }
 
 @Composable
@@ -134,7 +132,6 @@ fun FloatingOverlayView(
     val currentOpacity = when (currentMode) {
         OverlayBarMode.SMALL_PILL -> settings.smallBarOpacity
         OverlayBarMode.MAIN_BAR -> settings.mainBarOpacity
-        OverlayBarMode.LANG_BAR -> settings.langBarOpacity
     }.coerceIn(0.20f, 1.0f)
 
     // Main Floating Container - styled with independent bar opacity
@@ -169,7 +166,6 @@ fun FloatingOverlayView(
                     isGenerating = isGenerating,
                     currentQuestion = currentQuestion,
                     onExpandMain = { currentMode = OverlayBarMode.MAIN_BAR },
-                    onOpenLang = { currentMode = OverlayBarMode.LANG_BAR },
                     onClose = onClose
                 )
             }
@@ -181,17 +177,6 @@ fun FloatingOverlayView(
                     activeReplies = activeReplies,
                     isGenerating = isGenerating,
                     activeProvider = activeProvider,
-                    onCollapse = { currentMode = OverlayBarMode.SMALL_PILL },
-                    onOpenLang = { currentMode = OverlayBarMode.LANG_BAR },
-                    onClose = onClose
-                )
-            }
-            OverlayBarMode.LANG_BAR -> {
-                LangBarPanel(
-                    settings = settings,
-                    currentQuestion = currentQuestion,
-                    replyCount = activeReplies.size,
-                    onBackToMain = { currentMode = OverlayBarMode.MAIN_BAR },
                     onCollapse = { currentMode = OverlayBarMode.SMALL_PILL },
                     onClose = onClose
                 )
@@ -210,7 +195,6 @@ private fun SmallBarPill(
     isGenerating: Boolean,
     currentQuestion: DetectedQuestion?,
     onExpandMain: () -> Unit,
-    onOpenLang: () -> Unit,
     onClose: () -> Unit
 ) {
     Row(
@@ -293,19 +277,6 @@ private fun SmallBarPill(
             }
         }
 
-        // Lang Bar switcher icon
-        IconButton(
-            onClick = onOpenLang,
-            modifier = Modifier.size(20.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Default.Language,
-                contentDescription = "Open Lang Bar",
-                tint = if (settings.langModeEnabled) TechBlue else TextMuted,
-                modifier = Modifier.size(13.dp)
-            )
-        }
-
         IconButton(
             onClick = onExpandMain,
             modifier = Modifier.size(20.dp)
@@ -344,7 +315,6 @@ private fun MainBarExpanded(
     isGenerating: Boolean,
     activeProvider: com.example.model.AiProvider?,
     onCollapse: () -> Unit,
-    onOpenLang: () -> Unit,
     onClose: () -> Unit
 ) {
     val hasContent = currentQuestion != null || activeReplies.isNotEmpty() || isGenerating
@@ -387,7 +357,7 @@ private fun MainBarExpanded(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(2.dp)
             ) {
-                // Quick Analyze Toggle Button (next to Lang globe icon)
+                // Quick Analyze Toggle Button
                 IconButton(
                     onClick = {
                         AppStateManager.setContinuousScreenAnalysis(!settings.continuousScreenAnalysis)
@@ -413,21 +383,6 @@ private fun MainBarExpanded(
                             )
                         }
                     }
-                }
-
-                // Lang Bar switcher icon
-                IconButton(
-                    onClick = onOpenLang,
-                    modifier = Modifier
-                        .size(22.dp)
-                        .testTag("quick_lang_bar_button")
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Language,
-                        contentDescription = "Lang Bar",
-                        tint = if (settings.langModeEnabled) TechBlue else TextMuted,
-                        modifier = Modifier.size(14.dp)
-                    )
                 }
 
                 // Collapse to Small Bar
@@ -462,8 +417,6 @@ private fun MainBarExpanded(
         if (isGenerating) {
             GeneratingProgressIndicator()
         } else if (currentQuestion != null) {
-            val isNonEnglish = QuestionDetectionEngine.isNonEnglishOrHinglish(currentQuestion.text) || !currentQuestion.englishMeaning.isNullOrBlank()
-
             // Detected Question card
             Column(
                 modifier = Modifier
@@ -481,49 +434,6 @@ private fun MainBarExpanded(
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
-
-                // When Lang mode is active and translation is available, show a direct shortcut to the dedicated Lang Bar
-                if (settings.understandingMode && isNonEnglish) {
-                    Surface(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(4.dp))
-                            .clickable { onOpenLang() },
-                        shape = RoundedCornerShape(4.dp),
-                        color = TechBlue.copy(alpha = 0.15f),
-                        border = BorderStroke(0.5.dp, TechBlue.copy(alpha = 0.4f))
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Language,
-                                    contentDescription = null,
-                                    tint = TechBlue,
-                                    modifier = Modifier.size(11.dp)
-                                )
-                                Text(
-                                    text = "Translation in Lang Bar",
-                                    fontSize = 9.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = TechBlue
-                                )
-                            }
-                            Text(
-                                text = "Open Lang Bar >",
-                                fontSize = 8.5.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = TechBlue
-                            )
-                        }
-                    }
-                }
             }
 
             // Quick In-Bar Length & Count Controls
@@ -721,7 +631,7 @@ private fun MainBarExpanded(
                         modifier = Modifier.size(13.dp)
                     )
                     Text(
-                        text = if (settings.continuousScreenAnalysis) "Listening for inbound questions..." else "Analysis is paused (Tap Lang Bar to turn on)",
+                        text = if (settings.continuousScreenAnalysis) "Listening for inbound questions..." else "Analysis is paused",
                         fontSize = 10.sp,
                         color = if (settings.continuousScreenAnalysis) TextSecondary else TextMuted
                     )
@@ -731,253 +641,7 @@ private fun MainBarExpanded(
     }
 }
 
-// -------------------------------------------------------------
-// 3. Lang Bar — Language Mode & Continuous Analysis Panel
-// -------------------------------------------------------------
-@Composable
-private fun LangBarPanel(
-    settings: ReplySettings,
-    currentQuestion: DetectedQuestion?,
-    replyCount: Int,
-    onBackToMain: () -> Unit,
-    onCollapse: () -> Unit,
-    onClose: () -> Unit
-) {
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        // Lang Bar Header
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(5.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Language,
-                    contentDescription = null,
-                    tint = TechBlue,
-                    modifier = Modifier.size(14.dp)
-                )
-                Text(
-                    text = "LANG BAR",
-                    fontFamily = FontFamily.Monospace,
-                    fontSize = 10.5.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = TextWhite
-                )
-            }
 
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(2.dp)
-            ) {
-                IconButton(
-                    onClick = onBackToMain,
-                    modifier = Modifier.size(22.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Tune,
-                        contentDescription = "Back to Main Bar",
-                        tint = TextWhite,
-                        modifier = Modifier.size(14.dp)
-                    )
-                }
-
-                IconButton(
-                    onClick = onCollapse,
-                    modifier = Modifier.size(22.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.ExpandLess,
-                        contentDescription = "Minimize to Pill",
-                        tint = TextSecondary,
-                        modifier = Modifier.size(14.dp)
-                    )
-                }
-
-                IconButton(
-                    onClick = onClose,
-                    modifier = Modifier.size(22.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Close,
-                        contentDescription = "Close overlay",
-                        tint = CrimsonLight,
-                        modifier = Modifier.size(14.dp)
-                    )
-                }
-            }
-        }
-
-        HorizontalDivider(color = DarkCardBorder)
-
-        // Section: "Original"
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(8.dp))
-                .background(DarkSurfaceVariant)
-                .padding(horizontal = 9.dp, vertical = 7.dp),
-            verticalArrangement = Arrangement.spacedBy(3.dp)
-        ) {
-            Text(
-                text = "Original",
-                fontSize = 9.5.sp,
-                fontWeight = FontWeight.Bold,
-                color = TechBlue,
-                letterSpacing = 0.5.sp
-            )
-            Text(
-                text = currentQuestion?.text ?: "No active question detected",
-                fontSize = (settings.overlayTextSizeSp - 1).sp,
-                fontWeight = FontWeight.Medium,
-                color = if (currentQuestion != null) TextWhite else TextMuted,
-                modifier = Modifier.testTag("section_original_text")
-            )
-        }
-
-        // Section: "Meaning (English)"
-        val englishMeaning = currentQuestion?.englishMeaning
-            ?: if (currentQuestion != null) {
-                AiFallbackEngine.generateUnderstanding(currentQuestion.text, settings.understandingSummaryLength)
-            } else null
-            ?: "Meaning / translation will appear here"
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(8.dp))
-                .background(DarkSurfaceVariant)
-                .padding(horizontal = 9.dp, vertical = 7.dp),
-            verticalArrangement = Arrangement.spacedBy(3.dp)
-        ) {
-            Text(
-                text = "Meaning (English)",
-                fontSize = 9.5.sp,
-                fontWeight = FontWeight.Bold,
-                color = TechGreen,
-                letterSpacing = 0.5.sp
-            )
-            Text(
-                text = englishMeaning,
-                fontSize = (settings.overlayTextSizeSp - 1.5).sp,
-                fontWeight = FontWeight.Normal,
-                color = if (currentQuestion != null) TextSecondary else TextMuted,
-                modifier = Modifier.testTag("section_meaning_text")
-            )
-        }
-
-        // Quick button to switch to Main Bar to view and copy replies
-        if (replyCount > 0) {
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(6.dp))
-                    .clickable { onBackToMain() },
-                shape = RoundedCornerShape(6.dp),
-                color = CrimsonPrimary.copy(alpha = 0.18f),
-                border = BorderStroke(1.dp, CrimsonPrimary.copy(alpha = 0.6f))
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 8.dp, vertical = 5.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(5.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.QuestionAnswer,
-                            contentDescription = null,
-                            tint = CrimsonLight,
-                            modifier = Modifier.size(13.dp)
-                        )
-                        Text(
-                            text = "View Replies in Main Bar ($replyCount)",
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = CrimsonLight
-                        )
-                    }
-                    Icon(
-                        imageVector = Icons.Default.OpenInFull,
-                        contentDescription = null,
-                        tint = CrimsonLight,
-                        modifier = Modifier.size(12.dp)
-                    )
-                }
-            }
-        }
-
-        HorizontalDivider(color = DarkCardBorder)
-
-        // Lang Mode On/Off Toggle
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .testTag("lang_bar_mode_row"),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "Lang Mode",
-                    fontSize = 11.5.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = TextWhite
-                )
-                Text(
-                    text = "Translate & explain incoming text in English",
-                    fontSize = 9.5.sp,
-                    color = TextSecondary
-                )
-            }
-
-            Switch(
-                checked = settings.langModeEnabled,
-                onCheckedChange = { AppStateManager.setLangModeEnabled(it) },
-                colors = SwitchDefaults.colors(
-                    checkedThumbColor = TechBlue,
-                    checkedTrackColor = TechBlue.copy(alpha = 0.4f),
-                    uncheckedThumbColor = TextMuted,
-                    uncheckedTrackColor = DarkSurfaceVariant
-                ),
-                modifier = Modifier
-                    .size(width = 38.dp, height = 24.dp)
-                    .testTag("lang_bar_mode_switch")
-            )
-        }
-
-        // Return button
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(6.dp))
-                .clickable { onBackToMain() },
-            shape = RoundedCornerShape(6.dp),
-            color = DarkCardElevated,
-            border = BorderStroke(1.dp, CrimsonPrimary.copy(alpha = 0.5f))
-        ) {
-            Text(
-                text = "Done (Return to Main Bar)",
-                fontSize = 10.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = CrimsonLight,
-                modifier = Modifier
-                    .padding(vertical = 5.dp)
-                    .fillMaxWidth(),
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center
-            )
-        }
-    }
-}
 
 @Composable
 private fun GeneratingProgressIndicator() {

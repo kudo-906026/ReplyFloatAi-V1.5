@@ -95,8 +95,7 @@ fun HistoryTab(
         } else {
             questionsHistory.filter {
                 it.text.contains(searchQuery, ignoreCase = true) ||
-                        (it.sourceApp?.contains(searchQuery, ignoreCase = true) == true) ||
-                        (it.englishMeaning?.contains(searchQuery, ignoreCase = true) == true)
+                        (it.sourceApp?.contains(searchQuery, ignoreCase = true) == true)
             }
         }
     }
@@ -396,32 +395,6 @@ fun HistoryTab(
                             fontWeight = FontWeight.SemiBold,
                             color = TextWhite
                         )
-
-                        if (question.englishMeaning != null) {
-                            Surface(
-                                shape = RoundedCornerShape(4.dp),
-                                color = DarkCardElevated,
-                                border = BorderStroke(0.5.dp, DarkCardBorder)
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.AutoAwesome,
-                                        contentDescription = null,
-                                        tint = CrimsonLight,
-                                        modifier = Modifier.size(11.dp)
-                                    )
-                                    Text(
-                                        text = question.englishMeaning,
-                                        fontSize = 10.5.sp,
-                                        color = CrimsonLight
-                                    )
-                                }
-                            }
-                        }
                     }
                 }
             }

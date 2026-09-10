@@ -31,13 +31,24 @@ import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import com.example.MainActivity
 import com.example.state.AppStateManager
 import com.example.ui.FloatingOverlayView
+import com.example.ui.LangBarFloatingView
 import com.example.ui.theme.ReplyFloatTheme
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.launch
 
 class FloatingOverlayService : Service(), LifecycleOwner, ViewModelStoreOwner, SavedStateRegistryOwner {
 
     private var windowManager: WindowManager? = null
     private var overlayComposeView: View? = null
     private var windowLayoutParams: WindowManager.LayoutParams? = null
+
+    // Standalone Lang Bar floating window
+    private var langBarComposeView: View? = null
+    private var langBarLayoutParams: WindowManager.LayoutParams? = null
+    private var langStateCollectorJob: Job? = null
 
     private val lifecycleRegistry = LifecycleRegistry(this)
     private val store = ViewModelStore()
@@ -81,7 +92,19 @@ class FloatingOverlayService : Service(), LifecycleOwner, ViewModelStoreOwner, S
         startForeground(NOTIFICATION_ID, notification)
 
         initOverlayView()
+        initLangBarView()
         AppStateManager.setOverlayRunning(true)
+
+        langStateCollectorJob = CoroutineScope(Dispatchers.Main).launch {
+            combine(
+                AppStateManager.langTranslationState,
+                AppStateManager.settings
+            ) { state, settings ->
+                state.isVisible && settings.langModeEnabled
+            }.collect { shouldBeVisible ->
+                langBarComposeView?.visibility = if (shouldBeVisible) View.VISIBLE else View.GONE
+            }
+        }
     }
 
     private var pendingDx = 0f
@@ -117,6 +140,60 @@ class FloatingOverlayService : Service(), LifecycleOwner, ViewModelStoreOwner, S
                 lp.y += intY
                 runCatching { windowManager?.updateViewLayout(view, lp) }
             }
+        }
+    }
+
+    // Independent drag and frame callback for Lang Bar
+    private var pendingLangDx = 0f
+    private var pendingLangDy = 0f
+    private var isLangFrameScheduled = false
+    private val langFrameCallback = Choreographer.FrameCallback {
+        isLangFrameScheduled = false
+        val intX = pendingLangDx.toInt()
+        val intY = pendingLangDy.toInt()
+        if (intX != 0 || intY != 0) {
+            pendingLangDx -= intX
+            pendingLangDy -= intY
+            val lp = langBarLayoutParams
+            val view = langBarComposeView
+            if (lp != null && view != null) {
+                lp.x += intX
+                lp.y += intY
+                runCatching {
+                    windowManager?.updateViewLayout(view, lp)
+                    AppStateManager.setLangBarPosition(lp.x, lp.y)
+                }
+            }
+        }
+    }
+
+    private fun flushPendingLangDrag() {
+        val intX = pendingLangDx.toInt()
+        val intY = pendingLangDy.toInt()
+        if (intX != 0 || intY != 0) {
+            pendingLangDx -= intX
+            pendingLangDy -= intY
+            val lp = langBarLayoutParams
+            val view = langBarComposeView
+            if (lp != null && view != null) {
+                lp.x += intX
+                lp.y += intY
+                runCatching {
+                    windowManager?.updateViewLayout(view, lp)
+                    AppStateManager.setLangBarPosition(lp.x, lp.y)
+                }
+            }
+        }
+    }
+
+    private fun resetLangBarPosition() {
+        val lp = langBarLayoutParams ?: return
+        val view = langBarComposeView ?: return
+        lp.x = 100
+        lp.y = 1050
+        runCatching {
+            windowManager?.updateViewLayout(view, lp)
+            AppStateManager.resetLangBarPosition()
         }
     }
 
@@ -181,6 +258,77 @@ class FloatingOverlayService : Service(), LifecycleOwner, ViewModelStoreOwner, S
         }
     }
 
+    private fun initLangBarView() {
+        try {
+            val wm = windowManager ?: return
+
+            val layoutType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+            } else {
+                @Suppress("DEPRECATION")
+                WindowManager.LayoutParams.TYPE_PHONE
+            }
+
+            val settings = AppStateManager.settings.value
+            val initialX = if (settings.langBarX != 0) settings.langBarX else 100
+            // Distinct initial coordinate: 1050 (main bar starts at 300) so they NEVER overlap
+            val initialY = if (settings.langBarY != 0) settings.langBarY else 1050
+
+            val params = WindowManager.LayoutParams(
+                WindowManager.LayoutParams.WRAP_CONTENT,
+                WindowManager.LayoutParams.WRAP_CONTENT,
+                layoutType,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                        WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
+                        WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
+                PixelFormat.TRANSLUCENT
+            ).apply {
+                gravity = Gravity.TOP or Gravity.START
+                x = initialX
+                y = initialY
+            }
+            langBarLayoutParams = params
+
+            val composeView = ComposeView(this).apply {
+                setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnLifecycleDestroyed(lifecycle))
+                setViewTreeLifecycleOwner(this@FloatingOverlayService)
+                setViewTreeViewModelStoreOwner(this@FloatingOverlayService)
+                setViewTreeSavedStateRegistryOwner(this@FloatingOverlayService)
+
+                setContent {
+                    ReplyFloatTheme {
+                        LangBarFloatingView(
+                            context = this@FloatingOverlayService,
+                            onDrag = { dx, dy ->
+                                pendingLangDx += dx
+                                pendingLangDy += dy
+                                if (!isLangFrameScheduled) {
+                                    isLangFrameScheduled = true
+                                    Choreographer.getInstance().postFrameCallback(langFrameCallback)
+                                }
+                            },
+                            onDragEnd = {
+                                flushPendingLangDrag()
+                            },
+                            onClose = {
+                                AppStateManager.dismissLangBar()
+                            },
+                            onResetPosition = {
+                                resetLangBarPosition()
+                            }
+                        )
+                    }
+                }
+            }
+
+            val isInitiallyVisible = AppStateManager.langTranslationState.value.isVisible && settings.langModeEnabled
+            composeView.visibility = if (isInitiallyVisible) View.VISIBLE else View.GONE
+            langBarComposeView = composeView
+            wm.addView(composeView, params)
+        } catch (_: Exception) {
+        }
+    }
+
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
@@ -215,9 +363,16 @@ class FloatingOverlayService : Service(), LifecycleOwner, ViewModelStoreOwner, S
     }
 
     override fun onDestroy() {
+        langStateCollectorJob?.cancel()
+        langStateCollectorJob = null
+
         if (isFrameScheduled) {
             runCatching { Choreographer.getInstance().removeFrameCallback(frameCallback) }
             isFrameScheduled = false
+        }
+        if (isLangFrameScheduled) {
+            runCatching { Choreographer.getInstance().removeFrameCallback(langFrameCallback) }
+            isLangFrameScheduled = false
         }
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_PAUSE)
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_STOP)
@@ -227,6 +382,10 @@ class FloatingOverlayService : Service(), LifecycleOwner, ViewModelStoreOwner, S
         overlayComposeView?.let {
             windowManager?.removeView(it)
             overlayComposeView = null
+        }
+        langBarComposeView?.let {
+            windowManager?.removeView(it)
+            langBarComposeView = null
         }
         QuestionDetectorAccessibilityService.resetScanningState()
         AppStateManager.setOverlayRunning(false)

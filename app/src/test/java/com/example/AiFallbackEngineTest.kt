@@ -175,8 +175,8 @@ class AiFallbackEngineTest {
     }
 
     @Test
-    fun testTrashTalkHinglishLanguageMode() = runBlocking {
-        val settings = ReplySettings(tone = ReplyTone.TRASH_TALK, understandingMode = true)
+    fun testTrashTalkHinglishReplies() = runBlocking {
+        val settings = ReplySettings(tone = ReplyTone.TRASH_TALK)
         val result = AiFallbackEngine.generateRepliesWithFallback("bhai kaisa laga mera plan?", settings)
         assertTrue(result.replies.isNotEmpty())
         val reply = result.replies.first().text

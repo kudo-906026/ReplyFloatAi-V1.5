@@ -425,8 +425,6 @@ fun MainScreen() {
                         settings = settings,
                         onUpdateTone = { AppStateManager.updateTone(it) },
                         onUpdateReplyCount = { AppStateManager.updateReplyCount(it) },
-                        onSetUnderstandingMode = { AppStateManager.setUnderstandingMode(it) },
-                        onSetUnderstandingSummaryLength = { AppStateManager.setUnderstandingSummaryLength(it) },
                         onSetAutoGenerateReplies = { AppStateManager.setAutoGenerateReplies(it) },
                         onSetDetectQuestionsOnly = { AppStateManager.setDetectQuestionsOnly(it) },
                         onSetSmartDetectionAiVerified = { AppStateManager.setSmartDetectionAiVerified(it) },

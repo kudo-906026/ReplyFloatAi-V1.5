@@ -6,6 +6,7 @@ import android.content.Context
 import android.widget.Toast
 import com.example.ai.AiFallbackEngine
 import com.example.ai.DetectionAnalysisResult
+import com.example.ai.LangTranslationEngine
 import com.example.ai.OcrRecognitionEngine
 import com.example.ai.QuestionDetectionEngine
 import com.example.model.AiModelTier
@@ -23,7 +24,6 @@ import com.example.model.ReplySettings
 import com.example.model.ReplyTone
 import com.example.model.ResponseLengthPreset
 import com.example.model.SavedOverlayPosition
-import com.example.model.UnderstandingSummaryLength
 import com.example.model.WhitelistedApp
 import com.example.model.defaultBuiltInProviders
 import kotlinx.coroutines.CoroutineScope
@@ -71,6 +71,9 @@ object AppStateManager {
 
     private val _diagnosticLogs = MutableStateFlow<List<DiagnosticLogEntry>>(emptyList())
     val diagnosticLogs: StateFlow<List<DiagnosticLogEntry>> = _diagnosticLogs.asStateFlow()
+
+    private val _langTranslationState = MutableStateFlow(LangTranslationState())
+    val langTranslationState: StateFlow<LangTranslationState> = _langTranslationState.asStateFlow()
 
     private val processedQuestionsCache = mutableMapOf<String, Long>()
     private val answeredQuestions = mutableSetOf<String>()
@@ -410,21 +413,6 @@ object AppStateManager {
         saveCurrentSettings()
     }
 
-    fun setLangModeEnabled(enabled: Boolean) {
-        _settings.value = _settings.value.copy(langModeEnabled = enabled)
-        saveCurrentSettings()
-    }
-
-    fun setUnderstandingMode(enabled: Boolean) {
-        _settings.value = _settings.value.copy(understandingMode = enabled)
-        saveCurrentSettings()
-    }
-
-    fun setUnderstandingSummaryLength(length: UnderstandingSummaryLength) {
-        _settings.value = _settings.value.copy(understandingSummaryLength = length)
-        saveCurrentSettings()
-    }
-
     fun setAutoGenerateReplies(enabled: Boolean) {
         _settings.value = _settings.value.copy(autoGenerate = enabled)
         saveCurrentSettings()
@@ -695,13 +683,65 @@ object AppStateManager {
         saveCurrentSettings()
     }
 
+    fun setLangModeEnabled(enabled: Boolean) {
+        _settings.value = _settings.value.copy(langModeEnabled = enabled)
+        saveCurrentSettings()
+        if (!enabled) {
+            _langTranslationState.value = _langTranslationState.value.copy(isVisible = false)
+        }
+    }
+
+    fun setLangBarPosition(x: Int, y: Int) {
+        _settings.value = _settings.value.copy(langBarX = x, langBarY = y)
+        saveCurrentSettings()
+    }
+
+    fun resetLangBarPosition() {
+        setLangBarPosition(100, 1050)
+    }
+
+    fun dismissLangBar() {
+        _langTranslationState.value = _langTranslationState.value.copy(isVisible = false)
+    }
+
+    fun triggerLangTranslation(cleanText: String) {
+        if (!_settings.value.langModeEnabled) return
+        val detectedDialect = if (cleanText.any { Character.UnicodeBlock.of(it) == Character.UnicodeBlock.DEVANAGARI }) "Hindi" else "Hinglish"
+        _langTranslationState.value = LangTranslationState(
+            originalText = cleanText,
+            englishMeaning = "Translating...",
+            detectedLanguage = detectedDialect,
+            isTranslating = true,
+            isVisible = true,
+            isFailed = false
+        )
+
+        scope.launch {
+            val provider = _activeProvider.value ?: _settings.value.preferredProvider
+            val apiKey = AiFallbackEngine.resolveEffectiveApiKey(provider, _settings.value)
+            val result = LangTranslationEngine.translateQuestion(cleanText, provider, apiKey)
+
+            _langTranslationState.value = LangTranslationState(
+                originalText = result.original,
+                englishMeaning = result.englishMeaning,
+                detectedLanguage = result.detectedLanguage,
+                isTranslating = false,
+                isVisible = true,
+                isFailed = !result.isSuccessful
+            )
+        }
+    }
+
+    fun testSampleHinglishTranslation() {
+        triggerLangTranslation("bhai kaisa laga mera plan?")
+    }
+
     fun setOverlayOpacity(opacity: Float) {
         val clamped = opacity.coerceIn(0.20f, 1.0f)
         _settings.value = _settings.value.copy(
             overlayOpacity = clamped,
             smallBarOpacity = clamped,
-            mainBarOpacity = clamped,
-            langBarOpacity = clamped
+            mainBarOpacity = clamped
         )
         saveCurrentSettings()
     }
@@ -906,15 +946,10 @@ object AppStateManager {
             _errorMessage.value = null
             _activeReplies.value = emptyList()
 
-            val preUnderstanding = if (_settings.value.understandingMode) {
-                AiFallbackEngine.generateUnderstanding(cleanText, _settings.value.understandingSummaryLength)
-            } else null
-
             val initialQuestion = DetectedQuestion(
                 text = cleanText,
                 sourceApp = sourceApp,
                 packageName = packageName,
-                englishMeaning = preUnderstanding,
                 generatedByProvider = _activeProvider.value ?: _settings.value.preferredProvider,
                 detectionMethod = detectionMethod,
                 ocrLatencyMs = ocrLatencyMs
@@ -922,6 +957,13 @@ object AppStateManager {
 
             _currentQuestion.value = initialQuestion
             _questionsHistory.value = listOf(initialQuestion) + _questionsHistory.value.take(49)
+
+            // Trigger standalone Lang Mode translation if enabled and message is non-English/Hinglish
+            if (_settings.value.langModeEnabled && QuestionDetectionEngine.isNonEnglishOrHinglish(cleanText)) {
+                triggerLangTranslation(cleanText)
+            } else {
+                _langTranslationState.value = _langTranslationState.value.copy(isVisible = false)
+            }
 
             try {
                 val fallbackResult = AiFallbackEngine.generateRepliesWithFallback(
@@ -972,7 +1014,6 @@ object AppStateManager {
                 }
 
                 val finalQuestion = initialQuestion.copy(
-                    englishMeaning = fallbackResult.understanding ?: preUnderstanding,
                     generatedByProvider = usedProvider,
                     fallbackNotice = fallbackResult.fallbackNotice
                 )
@@ -1147,3 +1188,13 @@ object AppStateManager {
         }
     }
 }
+
+data class LangTranslationState(
+    val originalText: String = "",
+    val englishMeaning: String = "",
+    val detectedLanguage: String = "Hinglish",
+    val isTranslating: Boolean = false,
+    val isVisible: Boolean = false,
+    val isFailed: Boolean = false
+)
+

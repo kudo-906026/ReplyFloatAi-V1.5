@@ -11,7 +11,6 @@ import com.example.model.ReplySettings
 import com.example.model.ReplyTone
 import com.example.model.ResponseLengthPreset
 import com.example.model.SavedOverlayPosition
-import com.example.model.UnderstandingSummaryLength
 import com.example.model.WhitelistedApp
 import com.example.model.defaultBrainKnowledgeEntries
 import com.example.model.defaultBuiltInProviders
@@ -134,9 +133,6 @@ object SettingsStorage {
         root.put("smartDetectionAiVerified", settings.smartDetectionAiVerified)
         root.put("prefetchOnAppFocus", settings.prefetchOnAppFocus)
         root.put("autoCopySingleReply", settings.autoCopySingleReply)
-        root.put("langModeEnabled", settings.langModeEnabled)
-        root.put("understandingMode", settings.understandingMode)
-        root.put("understandingSummaryLength", settings.understandingSummaryLength.name)
         root.put("expandableReplies", settings.expandableReplies)
         root.put("responseLengthPreset", settings.responseLengthPreset.name)
         root.put("customCharLimit", settings.customCharLimit)
@@ -157,6 +153,9 @@ object SettingsStorage {
         root.put("smallBarOpacity", settings.smallBarOpacity.toDouble())
         root.put("mainBarOpacity", settings.mainBarOpacity.toDouble())
         root.put("langBarOpacity", settings.langBarOpacity.toDouble())
+        root.put("langModeEnabled", settings.langModeEnabled)
+        root.put("langBarX", settings.langBarX)
+        root.put("langBarY", settings.langBarY)
         root.put("overlayCornerRadius", settings.overlayCornerRadius)
         root.put("overlayTextSizeSp", settings.overlayTextSizeSp)
         root.put("enableOcrFallback", settings.enableOcrFallback)
@@ -325,12 +324,6 @@ object SettingsStorage {
             ReplyTone.CASUAL
         }
 
-        val underLength = try {
-            UnderstandingSummaryLength.valueOf(root.optString("understandingSummaryLength", UnderstandingSummaryLength.BALANCED.name))
-        } catch (_: Exception) {
-            UnderstandingSummaryLength.BALANCED
-        }
-
         val respLengthPreset = try {
             ResponseLengthPreset.valueOf(root.optString("responseLengthPreset", ResponseLengthPreset.SHORT.name))
         } catch (_: Exception) {
@@ -408,9 +401,6 @@ object SettingsStorage {
             triggers = finalTriggers,
             prefetchOnAppFocus = root.optBoolean("prefetchOnAppFocus", true),
             autoCopySingleReply = root.optBoolean("autoCopySingleReply", false),
-            langModeEnabled = root.optBoolean("langModeEnabled", true),
-            understandingMode = root.optBoolean("understandingMode", true),
-            understandingSummaryLength = underLength,
             expandableReplies = root.optBoolean("expandableReplies", true),
             responseLengthPreset = respLengthPreset,
             customCharLimit = root.optInt("customCharLimit", 120),
@@ -430,7 +420,10 @@ object SettingsStorage {
             overlayOpacity = root.optDouble("overlayOpacity", 0.95).toFloat(),
             smallBarOpacity = root.optDouble("smallBarOpacity", root.optDouble("overlayOpacity", 0.95)).toFloat(),
             mainBarOpacity = root.optDouble("mainBarOpacity", root.optDouble("overlayOpacity", 0.95)).toFloat(),
-            langBarOpacity = root.optDouble("langBarOpacity", root.optDouble("overlayOpacity", 0.95)).toFloat(),
+            langBarOpacity = root.optDouble("langBarOpacity", 0.95).toFloat(),
+            langModeEnabled = root.optBoolean("langModeEnabled", true),
+            langBarX = root.optInt("langBarX", 100),
+            langBarY = root.optInt("langBarY", 1050),
             overlayCornerRadius = root.optInt("overlayCornerRadius", 18),
             overlayTextSizeSp = root.optInt("overlayTextSizeSp", 13),
             savedPositions = savedPositions,

@@ -60,7 +60,6 @@ import com.example.model.AutoPurgeTimerOption
 import com.example.model.ReplySettings
 import com.example.model.ReplyTone
 import com.example.model.ResponseLengthPreset
-import com.example.model.UnderstandingSummaryLength
 import com.example.state.AppStateManager
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -89,8 +88,6 @@ fun RepliesTab(
     settings: ReplySettings,
     onUpdateTone: (ReplyTone) -> Unit,
     onUpdateReplyCount: (Int) -> Unit,
-    onSetUnderstandingMode: (Boolean) -> Unit,
-    onSetUnderstandingSummaryLength: (UnderstandingSummaryLength) -> Unit,
     onSetAutoGenerateReplies: (Boolean) -> Unit,
     onSetDetectQuestionsOnly: (Boolean) -> Unit,
     onSetSmartDetectionAiVerified: (Boolean) -> Unit = { AppStateManager.setSmartDetectionAiVerified(it) },
@@ -245,84 +242,7 @@ fun RepliesTab(
             }
         }
 
-        // 2. Understanding Mode & Summary Synthesis Section
-        item {
-            ControlPanelCard(
-                modifier = Modifier.fillMaxWidth(),
-                shapeRadius = 14.dp
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(13.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    ControlPanelSectionHeader(
-                        title = "UNDERSTANDING MODE & SYNTHESIS",
-                        icon = Icons.Default.AutoAwesome,
-                        accentColor = CrimsonPrimary
-                    )
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text("Sender Intent & Understanding Mode", fontWeight = FontWeight.SemiBold, fontSize = 12.5.sp, color = TextWhite)
-                            Text("Displays contextual meaning preview alongside reply options", fontSize = 10.5.sp, color = TextSecondary)
-                        }
-                        ControlPanelSwitch(
-                            checked = settings.understandingMode,
-                            onCheckedChange = onSetUnderstandingMode,
-                            activeColor = AccentBlue
-                        )
-                    }
-
-                    if (settings.understandingMode) {
-                        Text(
-                            text = "Intent Summary Granularity:",
-                            fontSize = 11.5.sp,
-                            color = TextSecondary
-                        )
-
-                        Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                            UnderstandingSummaryLength.entries.forEach { summaryLength ->
-                                val isSelected = settings.understandingSummaryLength == summaryLength
-                                ControlPanelCard(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    isSelected = isSelected,
-                                    activeColor = CrimsonPrimary,
-                                    onClick = { onSetUnderstandingSummaryLength(summaryLength) },
-                                    shapeRadius = 6.dp
-                                ) {
-                                    Column(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(8.dp),
-                                        verticalArrangement = Arrangement.spacedBy(2.dp)
-                                    ) {
-                                        Text(
-                                            text = summaryLength.label,
-                                            fontSize = 12.sp,
-                                            fontWeight = FontWeight.SemiBold,
-                                            color = if (isSelected) CrimsonLight else TextWhite
-                                        )
-                                        Text(
-                                            text = summaryLength.description,
-                                            fontSize = 10.sp,
-                                            color = TextSecondary
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // 3. Automation, Heuristics & Filtering Section
+        // 2. Automation, Heuristics & Filtering Section
         item {
             ControlPanelCard(
                 modifier = Modifier.fillMaxWidth(),

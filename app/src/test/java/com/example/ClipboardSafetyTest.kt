@@ -27,7 +27,6 @@ class ClipboardSafetyTest {
         AppStateManager.updateReplyCount(1)
         AppStateManager.updateTone(ReplyTone.PROFESSIONAL)
         AppStateManager.setResponseLengthPreset(ResponseLengthPreset.SHORT)
-        AppStateManager.setUnderstandingMode(true)
 
         assertEquals(1, AppStateManager.settings.value.count)
         assertEquals(ReplyTone.PROFESSIONAL, AppStateManager.settings.value.tone)

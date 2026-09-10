@@ -10,7 +10,6 @@ import com.example.model.ReplyItem
 import com.example.model.ReplySettings
 import com.example.model.ReplyTone
 import com.example.model.ResponseLengthPreset
-import com.example.model.UnderstandingSummaryLength
 import com.example.model.defaultBuiltInProviders
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -26,15 +25,12 @@ import java.util.UUID
 
 data class FallbackGenerationResult(
     val replies: List<ReplyItem>,
-    val understanding: String?,
     val usedProvider: AiProvider,
     val fallbackNotice: String? = null
 )
 
 data class ProviderReplyResult(
-    val replies: List<ReplyItem>,
-    val original: String? = null,
-    val meaning: String? = null
+    val replies: List<ReplyItem>
 )
 
 object AiFallbackEngine {
@@ -90,11 +86,6 @@ object AiFallbackEngine {
                 2L
             )
         }
-
-        // Generate meaning / understanding if enabled
-        val understanding = if (settings.understandingMode) {
-            generateUnderstanding(question, settings.understandingSummaryLength)
-        } else null
 
         // 1. Build the map of all registered providers with their stored API keys and model overrides
         val allMap = (defaultBuiltInProviders() + settings.customProviders).associateBy { it.id }.toMutableMap()
@@ -161,9 +152,6 @@ object AiFallbackEngine {
                     else -> ProviderReplyResult(emptyList())
                 }
                 val replies = result.replies
-                val effectiveUnderstanding = if (settings.understandingMode) {
-                    result.meaning?.takeIf { it.isNotBlank() } ?: understanding
-                } else null
 
                 val latency = System.currentTimeMillis() - startTime
 
@@ -192,7 +180,6 @@ object AiFallbackEngine {
 
                     return@withContext FallbackGenerationResult(
                         replies = replies,
-                        understanding = effectiveUnderstanding,
                         usedProvider = provider,
                         fallbackNotice = notice
                     )
@@ -233,9 +220,6 @@ object AiFallbackEngine {
         // 4. If all preceding providers failed, use local built-in engine
         val localResult = generateSmartLocalReplies(question, settings, qId, builtIn, relevantBrainEntries)
         val localReplies = localResult.replies
-        val effectiveLocalUnderstanding = if (settings.understandingMode) {
-            localResult.meaning?.takeIf { it.isNotBlank() } ?: understanding
-        } else null
         val firstFail = failoverLogs.firstOrNull() ?: "Offline"
         val briefFail = when {
             firstFail.contains("401") || firstFail.contains("No API key") || firstFail.contains("Auth") -> "HTTP 401 Auth/No Key"
@@ -256,7 +240,6 @@ object AiFallbackEngine {
 
         FallbackGenerationResult(
             replies = localReplies,
-            understanding = effectiveLocalUnderstanding,
             usedProvider = builtIn,
             fallbackNotice = fallbackNotice
         )
@@ -268,9 +251,9 @@ object AiFallbackEngine {
         settings: ReplySettings,
         activeProvider: AiProvider,
         sourceApp: String? = null
-    ): Pair<List<ReplyItem>, String?> = withContext(Dispatchers.IO) {
+    ): List<ReplyItem> = withContext(Dispatchers.IO) {
         val result = generateRepliesWithFallback(question, settings, sourceApp)
-        Pair(result.replies, result.understanding)
+        result.replies
     }
 
     /**
@@ -718,80 +701,6 @@ object AiFallbackEngine {
         }
     }
 
-    fun generateUnderstanding(question: String, length: UnderstandingSummaryLength): String {
-        val clean = question.trim()
-        val lower = clean.lowercase()
-
-        // 0. Non-English and Hinglish specific translations to plain English
-        when {
-            (lower.contains("vote") || lower.contains("voting")) && (lower.contains("karo") || lower.contains("kya") || lower.contains("isko") || lower.contains("du")) -> {
-                return "Should I vote for this / them?"
-            }
-            lower.contains("kya chal raha") || lower.contains("kya chal rha") || lower.contains("kya haal") -> {
-                return "What's going on? / How are things?"
-            }
-            lower.contains("kaha ho") || lower.contains("kahan ho") || lower.contains("kidhar ho") -> {
-                return "Where are you right now?"
-            }
-            lower.contains("kab aaoge") || lower.contains("kab aarahe") || lower.contains("kab pahuchoge") -> {
-                return "When will you arrive / come?"
-            }
-            lower.contains("khana khaya") || lower.contains("khana kha liya") -> {
-                return "Did you have food / have you eaten?"
-            }
-            lower.contains("kaisa hai") || lower.contains("kaisi ho") || lower.contains("kaise ho") -> {
-                return "How are you doing?"
-            }
-            lower.contains("kya hua") || lower.contains("kya ho gaya") -> {
-                return "What happened? / Is everything alright?"
-            }
-            lower.contains("kitna time") || lower.contains("kitni der") -> {
-                return "How much time will it take?"
-            }
-            lower.contains("isko") && lower.contains("kya") -> {
-                return "What should be done with this?"
-            }
-            lower.contains("bhai") && lower.contains("kaisa") && lower.contains("plan") -> {
-                return "Bro, how did you like my plan?"
-            }
-        }
-
-        return when (length) {
-            UnderstandingSummaryLength.EXTREMELY_CONCISE -> {
-                when {
-                    lower.contains("telephone") || lower.contains("invent") -> "History & Inventions inquiry"
-                    lower.contains("i²") || lower.contains("i^2") || lower.contains("math") || lower.contains("calculate") || lower.contains("solve") -> "Math computation"
-                    lower.contains("dinner") && lower.contains("historical") -> "Hypothetical conversation question"
-                    lower.contains("time") || lower.contains("when") -> "Time inquiry"
-                    lower.contains("where") || lower.contains("place") -> "Location check"
-                    lower.contains("how much") || lower.contains("cost") || lower.contains("price") -> "Pricing inquiry"
-                    lower.contains("can you") || lower.contains("could you") -> "Action request"
-                    lower.contains("why") -> "Reasoning request"
-                    lower.contains("who") -> "Identity inquiry"
-                    lower.contains("free") || lower.contains("available") -> "Availability check"
-                    else -> "Inquiry / Question"
-                }
-            }
-            UnderstandingSummaryLength.BALANCED -> {
-                when {
-                    lower.contains("telephone") || lower.contains("invent") -> "Asking for historical inventor and creation origin"
-                    lower.contains("i²") || lower.contains("i^2") || lower.contains("math") || lower.contains("calculate") || lower.contains("solve") -> "Requesting mathematical calculation or formula solution"
-                    lower.contains("dinner") && lower.contains("historical") -> "Asking which historical figure you would choose to dine with and reasoning"
-                    lower.contains("time") || lower.contains("when") -> "Inquiring about scheduled time or timing of upcoming event"
-                    lower.contains("where") || lower.contains("place") -> "Asking for venue or physical/virtual meeting location"
-                    lower.contains("how much") || lower.contains("cost") || lower.contains("price") -> "Requesting price quotation or cost breakdown"
-                    lower.contains("can you") || lower.contains("could you") -> "Politely asking if you can perform an upcoming task or favor"
-                    lower.contains("why") -> "Seeking explanation or motive regarding recent decision"
-                    lower.contains("free") || lower.contains("available") -> "Checking calendar availability for coordination"
-                    else -> "Contextual question asking for confirmation, facts, or follow-up details"
-                }
-            }
-            UnderstandingSummaryLength.DETAILED -> {
-                "The sender is asking: \"$clean\". Intent is to obtain an accurate answer, schedule confirmation, or direct response to the specific inquiry."
-            }
-        }
-    }
-
     private fun generateSmartLocalReplies(
         question: String,
         settings: ReplySettings,
@@ -804,8 +713,6 @@ object AiFallbackEngine {
         val count = settings.count.coerceIn(1, 3)
         val clean = question.trim()
         val lower = clean.lowercase()
-
-        val meaning = if (settings.understandingMode) generateUnderstanding(question, settings.understandingSummaryLength) else null
 
         // 0. Brain Knowledge Base matching (Highest priority verified user facts)
         val matchedBrain = if (relevantBrainEntries.isNotEmpty()) {
@@ -831,9 +738,7 @@ object AiFallbackEngine {
                             tone = tone,
                             generatedByProvider = provider
                         )
-                    },
-                    original = question,
-                    meaning = meaning ?: "Answered from Brain Knowledge Base: ${topEntry.title} (${topEntry.category})"
+                    }
                 )
             }
         }
@@ -849,9 +754,7 @@ object AiFallbackEngine {
                         tone = tone,
                         generatedByProvider = provider
                     )
-                },
-                original = question,
-                meaning = meaning
+                }
             )
         }
 
@@ -866,9 +769,7 @@ object AiFallbackEngine {
                         tone = tone,
                         generatedByProvider = provider
                     )
-                },
-                original = question,
-                meaning = meaning
+                }
             )
         }
 
@@ -883,9 +784,7 @@ object AiFallbackEngine {
                         tone = tone,
                         generatedByProvider = provider
                     )
-                },
-                original = question,
-                meaning = meaning
+                }
             )
         }
 
@@ -900,9 +799,7 @@ object AiFallbackEngine {
                         tone = tone,
                         generatedByProvider = provider
                     )
-                },
-                original = question,
-                meaning = meaning
+                }
             )
         }
 
@@ -1371,9 +1268,7 @@ object AiFallbackEngine {
                     tone = tone,
                     generatedByProvider = provider
                 )
-            },
-            original = question,
-            meaning = meaning
+            }
         )
     }
 
@@ -2108,19 +2003,8 @@ object AiFallbackEngine {
 
         val lengthPreset = settings.responseLengthPreset
         val charCeiling = minOf(settings.customCharLimit, lengthPreset.charCeiling)
-        val isLangMode = settings.understandingMode
 
-        val systemPrompt = if (isLangMode) {
-            "You are an intelligent multilingual assistant.\n" +
-            "The user received this question / incoming message: \"$question\".\n" +
-            "$DIRECT_ANSWER_INSTRUCTION\n" +
-            "If the question is in a non-English language or dialect (including Hinglish, Hindi, Spanish, or any other language), you must output a structured JSON object with three fields:\n" +
-            "1. \"original\": The exact question as detected, in its original language and script.\n" +
-            "2. \"meaning\": A plain, clear English translation and meaning of the question.\n" +
-            "3. \"replies\": An array of exactly ${settings.count} generated reply strings, in the SAME language/dialect as the original question, directly and specifically answering the question content, following tone '${settings.tone.systemPromptHint}' and length preset '${lengthPreset.title}' (${lengthPreset.promptInstruction}, max $charCeiling chars each).\n" +
-            "If the question is already plain English, provide \"original\", \"meaning\" (plain English translation/summary), and \"replies\".\n" +
-            "Output ONLY valid JSON in format: {\"original\": \"...\", \"meaning\": \"...\", \"replies\": [\"...\"]}. No markdown code fences, no extra text."
-        } else {
+        val systemPrompt = (
             "You are an intelligent quick reply assistant.\n" +
             "The user received this question / incoming message: \"$question\".\n" +
             "$DIRECT_ANSWER_INSTRUCTION\n" +
@@ -2131,7 +2015,7 @@ object AiFallbackEngine {
             "${lengthPreset.promptInstruction}\n" +
             "Maximum character ceiling: $charCeiling characters.\n" +
             "Output ONLY a valid JSON array of ${settings.count} strings, e.g. [\"reply 1\", \"reply 2\"]. No markdown code fences, no extra text."
-        } + brainKnowledgePrompt
+        ) + brainKnowledgePrompt
 
         val jsonBody = JSONObject().apply {
             put("contents", JSONArray().apply {
@@ -2293,18 +2177,8 @@ object AiFallbackEngine {
 
         val lengthPreset = settings.responseLengthPreset
         val charCeiling = minOf(settings.customCharLimit, lengthPreset.charCeiling)
-        val isLangMode = settings.understandingMode
 
-        val systemRolePrompt = if (isLangMode) {
-            "You are an intelligent multilingual assistant.\n" +
-            "$DIRECT_ANSWER_INSTRUCTION\n" +
-            "When the incoming question is in a non-English language or dialect (including Hinglish, Hindi, Spanish, etc.), you must output a structured JSON object with three fields:\n" +
-            "1. \"original\": The exact question as detected, in its original language and script.\n" +
-            "2. \"meaning\": A plain English translation of the question.\n" +
-            "3. \"replies\": An array of ${settings.count} replies in the SAME language/dialect as the original question, matching tone '${settings.tone.systemPromptHint}' and length preset '${lengthPreset.title}' (${lengthPreset.promptInstruction}, max $charCeiling chars each).\n" +
-            "If the question is plain English, provide \"original\", \"meaning\" (plain summary/translation), and \"replies\".\n" +
-            "Output ONLY valid JSON: {\"original\": \"...\", \"meaning\": \"...\", \"replies\": [\"...\"]}."
-        } else {
+        val systemRolePrompt = (
             "You are an accurate quick reply assistant.\n" +
             "$DIRECT_ANSWER_INSTRUCTION\n" +
             "You generate direct, specific answers and contextual replies that directly resolve the incoming question or message without generic filler.\n" +
@@ -2313,16 +2187,9 @@ object AiFallbackEngine {
             "Length Requirement: ${lengthPreset.title} (${lengthPreset.subtitle}). ${lengthPreset.promptInstruction}\n" +
             "Maximum character limit: $charCeiling chars per reply.\n" +
             "Format output strictly as a JSON array of strings: [\"reply 1\", \"reply 2\"]."
-        } + brainKnowledgePrompt
+        ) + brainKnowledgePrompt
 
-        val userPrompt = if (isLangMode) {
-            "Incoming question: \"$question\"\n" +
-            "CRITICAL: Answer specifically with zero conversational filler or evasion.\n" +
-            "Tone: ${settings.tone.systemPromptHint}\n" +
-            "Length preset: ${lengthPreset.title} (${lengthPreset.promptInstruction})\n" +
-            "Max length: $charCeiling characters per reply\n" +
-            "Output ONLY a structured JSON object: {\"original\": \"...\", \"meaning\": \"...\", \"replies\": [\"...\"]}"
-        } else {
+        val userPrompt = (
             "Incoming message/question: \"$question\"\n" +
             "CRITICAL: Directly and specifically answer the question or pick the choices asked. Do NOT respond with generic filler like 'That's a great question'.\n" +
             "Requested tone: ${settings.tone.systemPromptHint}\n" +
@@ -2331,7 +2198,7 @@ object AiFallbackEngine {
             "Max length: $charCeiling characters per reply\n" +
             "Generate ${settings.count} distinct quick reply options that directly answer this inquiry.\n" +
             "Respond ONLY with a JSON array of strings: [\"reply 1\", \"reply 2\"]"
-        }
+        )
 
         val defaultModel = if (provider.type == AiProviderType.GROQ) "openai/gpt-oss-120b" else "gpt-4o-mini"
         val body = JSONObject().apply {
@@ -2419,17 +2286,8 @@ object AiFallbackEngine {
 
         val lengthPreset = settings.responseLengthPreset
         val charCeiling = minOf(settings.customCharLimit, lengthPreset.charCeiling)
-        val isLangMode = settings.understandingMode
 
-        val prompt = if (isLangMode) {
-            "Question: \"$question\".\n" +
-            "$DIRECT_ANSWER_INSTRUCTION\n" +
-            "Output a structured JSON object with three fields:\n" +
-            "1. \"original\": the exact question in original language/script.\n" +
-            "2. \"meaning\": a plain English translation.\n" +
-            "3. \"replies\": a JSON array of ${settings.count} replies in the SAME language/dialect (e.g. Hinglish) directly and specifically answering the question content, matching tone '${settings.tone.systemPromptHint}' and length '${lengthPreset.title}' (max $charCeiling chars).\n" +
-            "Return ONLY JSON: {\"original\": \"...\", \"meaning\": \"...\", \"replies\": [\"...\"]}."
-        } else {
+        val prompt = (
             "Question: \"$question\".\n" +
             "$DIRECT_ANSWER_INSTRUCTION\n" +
             "Generate ${settings.count} quick replies directly and specifically answering this inquiry.\n" +
@@ -2439,7 +2297,7 @@ object AiFallbackEngine {
             "${lengthPreset.promptInstruction}\n" +
             "Max chars: $charCeiling.\n" +
             "Return ONLY a JSON array of strings: [\"reply1\", \"reply2\"]."
-        } + brainKnowledgePrompt
+        ) + brainKnowledgePrompt
 
         val body = JSONObject().apply {
             put("model", provider.modelName.ifBlank { "claude-3-5-haiku-20241022" })
@@ -2477,67 +2335,7 @@ object AiFallbackEngine {
         tone: ReplyTone,
         provider: AiProvider
     ): ProviderReplyResult {
-        if (rawText.isBlank() || rawText == "null") return ProviderReplyResult(emptyList())
-
-        var clean = rawText
-        if (clean.contains("</think>")) {
-            val afterThink = clean.substringAfter("</think>").trim()
-            clean = if (afterThink.isNotBlank()) afterThink else clean.replace(Regex("<think>[\\s\\S]*?</think>"), "").trim()
-        }
-        clean = clean.replace("```json", "").replace("```JSON", "").replace("```", "").trim()
-
-        // 1. Try parsing JSON Object with original, meaning, replies
-        try {
-            val startIndex = clean.indexOf('{')
-            val endIndex = clean.lastIndexOf('}')
-            if (startIndex != -1 && endIndex != -1 && endIndex > startIndex) {
-                val jsonObj = JSONObject(clean.substring(startIndex, endIndex + 1))
-                val original = jsonObj.optString("original").takeIf { it.isNotBlank() && it != "null" }
-                val meaning = jsonObj.optString("meaning").takeIf { it.isNotBlank() && it != "null" }
-
-                val repliesList = mutableListOf<ReplyItem>()
-                val arrayKey = listOf("replies", "reply", "options", "choices", "suggestions", "answers", "items")
-                    .firstOrNull { jsonObj.has(it) && jsonObj.optJSONArray(it) != null }
-
-                if (arrayKey != null) {
-                    val jsonArr = jsonObj.getJSONArray(arrayKey)
-                    for (i in 0 until jsonArr.length()) {
-                        val str = jsonArr.optString(i, "").trim()
-                        if (str.isNotBlank() && str != "null") {
-                            repliesList.add(
-                                ReplyItem(
-                                    questionId = questionId,
-                                    text = str,
-                                    tone = tone,
-                                    generatedByProvider = provider
-                                )
-                            )
-                        }
-                    }
-                } else if (jsonObj.has("reply") && jsonObj.optString("reply").isNotBlank()) {
-                    val singleReply = jsonObj.optString("reply").trim()
-                    repliesList.add(
-                        ReplyItem(
-                            questionId = questionId,
-                            text = singleReply,
-                            tone = tone,
-                            generatedByProvider = provider
-                        )
-                    )
-                }
-
-                if (repliesList.isNotEmpty()) {
-                    return ProviderReplyResult(
-                        replies = repliesList,
-                        original = original,
-                        meaning = meaning
-                    )
-                }
-            }
-        } catch (_: Exception) {}
-
-        // 2. Fallback to parsing JSON array or raw list of replies
-        val replies = parseJsonArrayReplies(clean, questionId, tone, provider)
+        val replies = parseJsonArrayReplies(rawText, questionId, tone, provider)
         return ProviderReplyResult(replies = replies)
     }
 

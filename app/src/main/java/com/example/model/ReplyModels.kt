@@ -79,7 +79,7 @@ enum class ReplyTone(
     TRASH_TALK(
         label = "Trash Talk",
         description = "Savage, witty, competitive banter — playful roasting, not genuinely abusive.",
-        systemPromptHint = "Savage, sharp, cutting, confident comebacks and playful put-downs about someone's argument, logic, or taste — like friendly trash talk between friends. Keep it playful-aggressive, not genuinely offensive. HARD SAFETY RULE: Never include sexual content, slurs, threats, or degrading language about someone's family members. When Lang mode is ON or the detected message is in Hinglish or another language, reply in that same language/script with natural casual slang appropriate to it, not a literal translation.",
+        systemPromptHint = "Savage, sharp, cutting, confident comebacks and playful put-downs about someone's argument, logic, or taste — like friendly trash talk between friends. Keep it playful-aggressive, not genuinely offensive. HARD SAFETY RULE: Never include sexual content, slurs, threats, or degrading language about someone's family members. When the detected message is in Hinglish or another language, reply in that same language/script with natural casual slang appropriate to it, not a literal translation.",
         exampleReply = "Bold claim for someone whose logic is currently held together by hope and duct tape! 😂"
     )
 }
@@ -134,16 +134,6 @@ enum class ResponseLengthPreset(
         maxTokens = 500,
         promptInstruction = "CRITICAL LENGTH CONSTRAINT: Provide detailed, comprehensive replies of 2 to 4 thorough sentences providing full background context, reasoning, and clear explanation (around 35 to 65 words / ~250 characters). Example: 'Alexander Graham Bell was awarded the first U.S. patent for the telephone on March 7, 1876 (Patent No. 174,465). His breakthrough enabled real-time acoustic speech transmission over electrical telegraph wires, transforming modern telecommunications.'"
     )
-}
-
-enum class UnderstandingSummaryLength(
-    val label: String,
-    val description: String,
-    val exampleText: String
-) {
-    EXTREMELY_CONCISE("Micro (1-3 Words)", "Ultra-compact intent tag", "Reschedule sync"),
-    BALANCED("Balanced (1 Sentence)", "Clean synthesis of underlying intent", "Inquiring about meeting availability at 4 PM"),
-    DETAILED("Detailed Analysis", "Full breakdown of intent, context, and nuance", "Asking for clarification on project timeline due to upcoming deadline")
 }
 
 enum class AutoPurgeTimerOption(val minutes: Int, val label: String, val description: String) {
@@ -225,9 +215,6 @@ data class ReplySettings(
     val triggers: List<TriggerItem> = defaultTriggers(),
     val prefetchOnAppFocus: Boolean = true,
     val autoCopySingleReply: Boolean = false,
-    val langModeEnabled: Boolean = true,
-    val understandingMode: Boolean = true,
-    val understandingSummaryLength: UnderstandingSummaryLength = UnderstandingSummaryLength.BALANCED,
     val expandableReplies: Boolean = true,
     val responseLengthPreset: ResponseLengthPreset = ResponseLengthPreset.SHORT,
     val customCharLimit: Int = 120,
@@ -248,6 +235,9 @@ data class ReplySettings(
     val smallBarOpacity: Float = 0.95f,
     val mainBarOpacity: Float = 0.95f,
     val langBarOpacity: Float = 0.95f,
+    val langModeEnabled: Boolean = true,
+    val langBarX: Int = 100,
+    val langBarY: Int = 1050,
     val overlayCornerRadius: Int = 18,
     val overlayTextSizeSp: Int = 13,
     val savedPositions: List<SavedOverlayPosition> = emptyList(),
@@ -387,8 +377,6 @@ data class DetectedQuestion(
     val sourceApp: String? = null,
     val packageName: String? = null,
     val timestamp: Long = System.currentTimeMillis(),
-    val englishMeaning: String? = null,
-    val detectedLanguage: String? = null,
     val generatedByProvider: AiProvider? = null,
     val fallbackNotice: String? = null,
     val detectionMethod: DetectionMethod = DetectionMethod.ACCESSIBILITY,

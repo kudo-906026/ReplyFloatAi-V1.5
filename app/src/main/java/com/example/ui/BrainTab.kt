@@ -147,7 +147,7 @@ fun BrainTab(
                 isOcrRunning = true
                 try {
                     val ocrResult = OcrRecognitionEngine.recognizeTextFromUri(context, uri)
-                    val extracted = ocrResult.text.trim()
+                    val extracted = ocrResult.rawText.trim()
                     isOcrRunning = false
                     if (extracted.isNotBlank()) {
                         // Infer reasonable title and category from OCR text
@@ -734,7 +734,7 @@ fun BrainTab(
                                 title = finalTitle,
                                 content = cleanContent,
                                 category = cleanCat,
-                                updatedAt = System.currentTimeMillis()
+                                timestamp = System.currentTimeMillis()
                             )
                             onUpdateEntry(updated)
                             Toast.makeText(context, "Knowledge updated", Toast.LENGTH_SHORT).show()
@@ -746,8 +746,7 @@ fun BrainTab(
                                 category = cleanCat,
                                 source = dialogSource,
                                 isEnabled = true,
-                                createdAt = System.currentTimeMillis(),
-                                updatedAt = System.currentTimeMillis()
+                                timestamp = System.currentTimeMillis()
                             )
                             onAddEntry(newEntry)
                             Toast.makeText(context, "Knowledge saved to Brain", Toast.LENGTH_SHORT).show()
@@ -960,7 +959,7 @@ private fun BrainEntryCard(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
-                    text = "Saved ${dateFormatter.format(Date(entry.updatedAt))}",
+                    text = "Saved ${dateFormatter.format(Date(entry.timestamp))}",
                     fontSize = 10.sp,
                     color = TextMuted
                 )

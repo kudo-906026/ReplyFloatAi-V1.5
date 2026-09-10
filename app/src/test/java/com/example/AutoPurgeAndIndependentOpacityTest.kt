@@ -25,8 +25,7 @@ class AutoPurgeAndIndependentOpacityTest {
     fun testIndependentOpacityControlsPersistence() {
         val settings = ReplySettings(
             smallBarOpacity = 0.45f,
-            mainBarOpacity = 0.85f,
-            langBarOpacity = 0.65f
+            mainBarOpacity = 0.85f
         )
 
         val serialized = SettingsStorage.serializeSettings(settings)
@@ -34,7 +33,6 @@ class AutoPurgeAndIndependentOpacityTest {
 
         assertEquals(0.45f, deserialized.smallBarOpacity, 0.01f)
         assertEquals(0.85f, deserialized.mainBarOpacity, 0.01f)
-        assertEquals(0.65f, deserialized.langBarOpacity, 0.01f)
     }
 
     @Test
@@ -44,9 +42,6 @@ class AutoPurgeAndIndependentOpacityTest {
 
         AppStateManager.setMainBarOpacity(0.80f)
         assertEquals(0.80f, AppStateManager.settings.value.mainBarOpacity, 0.01f)
-
-        AppStateManager.setLangBarOpacity(0.70f)
-        assertEquals(0.70f, AppStateManager.settings.value.langBarOpacity, 0.01f)
     }
 
     @Test
