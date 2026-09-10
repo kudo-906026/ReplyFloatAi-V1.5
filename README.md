@@ -8,7 +8,7 @@
 
 - **⚡ Dual-Engine Question Detection**:
   - **Fast Primary Path (Accessibility Node Scan)**: Scans view hierarchy text nodes in ~3–5ms for standard apps (WhatsApp, Telegram, Discord, Slack, SMS, Browsers).
-  - **On-Device OCR Fallback (ML Kit)**: Automatically triggers continuous screen analysis on a background thread (~35–80ms) when apps draw directly to custom canvases, OpenGL, or Unity surfaces with zero accessibility nodes (e.g., *Super Sus* chat, games).
+  - **On-Device OCR Fallback (ML Kit)**: Automatically triggers continuous screen analysis on a background thread (~35–80ms) when apps draw directly to custom canvases, OpenGL, or Unity surfaces with zero accessibility nodes. 
 - **🛡️ Capture Telemetry & Driver Compatibility**:
   - Automatically captures hardware buffers via Android 11+ Accessibility Screenshot API with automatic ARGB_8888 software conversion and Canvas fallbacks.
   - Transparently logs raw capture results, frame buffer dimensions, error codes, and extracted text blocks in real-time Diagnostics without false assumptions.
